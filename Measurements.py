@@ -14,15 +14,22 @@ from Basics import *
 from ForwardModel import fnu
 
 
+
+class Hadzhiyska2025:
+    zbins = ['pzbin1', 'pzbin2', 'pzbin3', 'pzbin4']
+    samples = ['main', 'extended']
+    
+
+
 class Liu2025:  # ACT DR6 maps stacked on DESI LRGs for cross-correlation (arxiv.org/abs/2502.08850)
     # Define options & freq for measurements, directory location for data, files for beam/response, and dust model
     bins = ['pz1', 'pz2', 'pz3', 'pz4']
     dBetas = ['fiducial', 'dBeta_1.2_10.7', 'dBeta_1.4_10.7', 'dBeta_1.6_10.7']
     freq = 150
-    dirname = "/global/homes/c/cpopik/Git/Capybara/Data/StackedProfiles_outputs_for_Nick"
+    dirname = "/global/homes/c/cpopik/Data/StackedProfiles_outputs_for_Nick"
     beamfile = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220/ilc_beam.txt"
     respfile = None  # TODO 3
-    dustfile = "/global/homes/c/cpopik/Git/Capybara/Data/fig6_TNG_H_dust.txt"  # TODO 4
+    dustfile = "/global/homes/c/cpopik/Capybara/Data/fig6_TNG_H_dust.txt"  # TODO 4
 
     def __init__(self, bin, dBeta):
         # Find data and covariance files for bin and CIB method
@@ -39,16 +46,16 @@ class Liu2025:  # ACT DR6 maps stacked on DESI LRGs for cross-correlation (arxiv
         
     def tSZdata_in_muK(self, T_CMB):  # Convert data/cov to muK*arcmin^2 to match model, needs a T_CMB value
         self.tSZdata = self.tSZdata*fnu(self.freq, T_CMB)*T_CMB*1e6
-        self.tSZerr = self.tSZerr*fnu(self.freq, T_CMB)*T_CMB*1e6
+        self.tSZerr = -self.tSZerr*fnu(self.freq, T_CMB)*T_CMB*1e6
         self.tSZcov = self.tSZcov*(fnu(self.freq, T_CMB)*T_CMB*1e6)**2
 
 
 class Schaan2021:  # ACT DR5 maps stacked on CMASS DR10/DR12 (arxiv.org/abs/2009.05557)
     # Define freq and files for data/cov/beam/response, and dust model
-    datafile = "/global/homes/c/cpopik/Git/Capybara/Data/emu4d_match_ACT_profiles.txt"  # TODO 1
-    tSZcovfile = "/global/homes/c/cpopik/Git/Capybara/Data/cov_diskring_tsz_varweight_bootstrap.txt"  # TODO 1
-    kSZcovfile = "/global/homes/c/cpopik/Git/Capybara/Data/cov_diskring_ksz_varweight_bootstrap.txt"  # TODO 1
-    dustfile = "/global/homes/c/cpopik/Git/Capybara/Data/fig6_TNG_H_dust.txt"  # TODO 1
+    datafile = "/global/homes/c/cpopik/Capybara/Data/emu4d_match_ACT_profiles.txt"  # TODO 1
+    tSZcovfile = "/global/homes/c/cpopik/Capybara/Data/cov_diskring_tsz_varweight_bootstrap.txt"  # TODO 1
+    kSZcovfile = "/global/homes/c/cpopik/Capybara/Data/cov_diskring_ksz_varweight_bootstrap.txt"  # TODO 1
+    dustfile = "/global/homes/c/cpopik/Capybara/Data/fig6_TNG_H_dust.txt"  # TODO 1
     freq = 150
 
     def __init__(self):

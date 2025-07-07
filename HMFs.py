@@ -39,8 +39,29 @@ class hmf_package(BASEHMF):  # https://hmf.readthaedocs.io/en/latest/index.html
         return HMF_m_z
 
 
+class hmvec(BASEHMF):
+    hmfs = ['tinker', 'sheth-torman']
+    mdefs = ['vir', 'mean']
+    def __init(self, model):
+        sys.path.append("/global/homes/c/cpopik/")
+        import hmvec.hmvec.hmvec as hm
+        self.hm = hm
+        
+    def HMF(self, ms, zs):
+        self.hmvecmodel = self.hm.HaloModel(ms = ms, zs = zs,
+            ks=np.linspace(1e-5, 2000, 21),
+            mass_function="sheth-torman",  # sheth-torman or tinker
+            mdef='vir',  # vir or mean
+            nfw_numeric=False,
+            skip_nfw=False,
+            accurate_sigma2=False
+            )
+        return self.hmvecmodel.nzm
+        
+
 Classes = {
     "hmf_package": hmf_package,
+    "hmvec": hmvec
 }
 
 def get_Class(class_name):

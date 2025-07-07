@@ -5,7 +5,6 @@ Functions should also take an input dictionary to specify custom values for para
 To more easily compare parameter values between models, they should be built off the Base Model functions.
 
 # TODO: Check to see if I should be adding sattelite profiles for the rest of the HODs
-# TODO: Check to make sure the halo masses are in m200c
 """
 
 from Basics import *
@@ -19,10 +18,12 @@ class BaseHOD:  # Contains base functional forms and general utilities
         else:
             raise NameError(f"Sample {sample} doesn't exist, choose from available samples: {self.samples}")
 
-    def N_cent(self, M, logM_min, sigma_logM):  # Expected number of centrals per halo (Zheng2005)
+    def N_cent(self, M, logM_min, sigma_logM):  # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564)
+        # Mvir
         return 0.5*(1+scipy.special.erf((np.log10(M)-logM_min)/sigma_logM))
 
-    def N_sat(self, M, logM_0, logM_1, alpha):  # Expected number of satellites per halo (Zheng2005)
+    def N_sat(self, M, logM_0, logM_1, alpha):  # Expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564)
+        # Mvir
         return ((M-10**logM_0)/10**logM_1)**alpha
 
     def f_inc(self, M, alpha_inc, logM_inc):  # CMASS incompleteness function (More2015)
@@ -33,6 +34,7 @@ class BaseHOD:  # Contains base functional forms and general utilities
 
 
 class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
+    mdef = "M200m"
     samples = ["M*>10.8", "M*>11.1", "M*>11.25", "M*>11.4"]
     params = {
         "logM_min": [13.47, 13.58, 13.84, 14.20],  
@@ -55,7 +57,7 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
         p = self.p0 | p
         return self.N_cent(M, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc(M, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
 
-    def Ns(self, M):
+    def Ns(self, M, p={}):
         p = self.p0 | p
         return self.N_sat(M, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(M-10**p['logM_min'],1) * self.Nc(M, p)
 
@@ -65,6 +67,7 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
 
 
 class Yuan2023(BaseHOD):  # DESI 1% LRGs/QSOs (arxiv.org/abs/2306.06314)
+    mdef = "M200c"  # M not clear, maybe same as zheng 2005/2007? or cmass?
     samples = ["LRG 0.4<z<0.6", "LRG 0.6<z<0.8", "QSO 0.8<z<2.1"]
     params = {
         "logM_cut": [12.89, 12.78, 12.67],
@@ -93,13 +96,14 @@ class Yuan2023(BaseHOD):  # DESI 1% LRGs/QSOs (arxiv.org/abs/2306.06314)
 
 
 class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.org/abs/2204.02418)
+    mdef = "M200m"
     samples = ["MS red", "MS blue", "KV450 X GAMA red", "KV450 X GAMA blue"]
     params = {
         "alpha^a": [0.47, 0.10, 0.34, 0.13],
         "sigma^a": [0.55, 0.47, 0.52, 0.47],
-        "M_th^a": [23.0, 1.19, 15, 1.4],
+        "M_th^a": [23.0, 1.19, 15, 1.4],  # 1e11 Msol
         "beta^a": [0.84, 0.73, 0.88, 0.55],
-        "M^a": [5.8, 32, 3.6, 20],
+        "M^a": [5.8, 32, 3.6, 20],  # 1e13 Msol
         "f": [1.49, 0.88, 1.27, 0.83],
         "A": [5.31, 5.31, 1.62, 1.62],
         "epsilon": [0.69, 0.69, 0.99, 0.99],
@@ -110,14 +114,15 @@ class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.o
         
     def Nc(self, M, p={}):
         p = self.p0 | p
-        return self.N_cent(M, logM_min=p['M_th^a'], sigma_logM=p['sigma^a']) * p['alpha^a']
+        return self.N_cent(M, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a']) * p['alpha^a']
     
     def Ns(self, M, p={}):
         p = self.p0 | p
-        return self.N_sat(M, logM_0=0, logM_1 = p['M^a'], alpha=p['beta^a']) * self.N_cent(M, logM_min=p['M_th^a'], sigma_logM=p['sigma^a'])
+        return self.N_sat(M, logM_0=0, logM_1 = np.log10(p['M^a']*1e13), alpha=p['beta^a']) * self.N_cent(M, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a'])
         
 
 class Kusiak2022(BaseHOD):  # unWISE (arxiv.org/abs/2203.12583)
+    mdef = "M200c"
     samples = ["Blue", "Green", "Red"]
     params = {
         "sigma_logM": [0.73, 0.61, 0.75],
@@ -137,10 +142,11 @@ class Kusiak2022(BaseHOD):  # unWISE (arxiv.org/abs/2203.12583)
     
     def Ns(self, M, p={}):
         p = self.p0 | p
-        return self.N_sat(M, logM_0=0, logM_1 = p['M_1'], alpha=p['alpha_s']) * self.Nc(M, p)
-    
-    
+        return self.N_sat(M, logM_0=0, logM_1 = p['logM_1'], alpha=p['alpha_s']) * self.Nc(M, p)
+
+
 class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
+    mdef = "M200m"  # M200b, 200 times overdense wrt background matter density
     samples = ["[11.10, 12.00]", "[11.30, 12.0]", "[11.40, 12.0]"]
     params = {
         "logM_min": [13.13, 13.45, 13.68],
@@ -167,7 +173,7 @@ class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
 
     def Nc(self, M, p={}):
         p = self.p0 | p
-        return self.N_cent(M, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc(M, alpha_inc=p['alpha_inc'], logMinc=p['logM_inc'])
+        return self.N_cent(M, logM_min=p['logM_min'], sigma_logM=p['sigma^2']**0.5) * self.f_inc(M, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
     
     def Ns(self, M, p={}):
         p = self.p0 | p

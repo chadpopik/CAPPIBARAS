@@ -1,0 +1,107 @@
+sampler:
+    mcmc:
+        Rminus1_stop: 0.01
+        max_tries: 200d
+        output_every: 10s
+    #minimize:
+    #  ignore_prior: True
+
+output: cobayatest/chains_TEST/cobaya_TEST_0.001
+debug: False
+
+
+thingtest:
+    name: 'test'
+    spefs: ['test1', 'test2']
+
+
+likelihood:
+    cobayatest_py.TSZLikelihoodTEST:
+    # cobayatest_py.KSZLikelihoodTEST:
+        DataUse:
+            name: 'Schaan2021'
+            spefs: []
+
+        onehalo:
+            name: 'Amodeo2021'
+            spefs: ['GNFW']
+        twohalo:
+            name: 'Amodeo2021'
+            spefs: ['GNFW']
+        galaxy_distribution:
+            name: 'DR10CMASS'
+            spefs: ['portsmouth', 'passive', 'krou']
+        HOD:
+            name: 'Kou2023'
+            spefs: ['M*>10.8']
+        SHMR: 
+            name: 'Kravstov2014'
+            spefs: ['M200c']
+        mass_function:
+            name: 'hmf_package'
+            spefs: ['Tinker08']
+        FFTtype:
+            name: 'mcfit_package'
+            spefs: []
+
+params:
+    # Fixed Cosmological
+    hh:
+        value: 0.7
+    Omega_L:
+        value: 0.75
+    Omega_m:
+        value: 0.25
+    Omega_b:
+        value: 0.044
+    XH:
+        value: 0.76 #hydrogen fraction
+    T_CMB:
+        value: 2.725
+    v_rms:
+        value: 1.06e-3 #v_rms/c
+
+    # GNFW Density Profile
+    logrho0:  # Amplitude
+        latex: \rho_0^{P_0}
+        ref: 2.6
+        prior: {'min': 1, 'max': 5}
+    xc_t:  # Core Radius
+        latex: x_{c, k}^{A_0}
+        ref: 0.6
+        prior: {'min': 0.1, 'max': 1}
+    beta_k:  # Outer slope
+        latex: \beta_k^{A_0}
+        ref: 2.6
+        prior: {'min': 1, 'max': 5}
+    A2h_k:  # Two-halo Amplitude
+        latex: A_{2h, k}
+        ref: 1.1
+        prior: {'min': 0, 'max': 5}
+
+    # # GNFW Pressure Profile
+    # P0:  # Amplitude
+    #     latex: A_0^{P_0}
+    #     ref: 2
+    #     prior: {'min': 0.1, 'max': 30}
+    # alpha_t:  # Intermediate slope
+    #     latex: \alpha_{GNFW}
+    #     ref: 0.8
+    #     prior: {'min': 0.1, 'max': 2}
+    # beta_t:  # Outer slope
+    #     latex: \beta_t^{A_0}
+    #     ref: 2.6
+    #     prior: {1, 10}
+    # A2h_t:  # Two-halo Amplitude
+    #     latex: A_{2h, t}
+    #     ref: 0.7
+    #     prior: {'min': 0, 'max': 5}
+
+
+    # HOD
+    # logM_min:  # Mass at which half of halos have a central
+    #     latex: \log{M_{min}}
+    #     # value: 
+    # sigma_M:  # Steepness of transition from 0 to 1 centrals
+    #     latex: \sigma_M
+    #     # value: 

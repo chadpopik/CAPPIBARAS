@@ -34,7 +34,7 @@ class Gao2023:  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
         # Sort/group/sum up the finer redshift bins to match the bins of the SMF distribution
         self.zdistdf['zbin'] = pd.cut(self.zdistdf['zmin'], bins=[0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1])
         # Scale the SMF to match the redshift distribution of the bin in question
-        self.SMF = self.SMF_unweighted*self.zdistdf.groupby('zbin')[f"{bin}_{hemisphere}"].sum().values/np.trapz(self.SMF_unweighted, self.mstars, axis=0)
+        self.SMF = self.SMF_LRG*self.zdistdf.groupby('zbin')[f"{bin}_{hemisphere}"].sum().values/np.trapz(self.SMF_LRG, self.mstars, axis=0)
 
 
 
@@ -72,6 +72,10 @@ class DR10CMASS:
 
     def granada(self, IMF, time, dust):
         return f"fsps_{IMF}_{time}_{dust}", "MSTELLAR_MEDIAN"
+    
+    
+# class Zhou2022:  # DESI LRGs (arxiv.org/abs/2208.08515)
+#     path = "/global/cfs/projectdirs/desi/public/ets/vac/stellar_mass/v1/"
 
 
 # class Amodeo2021():

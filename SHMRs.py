@@ -5,7 +5,7 @@ Functions should also take an input dictionary to specify custom values for para
 To more easily compare parameter values between models, they should be built off the Base Model functions.
 
 
-# TODO 1: For all, check to make sure M_sun (with no h) is used for stellar masses, m200c is used for halo masses, and if it's not, figure out how to convert to it.
+# TODO 1: Figure out how to convert from one mass definition to another
 """
 
 from Basics import *
@@ -20,12 +20,14 @@ class BASESHMR:
         else: 
             raise NameError(f"Sample {sample} doesn't exist, choose from available samples: {self.samples}")
 
-    def Behroozi(self, Mh, logM1, logeps, alpha, delta, gamma):  # (arxiv.org/abs/1207.6105)  TODO 1
+    def Behroozi(self, Mh, logM1, logeps, alpha, delta, gamma):  # (arxiv.org/abs/1207.6105)
+        # virial mass
         M1, eps = 10**logM1, 10**logeps
         f = lambda x : -np.log10(10**(alpha*x)+1) + delta*(np.log10(1+np.exp(x)))**gamma/(1+np.exp(10**(-x)))
         return 10**( np.log10(eps*M1) + f(np.log10(Mh/M1)) - f(0) )
     
-    def DoublePowerLaw(self, Mh, logM1, N, beta, gamma):  # (arxiv.org/abs/1205.5807)  TODO 1
+    def DoublePowerLaw(self, Mh, logM1, N, beta, gamma):  # (arxiv.org/abs/1205.5807)
+        # "virial masses are computed with respect to 200 times the critical density"????
         M1 = 10**logM1
         return 2*N/( (Mh/M1)**(-beta) + (Mh/M1)**(gamma) )
     
@@ -33,9 +35,12 @@ class BASESHMR:
         Mhs = np.logspace(10, 18, 1000)
         Mss_from_Mhs = self.HSMR(Mhs, self.p0 | p)
         return np.interp(Ms, Mss_from_Mhs, Mhs)
+    
+    # TODO 1
 
 
-class Xu2023(BASESHMR):  # SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.02665)  TODO 1
+class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.02665)
+    mdef = "Mvir"  # virial mass Mvir of the halo at the time when the galaxy was last the central dominant object
     samples = ["Main_BP13", "LOWZ_BP13", "CMASS_BP13", "Main_DP", "LOWZ_DP", "CMASS_DP"]
     params = {
         'logM0': [11.338, 11.359, 11.509, 11.732, 11.579, 11.624],
@@ -49,7 +54,7 @@ class Xu2023(BASESHMR):  # SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.
     def __init__(self, sample):
         self.checksample(sample)
 
-    def HSMR(self, Mh, p={}):  # TODO 1
+    def HSMR(self, Mh, p={}):
         p = self.p0 | p
         if self.sample in ["Main_BP13", "LOWZ_BP13", "CMASS_BP13"]:
             return self.Behroozi(Mh, logM1=p['logM0'], logeps=p['logeps'], alpha=-p['beta'], delta=p['delta'], gamma=p['alpha'])
@@ -57,7 +62,8 @@ class Xu2023(BASESHMR):  # SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.
             return self.DoublePowerLaw(Mh, logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
 
 
-class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)  TODO 1
+class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
+    mdef = "Mvir"  # Current Virial Mass
     samples = ["ELG_Auto", "ELG_Cross", "Psat_Mh"]
     params = {
         'logM0': [11.56, 12.14, 12.07],
@@ -74,7 +80,7 @@ class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)  TO
         return self.DoublePowerLaw(Mh, logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
 
 
-class Kravstov2014(BASESHMR):  # SDSS DR8 (arxiv.org/abs/1401.7329)  TODO 1
+class Kravstov2014(BASESHMR):  # SDSS DR8 (arxiv.org/abs/1401.7329)
     samples = ["M200c", "M200c_scatter", "M500c", "M500c_scatter", "M200m", "M200m_scatter", "Mvir", "Mvir_scatter"]
     params = {
         "logM1": [11.39, 11.35, 11.32, 11.28, 11.45, 11.41, 11.43, 11.39],

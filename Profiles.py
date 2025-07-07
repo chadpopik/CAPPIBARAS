@@ -3,8 +3,7 @@ Collections of radial profiles (pressure/density so far) either from functional 
 Functions should return lambda functions which take in parameter dictionaries, so that parts of the calculation unreliant on sampled parameters don't have to be redone. These lambda functions should return 3D arrays over radius, halo mass (in m200c), and redshift, even if they don't use those mass/redshift arrays for a calculation, to ensure same dimensionality between one-halo and two-halo profiles.
 
 
-# TODO 1: Find what Battaglia models were calibrated off
-# TODO 2: Add a two-halo term that's constructed from theory
+# TODO 1: Add a two-halo term that's constructed from theory
 """
 
 from Basics import *
@@ -28,6 +27,7 @@ class BaseGNFW:
 
 
 class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.org/abs/2009.05558)
+    mdef = "M200c"
     meanmass, medz = 3.3*10**13, 0.55
     studies = ['GNFW']
     params = {'logrho0': [2.6], 
@@ -39,7 +39,7 @@ class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.or
               'beta_t': [2.6],
               'A2h_t': [0.7]
     }
-    twohalofile = '/global/homes/c/cpopik/Git/Capybara/Data/twohalo_cmass_average.txt'
+    twohalofile = '/global/homes/c/cpopik/Capybara/Data/twohalo_cmass_average.txt'
 
     def __init__(self, study):
         self.checkstudy(study)
@@ -64,22 +64,23 @@ class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.or
         x = r/r200c_func(m200c, z)[None, ...]
         frac_b = cosmopars['Omega_b']/cosmopars['Omega_m']
         rhocs = rhocrit_func(z)
-        factorfront = frac_b*rhocs
+        factorfront = frac_b*rhocs*(u.Msun/u.Mpc**3).to(u.g/u.cm**3)
         func = lambda p: self.rho_over_rhodel(x, gamma=-0.2, alpha=1, rho0=10**p['logrho0'], xc=p['xc_k'], beta=p['beta_k'])
         return lambda p={}: factorfront*func(self.p0 | p)
     
-    def Pth2h(self, r, m, z):  # TODO 2
+    def Pth2h(self, r, m, z):  # TODO 1
         Pth2h = np.interp(r, self.rs2hfile, self.pth2hfile)[:, None, None]*np.ones((r.size, m.size, z.size))
         func = lambda p: p['A2h_t']*Pth2h
         return lambda p={}: func(self.p0 | p)
     
-    def rho2h(self, r, m, z):  # TODO 2
+    def rho2h(self, r, m, z):  # TODO 1
         rho2h = np.interp(r, self.rs2hfile, self.rho2hfile)[:, None, None]*np.ones((r.size, m.size, z.size))
         func = lambda p: p['A2h_k']*rho2h
         return lambda p={}: func(self.p0 | p)
 
 
-class Battaglia2015(BaseGNFW):  # (arxiv.org/abs/1607.02442) TODO 1
+class Battaglia2015(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/1607.02442)
+    mdef = "M200c"
     studies = ['AGN', 'SH']
     params = {'rho0_A0': [4*1e3, 1.9*1e4], 
                 'rho0_alpham': [0.29, 0.09], 
@@ -108,7 +109,8 @@ class Battaglia2015(BaseGNFW):  # (arxiv.org/abs/1607.02442) TODO 1
         return lambda p={}: factorfront*func(self.p0 | p)
 
 
-class Battaglia2012(BaseGNFW):  # (arxiv.org/abs/1109.3711) TODO 1
+class Battaglia2012(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/1109.3711)
+    mdef = "M200c"
     studies = ['B12']
     params = {'P0_A0': [18.1], 
                 'P0_alpham': [0.154], 
