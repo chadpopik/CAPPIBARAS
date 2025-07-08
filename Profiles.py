@@ -3,18 +3,19 @@ Collections of radial profiles (pressure/density so far) either from functional 
 Functions should return lambda functions which take in parameter dictionaries, so that parts of the calculation unreliant on sampled parameters don't have to be redone. These lambda functions should return 3D arrays over radius, halo mass (in m200c), and redshift, even if they don't use those mass/redshift arrays for a calculation, to ensure same dimensionality between one-halo and two-halo profiles.
 
 
-# TODO 1: Add a two-halo term that's constructed from theory
+# TODO 1: Add a two-halo term that's constructed from theory?
 """
 
 from Basics import *
 
 class BaseGNFW:
-    def checkstudy(self, study):  # Set default parameterization from input sample, checking for validity
-        if study in self.studies:
-            self.study = study
-            self.p0 = {param: self.params[param][self.studies.index(self.study)] for param in self.params.keys()}
-        else:
-            raise NameError(f"Sample {study} doesn't exist, choose from available samples: {self.studies}")
+    def checkspefs(self, spefs, required):
+        for mname in required:
+            if spefs[mname] not in getattr(self, f"{mname}s"):  # Check if the model is in the list of models
+                raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s')}")
+            else:
+                setattr(self, mname, spefs[mname])
+        self.p0 = {param: self.params[param][self.models.index(self.model)] for param in self.params.keys()}
     
     def PLmz(self, m200c, z, A0, alpham, alphaz):
         return A0 * (m200c/1.e14)**alpham * (1.+z)**alphaz
@@ -29,7 +30,7 @@ class BaseGNFW:
 class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.org/abs/2009.05558)
     mdef = "M200c"
     meanmass, medz = 3.3*10**13, 0.55
-    studies = ['GNFW']
+    models = ['GNFW']
     params = {'logrho0': [2.6], 
               'xc_k': [0.6],
               'beta_k': [2.6],
@@ -41,8 +42,8 @@ class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.or
     }
     twohalofile = '/global/homes/c/cpopik/Capybara/Data/twohalo_cmass_average.txt'
 
-    def __init__(self, study):
-        self.checkstudy(study)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['model'])
         
         self.rs2hfile, self.rho2hfile, self.pth2hfile = np.genfromtxt(self.twohalofile, unpack=True)
 
@@ -81,7 +82,7 @@ class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.or
 
 class Battaglia2015(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/1607.02442)
     mdef = "M200c"
-    studies = ['AGN', 'SH']
+    models = ['AGN', 'SH']
     params = {'rho0_A0': [4*1e3, 1.9*1e4], 
                 'rho0_alpham': [0.29, 0.09], 
                 'rho0_alphaz': [-0.66, -0.95],
@@ -92,8 +93,8 @@ class Battaglia2015(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/160
                 'beta_alpham': [0.04, 0.005], 
                 'beta_alphaz': [-0.025, 0.037]}
     
-    def __init__(self, study):
-        self.checkstudy(study)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['model'])
         
     def rho1h(self, r, m200c, z, rhocrit_func, r200c_func, cosmopars):
         r, m200c = r[:, None, None], m200c[:, None]
@@ -111,7 +112,7 @@ class Battaglia2015(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/160
 
 class Battaglia2012(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/1109.3711)
     mdef = "M200c"
-    studies = ['B12']
+    models = ['B12']
     params = {'P0_A0': [18.1], 
                 'P0_alpham': [0.154], 
                 'P0_alphaz': [-0.758],
@@ -122,8 +123,8 @@ class Battaglia2012(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/110
                 'beta_alpham': [0.0393], 
                 'beta_alphaz': [0.415]}
     
-    def __init__(self, study):
-        self.checkstudy(study)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['model'])
 
     def Pth1h(self, r, m200c, z, rhocrit_func, r200c_func, cosmopars):
         # Components not reliant on r are calculated beforehand to avoid being done every time
@@ -139,19 +140,6 @@ class Battaglia2012(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/110
                                             xc=self.PLmz(m200c, z, p['xc_A0'], p['xc_alpham'], p['xc_alphaz']),
                                             beta=self.PLmz(m200c, z, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
         return lambda p={}: factorfront*func(self.p0 | p)
-
-Classes = {
-    "Battaglia2012": Battaglia2012,
-    "Battaglia2015": Battaglia2015,
-    "Amodeo2021": Amodeo2021
-}
-
-def get_Class(class_name):
-    print("Loading HOD")
-    try:
-        return Classes[class_name]
-    except KeyError:
-        raise ValueError(f"Unknown class: {class_name}. Choose from {list(Classes.keys())}")
 
 
 

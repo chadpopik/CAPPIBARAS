@@ -12,7 +12,7 @@ The goal in all of these is to do as much precalculation as possible, as the onl
 
 from Basics import *
 
-from FFTs import RadialFourierTransformHankel
+import FFTs
 from scipy.interpolate import interp1d  # Do we need this? can we just use normal numpy?
 
 
@@ -22,7 +22,10 @@ def weighting(ms, zs, galaxydist):
     return lambda Pths: np.trapz(np.trapz(dndmdz_norm * Pths, zs), ms)
 
 
-def HODweighting(m200cs, zs, rs, HOD, HMF, r200c_func, H_func, FFT_func, IFFT_func):
+def HODweighting(m200cs, zs, rs, HOD, HMF, r200c_func, H_func):
+    ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
+    rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT1D()
+    
     # Precalculating as much as possible
     yfac = (c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*r200c_func(m200cs[:, None], zs)**3*(1+zs)**2/H_func(zs)  # Converting Pth to y
 
@@ -32,8 +35,8 @@ def HODweighting(m200cs, zs, rs, HOD, HMF, r200c_func, H_func, FFT_func, IFFT_fu
     uck_m_z = np.ones(usk_m_z.shape)  # Set to one
 
     def HODave(Pths, params):
-        Nc = HOD.Nc(m200cs[:, None], HOD.p0 | params)
-        Ns = HOD.Ns(m200cs[:, None], HOD.p0 | params)
+        Nc = HOD.Nc(m200cs[:, None], params)
+        Ns = HOD.Ns(m200cs[:, None], params)
         ngal = np.trapz(np.trapz((Nc+Ns)*HMF, zs), m200cs)
         HODTerm = (Nc*uck_m_z + Ns*usk_m_z)/ngal
 
@@ -62,7 +65,7 @@ def project_Hankel(rs, thetas, AngDist, beam_data, beam_ells, resp_data, resp_el
     rint = np.sqrt(los**2 + thta_smooth[:,None]**2*AngDist**2)
 
     # TODO: check value of pad
-    rht = RadialFourierTransformHankel(n=los.size, pad=100, lrange=[170.0, 1.4e6])  # n must be same size as los, lrange tested in Moser 2023
+    rht = FFTs.RadialFourierTransformHankel(n=los.size, pad=100, lrange=[170.0, 1.4e6])  # n must be same size as los, lrange tested in Moser 2023
     
     beamTF = np.interp(rht.ell, beam_ells, beam_data)  # Load beam profile
     respTF = np.interp(rht.ell, resp_ells, resp_data)
@@ -148,7 +151,46 @@ def C_gg_new(self,ells,zs,ks,Pgg,gzs,gdndz=None,zmin=None,zmax=None):
 
 
 
+# Limber Integral from hmvec
+def limber_integral2(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis):
+    """
+    Get C(ell) = \int dz (H(z)/c) W1(z) W2(z) Pzks(z,k=ell/chi) / chis**2.
+    ells: (nells,) multipoles looped over
+    zs: redshifts (npzs,) corresponding to Pzks
+    ks: comoving wavenumbers (nks,) corresponding to Pzks
+    Pzks: (npzs,nks) power specrum
+    gzs: (nzs,) corersponding to Wz1s, W2zs, Hzs and chis
+    Wz1s: weight function (nzs,)
+    Wz2s: weight function (nzs,)
+    hzs: Hubble parameter (nzs,) in *1/Mpc* (e.g. camb.results.h_of_z(z))
+    chis: comoving distances (nzs,)
 
+    We interpolate P(z,k)
+    """
+
+    hzs = np.array(hzs).reshape(-1)
+    Wz1s = np.array(Wz1s).reshape(-1)
+    Wz2s = np.array(Wz2s).reshape(-1)
+    chis = np.array(chis).reshape(-1)
+    
+    prefactor = hzs * Wz1s * Wz2s   / chis**2.
+    zevals = gzs
+    if zs.size>1:            
+         f = interp2d(ks,zs,Pzks,bounds_error=True)     
+    else:      
+         f = interp1d(ks,Pzks[0],bounds_error=True)
+    Cells = np.zeros(ells.shape)
+    for i,ell in enumerate(ells):
+        kevals = (ell+0.5)/chis
+        if zs.size>1:
+            # hack suggested in https://stackoverflow.com/questions/47087109/evaluate-the-output-from-scipy-2d-interpolation-along-a-curve
+            # to get around scipy.interpolate limitations
+            interpolated = si.dfitpack.bispeu(f.tck[0], f.tck[1], f.tck[2], f.tck[3], f.tck[4], kevals, zevals)[0]
+        else:
+            interpolated = f(kevals)
+        if zevals.size==1: Cells[i] = interpolated * prefactor
+        else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
+    return Cells
 
 
 

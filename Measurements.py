@@ -7,34 +7,62 @@ TODO 2: What are the units on the beam response and how should it be converted? 
 TODO 3: Find Liu response, and probably have to figure out conversions same as TODO 2.
 TODO 4: Find dust model to use for Liu, just using Emily's TNG file for now.
 TODO 5: Ask about dust file, should it be negative?
-TODO 6: Add boryana measurements https://zenodo.org/records/12633573
+TODO 6: Find beam and responses for boryana measurements
 """
 
 from Basics import *
 from ForwardModel import fnu
 
 
+class BaseData:
+    def checkspefs(self, spefs, required):
+        for mname in required:
+            if spefs[mname] not in getattr(self, f"{mname}s").keys():  # Check if the model is in the list of models
+                raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s').keys()}")
+            else:
+                setattr(self, mname, getattr(self, f'{mname}s')[spefs[mname]])
 
-class Hadzhiyska2025:
-    zbins = ['pzbin1', 'pzbin2', 'pzbin3', 'pzbin4']
-    samples = ['main', 'extended']
+
+
+class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
+    zbins = {'1': 'pzbin1', '2': 'pzbin2', '3': 'pzbin3', '4': 'pzbin4'}
+    samples = {'main': '', 'extended': 'extended_', 'all': ''}
+    corrs = {'corrected': 'corr_', 'uncorrected': ''}
+    zoutcuts = {'nocut': '', 'cut': 'sigmaz0.05000_'}
+    path = "/global/homes/c/cpopik/Capybara/Data/Hadzhiyska2024"
+    # TODO 6
+    
+    def __init__(self, spefs):       
+        self.checkspefs(spefs, required=['zbin', 'sample', 'corr', 'zoutcut'])
+         
+        self.thetas = np.load(f"{self.path}/Fig2_sim.npz")['theta_arcmins']
+        self.Tksz_Illustris1 = np.load(f"{self.path}/Fig2_sim.npz")['gas_illustris']
+        self.Tksz_TNG300 = np.load(f"{self.path}/Fig2_sim.npz")['dm_tng']
+        self.Tksz = np.load(f"{self.path}/Fig2_sim.npz")['signal']
+        
+        filename = f"{self.path}/Fig1_Fig8_{self.sample}dr10_allfoot_perbin_{self.zoutcut}dr6_{self.corr}{self.zbin}.npz"
+        self.kSZdata = np.load(filename)['prof']
+        self.kSZcov = np.load(filename)['cov']
+    
     
 
 
-class Liu2025:  # ACT DR6 maps stacked on DESI LRGs for cross-correlation (arxiv.org/abs/2502.08850)
+class Liu2025(BaseData):  # ACT DR6 maps stacked on DESI LRGs for cross-correlation (arxiv.org/abs/2502.08850)
     # Define options & freq for measurements, directory location for data, files for beam/response, and dust model
-    bins = ['pz1', 'pz2', 'pz3', 'pz4']
-    dBetas = ['fiducial', 'dBeta_1.2_10.7', 'dBeta_1.4_10.7', 'dBeta_1.6_10.7']
+    zbins = {'1':'pz1','2':'pz2', '3':'pz3', '4':'pz4'}
+    dBetas = {'fiducial':'fiducial', '1.2':'dBeta_1.2_10.7', '1.4':'dBeta_1.4_10.7','1.6':'dBeta_1.6_10.7'}
     freq = 150
     dirname = "/global/homes/c/cpopik/Data/StackedProfiles_outputs_for_Nick"
     beamfile = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220/ilc_beam.txt"
     respfile = None  # TODO 3
     dustfile = "/global/homes/c/cpopik/Capybara/Data/fig6_TNG_H_dust.txt"  # TODO 4
 
-    def __init__(self, bin, dBeta):
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['zbin', 'dBeta'])
+        
         # Find data and covariance files for bin and CIB method
-        self.datafname = f"{self.dirname}/DESI_{bin}_act_dr6_{dBeta}/diskring_tsz_uniformweight_measured.txt"
-        self.covfname = f"{self.dirname}/DESI_{bin}_act_dr6_{dBeta}/cov_diskring_tsz_uniformweight_bootstrap.txt"
+        self.datafname = f"{self.dirname}/DESI_{self.zbin}_act_dr6_{self.dBeta}/diskring_tsz_uniformweight_measured.txt"
+        self.covfname = f"{self.dirname}/DESI_{self.zbin}_act_dr6_{self.dBeta}/cov_diskring_tsz_uniformweight_bootstrap.txt"
 
         # Load in data and convert to arcmin^2
         self.thetas = np.genfromtxt(self.datafname).T[0]  # [arcmin]
@@ -74,17 +102,3 @@ class Schaan2021:  # ACT DR5 maps stacked on CMASS DR10/DR12 (arxiv.org/abs/2009
         self.resp_data = self.resp_data/self.resp_data[0]  # TODO 2
         
         self.dustprof = -np.genfromtxt(self.dustfile).T[1]  # [muK*arcmin^2]
-
-
-
-Classes = {
-    "Liu2025": Liu2025,
-    "Schaan2021": Schaan2021,
-}
-
-def get_Class(class_name):
-    print("Loading Data")
-    try:
-        return Classes[class_name]
-    except KeyError:
-        raise ValueError(f"Unknown class: {class_name}. Choose from {list(Classes.keys())}")

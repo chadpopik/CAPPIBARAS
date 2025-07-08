@@ -4,19 +4,21 @@ Classes should contain functions to calculate the average number of central and 
 Functions should also take an input dictionary to specify custom values for parameters, defaulting to the base values if not given. 
 To more easily compare parameter values between models, they should be built off the Base Model functions.
 
-# TODO: Check to see if I should be adding sattelite profiles for the rest of the HODs
+# TODO 1: Check to see if I should be adding sattelite profiles for the rest of the HODs
 """
 
 from Basics import *
 
 
 class BaseHOD:  # Contains base functional forms and general utilities
-    def checksample(self, sample):  # Set default parameterization from input sample, checking for validity
-        if sample in self.samples:
-            self.sample = sample
-            self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
-        else:
-            raise NameError(f"Sample {sample} doesn't exist, choose from available samples: {self.samples}")
+    def checkspefs(self, spefs, required):
+        for mname in required:
+            if spefs[mname] not in getattr(self, f"{mname}s"):  # Check if the model is in the list of models
+                raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s')}")
+            else:
+                setattr(self, mname, spefs[mname])
+        self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
+
 
     def N_cent(self, M, logM_min, sigma_logM):  # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564)
         # Mvir
@@ -50,8 +52,8 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
 
     min_z, max_z, med_z = 0.47, 0.59, 0.53
     
-    def __init__(self, sample):
-        self.checksample(sample)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['sample'])
 
     def Nc(self, M, p={}):
         p = self.p0 | p
@@ -80,8 +82,8 @@ class Yuan2023(BaseHOD):  # DESI 1% LRGs/QSOs (arxiv.org/abs/2306.06314)
         "logM_h": [13.42, 13.26, 12.74],
         "b_lin": [1.94, 2.11, 2.56],
     }
-    def __init__(self, sample):
-        self.checksample(sample)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['sample'])
     
     def Nc(self, M, p={}):
         p = self.p0 | p
@@ -109,8 +111,8 @@ class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.o
         "epsilon": [0.69, 0.69, 0.99, 0.99],
     }
 
-    def __init__(self, sample):
-        self.checksample(sample)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['sample'])
         
     def Nc(self, M, p={}):
         p = self.p0 | p
@@ -133,8 +135,8 @@ class Kusiak2022(BaseHOD):  # unWISE (arxiv.org/abs/2203.12583)
         "10^7A_SN": [-0.16, 1.35, 27.95],
     }
 
-    def __init__(self, sample):
-        self.checksample(sample)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['sample'])
     
     def Nc(self, M, p={}):
         p = self.p0 | p
@@ -168,8 +170,8 @@ class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
         "h": [0.703, 0.700, 0.695],
     }
 
-    def __init__(self, sample):
-        self.checksample(sample)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['sample'])
 
     def Nc(self, M, p={}):
         p = self.p0 | p
@@ -178,19 +180,3 @@ class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
     def Ns(self, M, p={}):
         p = self.p0 | p
         return self.N_sat(M, logM_0=np.log10(p['kappa'])+p['logM_min'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(M, p)
-
-
-Classes = {
-    "Kou2023": Kou2023,
-    "More2015": More2015,
-    "Yuan2023": Yuan2023,
-    "Linke2022": Linke2022,
-    "Kusiak2022": Kusiak2022
-}
-
-def get_Class(class_name):
-    print("Loading HOD")
-    try:
-        return Classes[class_name]
-    except KeyError:
-        raise ValueError(f"Unknown class: {class_name}. Choose from {list(Classes.keys())}")

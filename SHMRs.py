@@ -5,7 +5,7 @@ Functions should also take an input dictionary to specify custom values for para
 To more easily compare parameter values between models, they should be built off the Base Model functions.
 
 
-# TODO 1: Figure out how to convert from one mass definition to another
+# TODO 1: Figure out how to convert from one mass definition to another, probably using packages that we use to get the HMFs
 """
 
 from Basics import *
@@ -13,12 +13,13 @@ from Basics import *
 
 
 class BASESHMR:
-    def checksample(self, sample):  # Set default parameterization from input sample, checking for validity
-        if sample in self.samples: 
-            self.sample = sample
-            self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()} 
-        else: 
-            raise NameError(f"Sample {sample} doesn't exist, choose from available samples: {self.samples}")
+    def checkspefs(self, spefs, required):
+        for mname in required:
+            if spefs[mname] not in getattr(self, f"{mname}s"):  # Check if the model is in the list of models
+                raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s')}")
+            else:
+                setattr(self, mname, spefs[mname])
+        self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
 
     def Behroozi(self, Mh, logM1, logeps, alpha, delta, gamma):  # (arxiv.org/abs/1207.6105)
         # virial mass
@@ -51,8 +52,8 @@ class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.0
         'logk': [None, None, None, 10.303, 10.105, 10.133],
         'sigma': [0.237, 0.190, 0.190, 0.233, 0.201, 0.192]}
 
-    def __init__(self, sample):
-        self.checksample(sample)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['sample'])
 
     def HSMR(self, Mh, p={}):
         p = self.p0 | p
@@ -72,8 +73,8 @@ class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
         'logk': [10.11, 10.40, 10.36],
         'sigma': [0.18, 0.21, 0.21]}
 
-    def __init__(self, sample):
-        self.checksample(sample)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['sample'])
 
     def HSMR(self, Mh, p={}):
         p = self.p0 | p
@@ -89,22 +90,9 @@ class Kravstov2014(BASESHMR):  # SDSS DR8 (arxiv.org/abs/1401.7329)
         "delta": [4.345, 4.394, 4.376, 4.437, 4.273, 4.305, 4.290, 4.335],
         "gamma": [0.619, 0.547, 0.644, 0.567, 0.613, 0.544, 0.595, 0.531]}
 
-    def __init__(self, sample):
-        self.checksample(sample)
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['sample'])
 
     def HSMR(self, Mh, p={}):
         p = self.p0 | p
         return self.Behroozi(Mh, logM1=p['logM1'], logeps=p['logeps'], alpha=-p['alpha'], delta=p['delta'], gamma=p['gamma'])
-    
-
-Classes = {
-    "Xu2023": Xu2023,
-    "Gao2023": Gao2023,
-    "Kravstov2014": Kravstov2014,
-}
-def get_Class(class_name):
-    print("Loading SHMR")
-    try:
-        return Classes[class_name]
-    except KeyError:
-        raise ValueError(f"Unknown class: {class_name}. Choose from {list(Classes.keys())}")
