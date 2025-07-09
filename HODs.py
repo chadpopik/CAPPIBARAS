@@ -4,31 +4,30 @@ Classes should contain functions to calculate the average number of central and 
 Functions should also take an input dictionary to specify custom values for parameters, defaulting to the base values if not given. 
 To more easily compare parameter values between models, they should be built off the Base Model functions.
 
-# TODO 1: Check to see if I should be adding sattelite profiles for the rest of the HODs
 """
 
 from Basics import *
 
 
-class BaseHOD:  # Contains base functional forms and general utilities
-    def checkspefs(self, spefs, required):
+class BaseHOD:
+    def checkspefs(self, spefs, required): # Check specification validity and assign parameters
         for mname in required:
-            if spefs[mname] not in getattr(self, f"{mname}s"):  # Check if the model is in the list of models
+            if spefs[mname] not in getattr(self, f"{mname}s"):
                 raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s')}")
             else:
                 setattr(self, mname, spefs[mname])
         self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
 
 
-    def N_cent(self, M, logM_min, sigma_logM):  # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564)
+    def Nc_Zheng2005(self, M, logM_min, sigma_logM):  # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564)
         # Mvir
         return 0.5*(1+scipy.special.erf((np.log10(M)-logM_min)/sigma_logM))
 
-    def N_sat(self, M, logM_0, logM_1, alpha):  # Expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564)
+    def Ns_Zheng2005(self, M, logM_0, logM_1, alpha):  # Expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564)
         # Mvir
         return ((M-10**logM_0)/10**logM_1)**alpha
 
-    def f_inc(self, M, alpha_inc, logM_inc):  # CMASS incompleteness function (More2015)
+    def f_inc_More2015(self, M, alpha_inc, logM_inc):  # CMASS incompleteness function (arxiv.org/abs/1407.1856)
         return np.clip(1+alpha_inc*(np.log10(M)-logM_inc), 0, 1)
     
     def GNFW(self, x, gamma, alpha, beta):  # Satellite density profile
@@ -36,7 +35,7 @@ class BaseHOD:  # Contains base functional forms and general utilities
 
 
 class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
-    mdef = "M200m"
+    mdef = "200m"
     samples = ["M*>10.8", "M*>11.1", "M*>11.25", "M*>11.4"]
     params = {
         "logM_min": [13.47, 13.58, 13.84, 14.20],  
@@ -51,17 +50,17 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
         }
 
     min_z, max_z, med_z = 0.47, 0.59, 0.53
-    
+
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
 
     def Nc(self, M, p={}):
         p = self.p0 | p
-        return self.N_cent(M, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc(M, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
+        return self.Nc_Zheng2005(M, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc_More2015(M, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
 
     def Ns(self, M, p={}):
         p = self.p0 | p
-        return self.N_sat(M, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(M-10**p['logM_min'],1) * self.Nc(M, p)
+        return self.Ns_Zheng2005(M, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(M-10**p['logM_min'],1) * self.Nc(M, p)
 
     def uSat(self, x, p={}):
         p = self.p0 | p
@@ -69,7 +68,7 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
 
 
 class Yuan2023(BaseHOD):  # DESI 1% LRGs/QSOs (arxiv.org/abs/2306.06314)
-    mdef = "M200c"  # M not clear, maybe same as zheng 2005/2007? or cmass?
+    mdef = "200c"  # M not clear, maybe same as zheng 2005/2007? or cmass?
     samples = ["LRG 0.4<z<0.6", "LRG 0.6<z<0.8", "QSO 0.8<z<2.1"]
     params = {
         "logM_cut": [12.89, 12.78, 12.67],
@@ -82,23 +81,24 @@ class Yuan2023(BaseHOD):  # DESI 1% LRGs/QSOs (arxiv.org/abs/2306.06314)
         "logM_h": [13.42, 13.26, 12.74],
         "b_lin": [1.94, 2.11, 2.56],
     }
+    
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
     
     def Nc(self, M, p={}):
         p = self.p0 | p
-        return self.N_cent(M, logM_min=p['logM_cut'], sigma_logM=np.sqrt(2)*p['sigma']) * p['f_ic']
+        return self.Nc_Zheng2005(M, logM_min=p['logM_cut'], sigma_logM=np.sqrt(2)*p['sigma']) * p['f_ic']
     
     def Ns(self, M, p={}):
         p = self.p0 | p
         if self.sample=="QSO 0.8<z<2.1":
-            return self.N_sat(M, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha'])
+            return self.Ns_Zheng2005(M, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha'])
         else:
-            return self.N_sat(M, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(M, p)
+            return self.Ns_Zheng2005(M, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(M, p)
 
 
 class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.org/abs/2204.02418)
-    mdef = "M200m"
+    mdef = "200m"
     samples = ["MS red", "MS blue", "KV450 X GAMA red", "KV450 X GAMA blue"]
     params = {
         "alpha^a": [0.47, 0.10, 0.34, 0.13],
@@ -116,15 +116,15 @@ class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.o
         
     def Nc(self, M, p={}):
         p = self.p0 | p
-        return self.N_cent(M, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a']) * p['alpha^a']
+        return self.Nc_Zheng2005(M, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a']) * p['alpha^a']
     
     def Ns(self, M, p={}):
         p = self.p0 | p
-        return self.N_sat(M, logM_0=0, logM_1 = np.log10(p['M^a']*1e13), alpha=p['beta^a']) * self.N_cent(M, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a'])
+        return self.Ns_Zheng2005(M, logM_0=0, logM_1 = np.log10(p['M^a']*1e13), alpha=p['beta^a']) * self.Nc_Zheng2005(M, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a'])
         
 
 class Kusiak2022(BaseHOD):  # unWISE (arxiv.org/abs/2203.12583)
-    mdef = "M200c"
+    mdef = "200c"
     samples = ["Blue", "Green", "Red"]
     params = {
         "sigma_logM": [0.73, 0.61, 0.75],
@@ -140,15 +140,15 @@ class Kusiak2022(BaseHOD):  # unWISE (arxiv.org/abs/2203.12583)
     
     def Nc(self, M, p={}):
         p = self.p0 | p
-        return self.N_cent(M, logM_min=p['logM_min^HOD'], sigma_logM=p['sigma_logM'])
+        return self.Nc_Zheng2005(M, logM_min=p['logM_min^HOD'], sigma_logM=p['sigma_logM'])
     
     def Ns(self, M, p={}):
         p = self.p0 | p
-        return self.N_sat(M, logM_0=0, logM_1 = p['logM_1'], alpha=p['alpha_s']) * self.Nc(M, p)
+        return self.Ns_Zheng2005(M, logM_0=0, logM_1 = p['logM_1'], alpha=p['alpha_s']) * self.Nc(M, p)
 
 
 class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
-    mdef = "M200m"  # M200b, 200 times overdense wrt background matter density
+    mdef = "200m"  # M200b, 200 times overdense wrt background matter density
     samples = ["[11.10, 12.00]", "[11.30, 12.0]", "[11.40, 12.0]"]
     params = {
         "logM_min": [13.13, 13.45, 13.68],
@@ -175,8 +175,8 @@ class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
 
     def Nc(self, M, p={}):
         p = self.p0 | p
-        return self.N_cent(M, logM_min=p['logM_min'], sigma_logM=p['sigma^2']**0.5) * self.f_inc(M, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
+        return self.Nc_Zheng2005(M, logM_min=p['logM_min'], sigma_logM=p['sigma^2']**0.5) * self.f_inc_More2015(M, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
     
     def Ns(self, M, p={}):
         p = self.p0 | p
-        return self.N_sat(M, logM_0=np.log10(p['kappa'])+p['logM_min'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(M, p)
+        return self.Ns_Zheng2005(M, logM_0=np.log10(p['kappa'])+p['logM_min'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(M, p)

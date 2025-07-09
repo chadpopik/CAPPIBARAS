@@ -1,12 +1,6 @@
 """
 Collection of Halo Mass Function obtained either from halo model codes or loaded from a data files. 
 Classes should contain halo number density 2D arrays over halo mass (in m200c) and redshift and the corresponding mass/redshift arrays, in consistent units. If using functions, require input halo mass/redshift arrays to ensure output consistency between classes.
-
-
-TODO 1: Check hmf against others
-TODO 2: Check for units of input M and units of output SMF (watch for factors of h/dex)
-TODO 3: Consider interpolating hmf to actually match the input ms rather then use them for range guidance?
-TODO 4: Add cosmology dependence for both models
 """
 
 from Basics import *

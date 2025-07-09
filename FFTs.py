@@ -4,8 +4,6 @@ Going to and back from Fourier space is necessary for beam convolution, as well 
 This file contains various methods of performing FFTs collected from various packages around, returning functions that take in a profile and spit out its transform.
 
 The ideal being ones that are as fast as possible, while being able to maintain the profile values if just doing a conversion back and forth (which is what the HOD method does, and we want to make sure the FFT-IFFT process doesn't insert any changes).
-# TODO: test mcfit for forward/backward equivalency
-# TODO: understand better Emily's Hankel transform
 """
 
 from Basics import *

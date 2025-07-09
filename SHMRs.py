@@ -3,9 +3,6 @@ Collection of Stellar Halo Mass Relations models and paramterizations for variou
 Classes should contain functions for converting host halo masses (in m200c) to galaxy stellar masses (HSMR) and the parameters values outlined in the papers, as well as the reverse conversion (SHMR) constructed through interpolation. 
 Functions should also take an input dictionary to specify custom values for parameters, defaulting to the base values if not given. 
 To more easily compare parameter values between models, they should be built off the Base Model functions.
-
-
-# TODO 1: Figure out how to convert from one mass definition to another, probably using packages that we use to get the HMFs
 """
 
 from Basics import *
@@ -33,7 +30,7 @@ class BASESHMR:
         return 2*N/( (Mh/M1)**(-beta) + (Mh/M1)**(gamma) )
     
     def SHMR(self, Ms, p={}):  # Interpolate to get halo masses from stellar mass
-        Mhs = np.logspace(10, 18, 1000)
+        Mhs = np.logspace(10, 20, 1000)
         Mss_from_Mhs = self.HSMR(Mhs, self.p0 | p)
         return np.interp(Ms, Mss_from_Mhs, Mhs)
     
@@ -41,7 +38,7 @@ class BASESHMR:
 
 
 class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.02665)
-    mdef = "Mvir"  # virial mass Mvir of the halo at the time when the galaxy was last the central dominant object
+    mdef = "vir"  # virial mass Mvir of the halo at the time when the galaxy was last the central dominant object
     samples = ["Main_BP13", "LOWZ_BP13", "CMASS_BP13", "Main_DP", "LOWZ_DP", "CMASS_DP"]
     params = {
         'logM0': [11.338, 11.359, 11.509, 11.732, 11.579, 11.624],
@@ -64,7 +61,7 @@ class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.0
 
 
 class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
-    mdef = "Mvir"  # Current Virial Mass
+    mdef = "vir"  # Current Virial Mass
     samples = ["ELG_Auto", "ELG_Cross", "Psat_Mh"]
     params = {
         'logM0': [11.56, 12.14, 12.07],

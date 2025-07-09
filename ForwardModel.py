@@ -2,12 +2,6 @@
 This file contains the meat of the forward model: everything that happens once you have your function for profile making and all the prep work (HODs, HMF, SMFs, etc.). Specifically, averaging the profile over mass and redshift, projecting it onto the sky and convolving it with the beam, and performing the aperture photometry.
 
 The goal in all of these is to do as much precalculation as possible, as the only things that are changing as chains run is the value of certain parameters, and therefore anything that stays the same should NOT be run everytime. This is done by instead returning lambda functions of just the fit parameters.
-
-# TODO: clean up the projection and aperture functions
-# TODO: Maybe too much of th FFT mess is done in this file, it can be put into the FFT file?
-# TODO: check if intergrating over zs is really necessary, maybe just use the medium z?
-# TODO: Add miscentering
-# TODO: Add calculation for Cls
 """
 
 from Basics import *
@@ -18,20 +12,20 @@ from scipy.interpolate import interp1d  # Do we need this? can we just use norma
 
 
 def weighting(ms, zs, galaxydist):
-    dndmdz_norm = galaxydist/np.trapz(np.trapz(galaxydist, zs), ms)
-    return lambda Pths: np.trapz(np.trapz(dndmdz_norm * Pths, zs), ms)
+    gdist_norm = galaxydist/np.sum(galaxydist)
+    return lambda Pths: np.sum(np.sum(gdist_norm * Pths, axis=1), axis=1)
 
 
-def HODweighting(m200cs, zs, rs, HOD, HMF, r200c_func, H_func):
+def HODweighting(m200cs, zs, rs, HOD, HMF, r200c_func, H_func, XH, **kwargs):
     ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
     rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT1D()
     
     # Precalculating as much as possible
-    yfac = (c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*r200c_func(m200cs[:, None], zs)**3*(1+zs)**2/H_func(zs)  # Converting Pth to y
+    yfac = (2+2*XH)/(3+5*XH)*(c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*r200c_func(m200cs[:, None], zs)**3*(1+zs)**2/H_func(zs)  # Converting Pth to y
 
     xs = rs[:, None, None]/r200c_func(m200cs[:, None], zs)
     # NOTE: These profiles also have some parameters that can be fit, but I'm not doing that here
-    usk_m_z = FFT_func(HOD.uSat(xs, HOD.p0))
+    usk_m_z = FFT_func(HOD.uSat(xs))
     uck_m_z = np.ones(usk_m_z.shape)  # Set to one
 
     def HODave(Pths, params):

@@ -3,11 +3,6 @@ Collections of galaxy distributions in stellar mass and redshift for various sur
 Classes should have galaxy number density 2D arrays over stellar and redshift and the corresponding stellar mass/redshift arrays, in consistent units.
 Some samples may need to combine a SMF from one study and a redshift distribution from another.
 If available, using halo masses in m200c instead of stellar masses is fine, then just don't use a SHMR later.
-
-
-TODO: Check for units and factors of h/dex
-TODO: Clean CMASS DR10 and making adaptable to ms and zs
-TODO: Make the class more organized and sensible with functionality
 """
 
 from Basics import *
@@ -29,15 +24,17 @@ class BaseSMF:
 
 
 class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
-    path = "/pscratch/sd/c/cpopik/save_data_point_DESI-2023-0213"
     zbins = ['all', 'bin_1', 'bin_2', 'bin_3', 'bin_4']
     samples = ['LRG', 'ELG']
     hemispheres = ['combined', 'north', 'south']
+    zweights = ['True', 'False']
+    
+    path = "/pscratch/sd/c/cpopik/save_data_point_DESI-2023-0213"
     redshift_dist_file = "/global/cfs/projectdirs/desi/public/papers/c3/lrg_xcorr_2023/v1/redshift_dist/main_lrg_pz_dndz_iron_v0.4_dz_0.01.txt"
     surveyarea = 16700
     
     def __init__(self, spefs):
-        self.checkspefs(spefs, required=['sample', 'zbin', 'hemisphere'])
+        self.checkspefs(spefs, required=['sample', 'zbin', 'hemisphere', 'zweight'])
 
         if self.sample=='LRG': self.zs = np.arange(0.4, 1.1, 0.1)
         elif self.sample=='ELG': self.zs = np.arange(0.6, 1.6, 0.1)
@@ -54,23 +51,22 @@ class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
         self.zdistdf['zbin'] = pd.cut(self.zdistdf['zmin'], bins=np.arange(self.zs[0], self.zs[-1]+0.2, 0.1))
         self.zdistscale = self.zdistdf.groupby('zbin')[f"{self.zbin}_{self.hemisphere}"].sum().values*self.surveyarea
         
-    def get_gdist(self, cosmopars, zweight=False):
+    def get_gdist(self, cosmopars):
         self.gdist = self.SMFraw*cosmopars["hh"]**3*self.SMF_to_N(cosmopars)
-        if zweight is True:
+        if self.zweight is True:
             self.gdist = self.gdist*self.zdistscale/np.sum(self.gdist, axis=0)
         self.zave = np.sum(self.gdist*self.zs)/np.sum(self.gdist)
         return self.gdist
     
-    def get_SMF(self, cosmopars, zweight=False):
+    def get_SMF(self, cosmopars):
         self.SMF = self.SMFraw*cosmopars['hh']**3
-        if zweight is True:
+        if self.zweight is True:
             return self.SMF*self.zdistscale/self.SMF_to_N(cosmopars)/np.trapz(self.SMF, np.log10(self.mstars), axis=0)
         return self.SMF
     
 
 
 class DR10CMASS(BaseSMF):
-    path = "/global/cfs/projectdirs/sdss/data/sdss/dr10/boss/spectro/redux/galaxy/v1_0"
     groups = ['portsmouth', 'wisconsin', 'granada']
     IMFs = ['krou', 'salp']
     templates = ['starforming', 'passive']
@@ -78,6 +74,7 @@ class DR10CMASS(BaseSMF):
     times = ['earlyform', 'wideform']
     dusts = ['dust', 'nodust']
     
+    path = "/global/cfs/projectdirs/sdss/data/sdss/dr10/boss/spectro/redux/galaxy/v1_0"
     skyfrac = (6373.2/41253) 
 
     def __init__(self, spefs):
@@ -91,7 +88,7 @@ class DR10CMASS(BaseSMF):
         elif self.group=='granada': 
             self.checkspefs(spefs, required=['IMF', 'time', 'dust'])
             fname, mcolname = f"fsps_{self.IMF}_{self.time}_{self.dust}", "MSTELLAR_MEDIAN"
-            
+
 
         self.dfdata = Table.read(f"{self.path}/{self.group}_{fname}-v5_5_12.fits.gz")['Z', mcolname].to_pandas().rename(columns={mcolname: "LOGM"})
 
@@ -100,20 +97,15 @@ class DR10CMASS(BaseSMF):
         
         self.gdist, self.mstars, self.zs = np.histogram2d(self.dfdata.LOGM, self.dfdata.Z, bins=[mbins, zbins])
         self.mstars, self.zs = 10**self.mstars[:-1], self.zs[:-1]
-        
+
     def get_SMF(self, cosmopars):
         self.SMF = self.gdist/self.SMF_to_N(cosmopars)
         return self.SMF
-    
+
     def get_gdist(self, cosmopars={}):
+        self.zave = np.sum(self.gdist*self.zs)/np.sum(self.gdist)
         return self.gdist
         
-        
-                                         
-        # vols = self.skyfrac * np.array([self.cosmo.comoving_volume(zbins[i+1]).value-self.cosmo.comoving_volume(zbins[i]).value for i in range(zbins.size-1)])
-        # self.SMF = self.SMF/vols
-        
-        # self.mstars, self.zs = 10**self.mstars[:-1], self.zs[:-1]
 
 
 
