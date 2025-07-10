@@ -15,12 +15,16 @@ class BaseSMF:
             else:
                 setattr(self, mname, spefs[mname])
                 
-    def SMF_to_N(self, cosmopars):
-        cosmo = astropy.cosmology.LambdaCDM(H0=cosmopars["hh"]*100, Tcmb0=cosmopars['T_CMB'], Om0=cosmopars["Omega_m"], Ode0=cosmopars["Omega_L"], Ob0=cosmopars["Omega_b"])
+    def SMF_to_N(self, hh, T_CMB, Omega_m, Omega_L, Omega_b, **kwargs):
+        cosmo = astropy.cosmology.LambdaCDM(H0=hh*100, Tcmb0=T_CMB, Om0=Omega_m, Ode0=Omega_L, Ob0=Omega_b)
         
         vols = np.array([(cosmo.comoving_volume(z+0.1).value-cosmo.comoving_volume(z).value)/(1+z+0.05)**3 for z in self.zs])
         
         return vols*np.log10(self.mstars[1]/self.mstars[0])
+    
+    def zave(self, **cosmopars):
+        gdist = self.gdist(**cosmopars)
+        return np.sum(gdist*self.zs[:, None])/np.sum(gdist)
 
 
 class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
@@ -30,7 +34,7 @@ class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
     zweights = ['True', 'False']
     
     path = "/pscratch/sd/c/cpopik/save_data_point_DESI-2023-0213"
-    redshift_dist_file = "/global/cfs/projectdirs/desi/public/papers/c3/lrg_xcorr_2023/v1/redshift_dist/main_lrg_pz_dndz_iron_v0.4_dz_0.01.txt"
+    redshift_dist_file = "/global/cfs/projectdirs/desi/public/papers/c3/lrg_xcorr_2023/v1/redshift_dist/main_lrg_pz_dndz_iron_v0.4_dz_0.01.txt"  # arxiv.org/abs/2309.06443
     surveyarea = 16700
     
     def __init__(self, spefs):
@@ -40,31 +44,30 @@ class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
         elif self.sample=='ELG': self.zs = np.arange(0.6, 1.6, 0.1)
 
         self.mstars = 10**pd.read_csv(f"{self.path}/Fig1_{self.sample}_z0.8.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[0]).Mstar.values  # [M_sol]
-        self.SMFraw = np.array([pd.read_csv(f"{self.path}/Fig1_{self.sample}_z{z:.1f}.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[1]).n.values for z in self.zs]).T  # [(Mpc/h)^-3 dex^-1]
-        
+        self.SMFraw = np.array([pd.read_csv(f"{self.path}/Fig1_{self.sample}_z{z:.1f}.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[1]).n.values for z in self.zs])  # [(Mpc/h)^-3 dex^-1]
+
         # Read in the redshift distribution for each specific bin
         # Number density in N / deg^2, dataframe with 1D arrays of length [ndim_zs_zdist]
         self.zdistdf = pd.read_csv(self.redshift_dist_file, sep=" ", skiprows=1, names=pd.read_csv(self.redshift_dist_file, sep=" ").columns[1:])
         self.zdist = self.zdistdf[f"{self.zbin}_{self.hemisphere}"]
-        
+
         # Sort/group/sum up the finer redshift bins to match the bins of the SMF distribution
         self.zdistdf['zbin'] = pd.cut(self.zdistdf['zmin'], bins=np.arange(self.zs[0], self.zs[-1]+0.2, 0.1))
         self.zdistscale = self.zdistdf.groupby('zbin')[f"{self.zbin}_{self.hemisphere}"].sum().values*self.surveyarea
-        
-    def get_gdist(self, cosmopars):
-        self.gdist = self.SMFraw*cosmopars["hh"]**3*self.SMF_to_N(cosmopars)
-        if self.zweight is True:
-            self.gdist = self.gdist*self.zdistscale/np.sum(self.gdist, axis=0)
-        self.zave = np.sum(self.gdist*self.zs)/np.sum(self.gdist)
-        return self.gdist
-    
-    def get_SMF(self, cosmopars):
-        self.SMF = self.SMFraw*cosmopars['hh']**3
-        if self.zweight is True:
-            return self.SMF*self.zdistscale/self.SMF_to_N(cosmopars)/np.trapz(self.SMF, np.log10(self.mstars), axis=0)
-        return self.SMF
-    
 
+    def gdist(self, **cosmopars):
+        gdist = self.SMFraw*cosmopars["hh"]**3*self.SMF_to_N(**cosmopars)[:, None]
+        if self.zweight=='True':
+            gdist = gdist*(self.zdistscale/np.sum(gdist, axis=1))[:, None]
+        return gdist
+
+    def SMF(self, **cosmopars):
+        SMF = self.SMFraw*cosmopars['hh']**3
+        if self.zweight=='True':
+            SMF = SMF*(self.zdistscale/self.SMF_to_N(**cosmopars)/np.trapz(SMF, np.log10(self.mstars), axis=1))[:, None]
+        return SMF
+
+    
 
 class DR10CMASS(BaseSMF):
     groups = ['portsmouth', 'wisconsin', 'granada']
@@ -92,19 +95,19 @@ class DR10CMASS(BaseSMF):
 
         self.dfdata = Table.read(f"{self.path}/{self.group}_{fname}-v5_5_12.fits.gz")['Z', mcolname].to_pandas().rename(columns={mcolname: "LOGM"})
 
-        mbins = np.arange((np.floor(self.dfdata.LOGM.min()*10)/10).round(1), (np.ceil(self.dfdata.LOGM.max()*10)/10+0.1).round(1), 0.1)
         zbins = np.arange((np.floor(self.dfdata.Z.min()*10)/10).round(1), (np.ceil(self.dfdata.Z.max()*10)/10+0.1).round(1), 0.1)
+        mbins = np.arange((np.floor(self.dfdata.LOGM.min()*10)/10).round(1), (np.ceil(self.dfdata.LOGM.max()*10)/10+0.1).round(1), 0.1)
         
-        self.gdist, self.mstars, self.zs = np.histogram2d(self.dfdata.LOGM, self.dfdata.Z, bins=[mbins, zbins])
+        self.gdistraw, self.zs, self.mstars = np.histogram2d(self.dfdata.Z, self.dfdata.LOGM, bins=[zbins, mbins])
         self.mstars, self.zs = 10**self.mstars[:-1], self.zs[:-1]
 
-    def get_SMF(self, cosmopars):
-        self.SMF = self.gdist/self.SMF_to_N(cosmopars)
-        return self.SMF
+    def SMF(self, **cosmopars):
+        SMF = self.gdistraw/self.SMF_to_N(**cosmopars)[:, None]
+        return SMF
 
-    def get_gdist(self, cosmopars={}):
-        self.zave = np.sum(self.gdist*self.zs)/np.sum(self.gdist)
-        return self.gdist
+    def gdist(self, **cosmopars):
+        gdist = self.gdistraw
+        return gdist
         
 
 

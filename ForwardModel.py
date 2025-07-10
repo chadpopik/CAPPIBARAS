@@ -11,34 +11,34 @@ from scipy.interpolate import interp1d  # Do we need this? can we just use norma
 
 
 
-def weighting(ms, zs, galaxydist):
+def weighting(galaxydist):
     gdist_norm = galaxydist/np.sum(galaxydist)
     return lambda Pths: np.sum(np.sum(gdist_norm * Pths, axis=1), axis=1)
 
 
-def HODweighting(m200cs, zs, rs, HOD, HMF, r200c_func, H_func, XH, **kwargs):
+def HODweighting(rs, zs, mshalo, HOD, HMF, r200c_func, H_func, XH, **kwargs):
     ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
     rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT1D()
     
-    # Precalculating as much as possible
-    yfac = (2+2*XH)/(3+5*XH)*(c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*r200c_func(m200cs[:, None], zs)**3*(1+zs)**2/H_func(zs)  # Converting Pth to y
-
-    xs = rs[:, None, None]/r200c_func(m200cs[:, None], zs)
+    xs = rs[:, None, None]/r200c_func(zs[:, None], mshalo)
     # NOTE: These profiles also have some parameters that can be fit, but I'm not doing that here
     usk_m_z = FFT_func(HOD.uSat(xs))
     uck_m_z = np.ones(usk_m_z.shape)  # Set to one
+    
+    # Precalculating as much as possible
+    yfac = (2+2*XH)/(3+5*XH)*(c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*r200c_func(zs[:, None], mshalo)**3*((1+zs)**2/H_func(zs))[:, None]  # Converting Pth to y
 
     def HODave(Pths, params):
-        Nc = HOD.Nc(m200cs[:, None], params)
-        Ns = HOD.Ns(m200cs[:, None], params)
-        ngal = np.trapz(np.trapz((Nc+Ns)*HMF, zs), m200cs)
+        Nc = HOD.Nc(mshalo, params)
+        Ns = HOD.Ns(mshalo, params)
+        ngal = np.trapz(np.trapz((Nc+Ns)*HMF, mshalo), zs)
         HODTerm = (Nc*uck_m_z + Ns*usk_m_z)/ngal
 
-        dndzdm_norm = HODTerm*HMF/np.trapz(np.trapz(HODTerm*HMF, zs), m200cs)[:, None, None]
+        dndzdm_norm = HODTerm*HMF/np.trapz(np.trapz(HODTerm*HMF, mshalo), zs)[:, None, None]
         yk_m_z = FFT_func(Pths)*yfac
-        Pgy1h = np.trapz(np.trapz(yk_m_z*dndzdm_norm, zs), m200cs)
+        Pgy1h = np.trapz(np.trapz(yk_m_z*dndzdm_norm, mshalo), zs)
 
-        yfacave = np.trapz(np.trapz(yfac*dndzdm_norm, zs), m200cs)
+        yfacave = np.trapz(np.trapz(yfac*dndzdm_norm, mshalo), zs)
         return IFFT_func(Pgy1h/yfacave)
 
     return lambda Pths, params: HODave(Pths, params)
@@ -60,7 +60,7 @@ def project_Hankel(rs, thetas, AngDist, beam_data, beam_ells, resp_data, resp_el
 
     # TODO: check value of pad
     rht = FFTs.RadialFourierTransformHankel(n=los.size, pad=100, lrange=[170.0, 1.4e6])  # n must be same size as los, lrange tested in Moser 2023
-    
+
     beamTF = np.interp(rht.ell, beam_ells, beam_data)  # Load beam profile
     respTF = np.interp(rht.ell, resp_ells, resp_data)
 

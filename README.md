@@ -1,33 +1,38 @@
 # Capybara (placeholder name)
 
-Very initial version of the code
 
+Very initial version of the code, no judging.
 
+Things to come:
+- Mass definition conversions
+- DESI SMF from catalog
+- twohalo theory term (currently just using one from a file)
+- Calculating C_ells 
+- Miscentering (maybe)
 
-HODs:
-- TODO 1: Check to see if I should be adding sattelite profiles for the rest of the HODs
-
-
-SHMRs:
-- TODO 1: Figure out how to convert from one mass definition to another, probably using packages that we use to get the HMFs
-- TODO 2: Add valid mass ranges
-
-
-HMFs:
-- TODO 1: Check hmf against pyccl
-- TODO 2: Check for units of input M and units of output SMF (watch for factors of h/dex)
-- TODO 3: Consider interpolating hmf to actually match the input ms rather then use them for range guidance?
-- TODO 4: Add cosmology dependence for both models
-
-
-SMFs:
-- TODO 1: Check for units and factors of h/dex
-- TODO 2: Clean CMASS DR10 and making adaptable to ms and zs
-- TODO 3: Make the class more organized and sensible with functionality
 
 
 Profiles:
 - TODO 1: Add a two-halo term that's constructed from theory?
+
+
+HODs:
+- TODO 1: Add valid mass and redshift ranges for each model
+- TODO 2: Check to see if the other HODs have extra parts of their models, like different satellite profiles
+
+
+SHMRs:
+- TODO 1: Add valid mass and redshift ranges for each model
+- TODO 3: Add satellite dependent model somehow
+
+
+HMFs:
+- TODO 1: Investigate more the cosmology dependence for both models
+
+
+SMFs:
+- TODO 1: Check for units and factors of h/dex
+- TODO 2: Add zdistributions for CMASS
 
 
 Measurements:
@@ -48,8 +53,6 @@ ForwardModel:
 - TODO 1: clean up the projection and aperture functions
 - TODO 2: Maybe too much of th FFT mess is done in this file, it can be put into the FFT file?
 - TODO 3: check if intergrating over zs is really necessary, maybe just use the medium z?
-- TODO 4: Add miscentering
-- TODO 5: Add calculation for Cls
 
 
 SOLikelihoods:

@@ -18,15 +18,16 @@ class BaseData:
 
 
 class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
-    freq = 90  # check this?
     zbins = {'1': 'pzbin1', '2': 'pzbin2', '3': 'pzbin3', '4': 'pzbin4'}
     samples = {'main': '', 'extended': 'extended_', 'all': ''}
     corrs = {'corrected': 'corr_', 'uncorrected': ''}
     zoutcuts = {'nocut': '', 'cut': 'sigmaz0.05000_'}
+    
     path = "/global/homes/c/cpopik/Capybara/Data/Hadzhiyska2024"
     beamfile = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220/ilc_beam.txt"
     respfile = None
     dustfile = None
+    freq = 90  # check this?
     # TODO 6
 
     def __init__(self, spefs):       
@@ -48,9 +49,9 @@ class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/a
 
 
 class Liu2025(BaseData):  # ACT DR6 maps stacked on DESI LRGs for cross-correlation (arxiv.org/abs/2502.08850)
-    # Define options & freq for measurements, directory location for data, files for beam/response, and dust model
     zbins = {'1':'pz1','2':'pz2', '3':'pz3', '4':'pz4'}
     dBetas = {'fiducial':'fiducial', '1.2':'dBeta_1.2_10.7', '1.4':'dBeta_1.4_10.7','1.6':'dBeta_1.6_10.7'}
+    
     freq = 150
     dirname = "/global/homes/c/cpopik/Data/StackedProfiles_outputs_for_Nick"
     beamfile = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220/ilc_beam.txt"
@@ -72,7 +73,7 @@ class Liu2025(BaseData):  # ACT DR6 maps stacked on DESI LRGs for cross-correlat
         self.resp_ells, self.resp_data = self.beam_ells, np.ones(self.beam_ells.shape)  # [ells, unitless]
         self.dustprof = self.thetas*0
         
-    def tSZdata_in_muK(self, T_CMB):  # Convert data/cov to muK*arcmin^2 to match model, needs a T_CMB value
+    def tSZdata_in_muK(self, T_CMB, **kwargs):  # Convert data/cov to muK*arcmin^2 to match model, needs a T_CMB value
         self.tSZdata = self.tSZdata*fnu(self.freq, T_CMB)*T_CMB*1e6
         self.tSZerr = -self.tSZerr*fnu(self.freq, T_CMB)*T_CMB*1e6
         self.tSZcov = self.tSZcov*(fnu(self.freq, T_CMB)*T_CMB*1e6)**2

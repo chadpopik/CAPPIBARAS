@@ -10,11 +10,6 @@ output: cobayatest/chains_TEST/cobaya_TEST_0.001
 debug: False
 
 
-thingtest:
-    name: 'test'
-    spefs: ['test1', 'test2']
-
-
 # TODO 2
 likelihood:
     SOLikelihoods.TSZLikelihood:

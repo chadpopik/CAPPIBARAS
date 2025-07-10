@@ -1,9 +1,16 @@
-theory: null
 likelihood:
   SOLikelihoods.TSZLikelihood:
     DataUse:
       name: Schaan2021
-      spefs: null
+      spefs: {}
+    onehalo:
+      name: Amodeo2021
+      spefs:
+        model: GNFW
+    twohalo:
+      name: Amodeo2021
+      spefs:
+        model: GNFW
     galaxy_distribution:
       name: DR10CMASS
       spefs:
@@ -18,42 +25,11 @@ likelihood:
       name: Kravstov2014
       spefs:
         sample: M200c
-    onehalo:
-      name: Amodeo2021
-      spefs:
-        model: GNFW
-    twohalo:
-      name: Amodeo2021
-      spefs:
-        model: GNFW
     mass_function:
       name: pyccl
       spefs:
         mfunc: Tinker08
         mdef: 200c
-    thingtest: null
-    yaml_file: /global/homes/c/cpopik/Capybara/runchains.yaml
-    name: Gaussian
-    datapath: null
-    covpath: null
-    ncovsims: null
-    type: []
-    speed: -1
-    stop_at_error: false
-    version: null
-    input_params:
-    - hh
-    - Omega_L
-    - Omega_m
-    - Omega_b
-    - XH
-    - T_CMB
-    - v_rms
-    - logrho0
-    - xc_t
-    - beta_t
-    - A2h_t
-    output_params: []
 params:
   hh:
     value: 0.7
@@ -94,26 +70,13 @@ params:
       min: 0
       max: 5
 sampler:
-  minimize:
-    method: bobyqa
-    ignore_prior: false
-    max_evals: 1e6d
-    best_of: 2
-    confidence_for_unbounded: 0.9999995
-    seed: null
-    override_scipy: null
-    override_bobyqa:
-      rhoend: 0.05
-    override_iminuit: null
-    covmat: null
-    covmat_params: null
-    version: null
-    fallback_covmat_scale: 4
+  mcmc:
+    Rminus1_stop: 0.01
+    max_tries: 200d
+    output_every: 10s
 output: cobaya_TEST_0.001
 thingtest:
   name: test
   spefs:
   - test1
   - test2
-minimize: true
-version: 3.5.7

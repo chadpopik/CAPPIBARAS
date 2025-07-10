@@ -26,10 +26,10 @@ class pyccl(BASEHMF):
         
         self.hmffunc = getattr(ccl.halos.hmfunc, f"MassFunc{self.mfunc}")(mass_def=self.mdef)
         
-    def HMF(self, ms, zs, cosmopars):
-        self.cosmo = self.ccl.Cosmology(h=cosmopars['hh'], Omega_c=cosmopars['Omega_m']-cosmopars['Omega_b'], Omega_b=cosmopars['Omega_b'], n_s=0.95, sigma8=0.8,transfer_function='bbks')
+    def HMF(self, zs, mshalo, hh, Omega_b, Omega_m, **kwargs):
+        self.cosmo = self.ccl.Cosmology(h=hh, Omega_c=Omega_m-Omega_b, Omega_b=Omega_b, n_s=0.95, sigma8=0.8,transfer_function='bbks')
                 
-        HMF_m_z = np.array([self.hmffunc(cosmo=self.cosmo, M=ms, a=1/(1+z))for z in zs])
+        HMF_m_z = np.array([self.hmffunc(cosmo=self.cosmo, M=mshalo, a=1/(1+z))for z in zs])
         return HMF_m_z
 
 
@@ -42,16 +42,14 @@ class hmf_package(BASEHMF):  # https://hmf.readthaedocs.io/en/latest/index.html
         
         self.checkspefs(spefs, required=['mdef', 'mfunc'])
 
-    def HMF(self, ms, zs, cosmopars):
-        cosmo = astropy.cosmology.LambdaCDM(H0=cosmopars["hh"]*100, Tcmb0=2.726, Om0=cosmopars["Omega_m"], Ode0=cosmopars["Omega_L"], Ob0=cosmopars["Omega_b"])
-        
-        # Set spacing between logMhalo values, which must be logspaced
-        try: dlog10m = np.min(np.log10(ms[1:])-np.log10(ms[:-1]))  # TODO 3
-        except ValueError: dlog10m = 0.1
+    def HMF(self, zs, mshalo, hh, Omega_b, Omega_m, Omega_L, T_CMB, **kwargs):
+        cosmo = astropy.cosmology.LambdaCDM(H0=hh*100, Tcmb0=T_CMB, Om0=Omega_m, Ode0=Omega_L, Ob0=Omega_b)
+        mshalo = mshalo*hh
+        dlog10m = 0.1
 
         # Function only takes one z at a time so use list comprehension and then combine
-        haloMFsraw = [self.hmf.MassFunction(z=z, Mmin=np.log10(np.min(ms))-dlog10m, Mmax=np.log10(np.max(ms))+dlog10m, dlog10m=dlog10m, hmf_model=self.mfunc, mdef_model=self.mdef, cosmo_model=cosmo) for z in zs]  # TODO 2
-        HMF_m_z = np.array([np.interp(ms, haloMF.m, haloMF.dndlog10m) for haloMF in haloMFsraw]).T
+        haloMFsraw = [self.hmf.MassFunction(z=z, Mmin=np.log10(np.min(mshalo))-dlog10m, Mmax=np.log10(np.max(mshalo))+dlog10m, dlog10m=dlog10m, hmf_model=self.mfunc, mdef_model=self.mdef, cosmo_model=cosmo) for z in zs]  # TODO 2
+        HMF_m_z = np.array([np.interp(mshalo, haloMF.m, haloMF.dndlog10m*hh**3) for haloMF in haloMFsraw])
         return HMF_m_z
 
 

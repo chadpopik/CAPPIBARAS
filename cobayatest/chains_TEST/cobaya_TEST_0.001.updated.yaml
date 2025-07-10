@@ -94,26 +94,46 @@ params:
       min: 0
       max: 5
 sampler:
-  minimize:
-    method: bobyqa
-    ignore_prior: false
-    max_evals: 1e6d
-    best_of: 2
-    confidence_for_unbounded: 0.9999995
-    seed: null
-    override_scipy: null
-    override_bobyqa:
-      rhoend: 0.05
-    override_iminuit: null
+  mcmc:
+    burn_in: 0
+    max_tries: 200d
     covmat: null
     covmat_params: null
-    version: null
+    proposal_scale: 2.4
+    output_every: 10s
+    learn_every: 40d
+    temperature: 1
+    learn_proposal: true
+    learn_proposal_Rminus1_max: 2.0
+    learn_proposal_Rminus1_max_early: 30.0
+    learn_proposal_Rminus1_min: 0.0
+    max_samples: .inf
+    Rminus1_stop: 0.01
+    Rminus1_cl_stop: 0.2
+    Rminus1_cl_level: 0.95
+    Rminus1_single_split: 4
+    measure_speeds: true
+    oversample_power: 0.4
+    oversample_thin: true
+    drag: false
+    blocking:
+    - - 1
+      - - logrho0
+        - xc_t
+        - beta_t
+        - A2h_t
+    callback_function: null
+    callback_every: null
+    seed: null
+    check_every: null
+    oversample: null
+    drag_limits: null
     fallback_covmat_scale: 4
+    version: 3.5.7
 output: cobaya_TEST_0.001
 thingtest:
   name: test
   spefs:
   - test1
   - test2
-minimize: true
 version: 3.5.7

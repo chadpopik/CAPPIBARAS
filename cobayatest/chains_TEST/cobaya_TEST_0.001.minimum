@@ -1,27 +1,17 @@
- -log(Like) = 77.74448015521578
-  chi-sq    = 155.48896031043157
+ -log(Like) = 11.314064792388777
+  chi-sq    = 22.628129584777554
 
-   10  5.895517751e-01   A0_P0                                   A_0^{P_0}
-   17  5.379870635e-01   alpha_GNFW                              \alpha_{GNFW}
-   18  1.209331925e+00   A0_beta                                 A_0^{\beta}
-   21  2.044311356e-01   A2h                                     A_{2h}
+    8  2.8556745         logrho0                             \rho_0^{P_0}
+    9  0.97193918        xc_t                                x_{c, k}^{A_0}
+   10  10.0              beta_t                              \beta_t^{A_0}
+   11  4.955245245e+00   A2h_t                               A_{2h, t}
 
-    1  0.25              Omega_m                                 Omega\ m
-    2  0.044             Omega_b                                 Omega\ b
-    3  0.7               hh                                      hh
-    4  0.75              Omega_L                                 Omega\ L
-    5  0.76              XH                                      XH
-    6  2.725             T_CMB                                   T\ CMB
-    7  277.525           rhoc_0                                  rhoc\ 0
-    8  2997.9            C_OVER_HUBBLE                           C\ OVER\ HUBBLE
-    9  0.00106           v_rms                                   v\ rms
-   11  0.0               alpham_P0                               \alpha_m^{P_0}
-   12  0.0               alphaz_P0                               \alpha_z^{P_0}
-   13  0.497             A0_xc                                   A_0^{x_c}
-   14  -0.00865          alpham_xc                               \alpha_m^{x_c}
-   15  0.731             alphaz_xc                               \alpha_z^{x_c}
-   16  -0.3              gamma_GNFW                              \gamma_{GNFW}
-   19  0.0               alpham_beta                             \alpha_m^{\beta}
-   20  0.0               alphaz_beta                             \alpha_z^{\beta}
+    1  0.7               hh                                  hh
+    2  0.75              Omega_L                             Omega\ L
+    3  0.25              Omega_m                             Omega\ m
+    4  0.044             Omega_b                             Omega\ b
+    5  0.76              XH                                  XH
+    6  2.725             T_CMB                               T\ CMB
+    7  0.00106           v_rms                               v\ rms
 
-   22  1.397962106e+02   chi2__cobayatest_py.TSZLikelihoodTEST   \chi^2_{\rm cobayatest\ py.TSZLikelihoodTEST}
+   12  1.245293691e+01   chi2__SOLikelihoods.TSZLikelihood   \chi^2_{\rm SOLikelihoods.TSZLikelihood}

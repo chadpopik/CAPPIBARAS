@@ -8,7 +8,6 @@ To more easily compare parameter values between models, they should be built off
 from Basics import *
 
 
-
 class BASESHMR:
     def checkspefs(self, spefs, required):
         for mname in required:
@@ -18,14 +17,12 @@ class BASESHMR:
                 setattr(self, mname, spefs[mname])
         self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
 
-    def Behroozi(self, Mh, logM1, logeps, alpha, delta, gamma):  # (arxiv.org/abs/1207.6105)
-        # virial mass
+    def Behroozi(self, Mh, logM1, logeps, alpha, delta, gamma):  # (arxiv.org/abs/1207.6105), virial mass
         M1, eps = 10**logM1, 10**logeps
         f = lambda x : -np.log10(10**(alpha*x)+1) + delta*(np.log10(1+np.exp(x)))**gamma/(1+np.exp(10**(-x)))
         return 10**( np.log10(eps*M1) + f(np.log10(Mh/M1)) - f(0) )
     
-    def DoublePowerLaw(self, Mh, logM1, N, beta, gamma):  # (arxiv.org/abs/1205.5807)
-        # "virial masses are computed with respect to 200 times the critical density"????
+    def DoublePowerLaw(self, Mh, logM1, N, beta, gamma):  # (arxiv.org/abs/1205.5807), "virial masses are computed with respect to 200 times the critical density"????
         M1 = 10**logM1
         return 2*N/( (Mh/M1)**(-beta) + (Mh/M1)**(gamma) )
     
@@ -38,7 +35,6 @@ class BASESHMR:
 
 
 class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.02665)
-    mdef = "vir"  # virial mass Mvir of the halo at the time when the galaxy was last the central dominant object
     samples = ["Main_BP13", "LOWZ_BP13", "CMASS_BP13", "Main_DP", "LOWZ_DP", "CMASS_DP"]
     params = {
         'logM0': [11.338, 11.359, 11.509, 11.732, 11.579, 11.624],
@@ -48,6 +44,8 @@ class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.0
         'logeps': [-1.545, -1.598, -1.565, None, None, None],
         'logk': [None, None, None, 10.303, 10.105, 10.133],
         'sigma': [0.237, 0.190, 0.190, 0.233, 0.201, 0.192]}
+    
+    mdef = "vir"  # virial mass of the halo at the time when the galaxy was last the central dominant object
 
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
@@ -61,7 +59,6 @@ class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.0
 
 
 class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
-    mdef = "vir"  # Current Virial Mass
     samples = ["ELG_Auto", "ELG_Cross", "Psat_Mh"]
     params = {
         'logM0': [11.56, 12.14, 12.07],
@@ -69,6 +66,8 @@ class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
         'beta': [2.72, 2.27, 2.61],
         'logk': [10.11, 10.40, 10.36],
         'sigma': [0.18, 0.21, 0.21]}
+    
+    mdef = "vir"  # Current Virial Mass
 
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
