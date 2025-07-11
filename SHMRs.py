@@ -52,9 +52,9 @@ class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.0
 
     def HSMR(self, Mh, p={}):
         p = self.p0 | p
-        if self.sample in ["Main_BP13", "LOWZ_BP13", "CMASS_BP13"]:
+        if self.sample.split('_')[-1]=='BP13':
             return self.Behroozi(Mh, logM1=p['logM0'], logeps=p['logeps'], alpha=-p['beta'], delta=p['delta'], gamma=p['alpha'])
-        elif self.sample in ["Main_DP", "LOWZ_DP", "CMASS_DP"]:
+        elif self.sample.split('_')[-1]=='DP':
             return self.DoublePowerLaw(Mh, logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
 
 

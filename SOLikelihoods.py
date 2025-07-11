@@ -7,23 +7,25 @@ import ForwardModel, Measurements, Profiles, SHMRs, HODs, SMFs, HMFs
 
 from typing import Optional, Sequence, Dict, Any
 from cobaya.yaml import yaml_load_file
-
+from cobaya.theory import Theory
 
 sys.path.append('/global/homes/c/cpopik/SOLikeT')
 from soliket.gaussian import GaussianData, GaussianLikelihood
 
 
+
+
 class SZLikelihood(GaussianLikelihood):
     # TODO 1
     DataUse: Optional[Dict[str, Any]] = None
+    onehalo: Optional[Dict[str, Any]] = None
+    twohalo: Optional[Dict[str, Any]] = None
+    
     galaxy_distribution: Optional[Dict[str, Any]] = None
     HOD: Optional[Dict[str, Any]] = None
     SHMR: Optional[Dict[str, Any]] = None
-    onehalo: Optional[Dict[str, Any]] = None
-    twohalo: Optional[Dict[str, Any]] = None
     mass_function: Optional[Dict[str, Any]] = None
-    thingtest: Optional[Dict[str, Any]] = None
-    
+
     yaml_file = "/global/homes/c/cpopik/Capybara/runchains.yaml"
 
     # Anything that should be used for multiple likelihoods should be defind in the initalize 
@@ -58,11 +60,11 @@ class SZLikelihood(GaussianLikelihood):
         print("Loading HOD")
         self.hod = getattr(HODs, self.HOD['name'])(self.HOD['spefs'])
         
-        self.rs = np.logspace(-1, 1, 100)
+        self.rs = np.logspace(-2, 2, 100)
         
         print("Loading Average Functions")
         self.ave_SMF = ForwardModel.weighting(self.gdist)
-        self.ave_HOD = ForwardModel.HODweighting(self.rs, self.zs, self.mhalos, self.hod, self.hmf, self.r200c_func,self. H_func, **self.cpars)
+        self.ave_HOD = ForwardModel.HODweighting(self.rs, self.zs, self.mhalos, self.hod.Nc, self.hod.Ns, self.hod.uSat, self.hmf, self.r200c_func, self.H_func, **self.cpars)
         
         print("Loading Projection Functions")
         self.proj = ForwardModel.project_Hankel(self.rs, self.meas.thetas, self.dA_func(self.smf.zave()), self.meas.beam_data, self.meas.beam_ells, self.meas.resp_data, self.meas.resp_ells)
@@ -73,12 +75,12 @@ class SZLikelihood(GaussianLikelihood):
     def logp(self, **params_values):
         theory = self._get_theory({**params_values})
         return self.data.loglike(theory)
-
-
-class TSZLikelihood(SZLikelihood):
+    
     def get_requirements(self):
         return {k: None for k in yaml_load_file(self.yaml_file)['params'].keys()}
-    
+
+
+class TSZLikelihood(SZLikelihood):    
     def _get_data(self):
         self.meas = getattr(Measurements, self.DataUse['name'])(self.DataUse['spefs'])
         
@@ -103,9 +105,6 @@ class TSZLikelihood(SZLikelihood):
 
 
 class KSZLikelihood(SZLikelihood):
-    def get_requirements(self):
-        return {k: None for k in yaml_load_file(self.yaml_file)['params'].keys()}
-
     # Data is specific to measurement, so describe in the topmost likelihood
     def _get_data(self):
         self.meas = getattr(Measurements, self.DataUse['name'])(self.DataUse['spefs'])

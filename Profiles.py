@@ -23,21 +23,41 @@ class BaseGNFW:
     def Pth_over_Pdel(self, x, P0, xc, gamma, alpha, beta):
         return P0* (x/xc)**gamma * (1.+(x/xc)**alpha)**(-beta)
 
+    def twohalo(self, prof_func, rs, zs, mshalo, Plin_func, bias_func, hmf_func, windfunc=1, **kwargs):
+        import FFTs
+        ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
+        rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT3D()
+                        
+        bias = bias_func(zs, mshalo, **kwargs)
+        hmf = hmf_func(zs, mshalo, **kwargs)
+        Plin = Plin_func(ks, zs, **kwargs)
+        if windfunc!=1: windfunc=windfunc(ks)
+        
+        infac = hmf*bias
+        prefac = bias*Plin[..., None]*windfunc
+        logms = np.log10(mshalo)
+        
+        prof_k = lambda p: FFT_func(prof_func(p))
+        Pprof2h = lambda p: prefac*np.trapz(prof_k(p)*infac,logms)[..., None]
+        prof2h = lambda p: IFFT_func(Pprof2h(p))
+        return lambda p={}: prof2h(self.p0 | p)
+        
 
 class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.org/abs/2009.05558)
     models = ['GNFW']
-    params = {'logrho0': [2.6], 
-              'xc_k': [0.6],
-              'beta_k': [2.6],
-              'A2h_k': [1.1],
-              'P0': [2.0],
-              'alpha_t': [0.8],
-              'beta_t': [2.6],
-              'A2h_t': [0.7]
+    params = {'logrho0': [2.6],  # density log amplitude
+              'xc_k': [0.6],  # core radius
+              'beta_k': [2.6],  # outer slope
+              'A2h_k': [1.1],  # density 2h amplitude
+              'P0': [2.0],  # pressure amplitude
+              'alpha_t': [0.8],  # intermediate slope
+              'beta_t': [2.6],  # outer slope
+              'A2h_t': [0.7],  # pressure 2h amplitude
     }
     twohalofile = '/global/homes/c/cpopik/Capybara/Data/twohalo_cmass_average.txt'
     mdef = "200c"
-    meanmass, medz = 3.3*10**13, 0.55
+    meanmass = 3.3*10**13
+    medz = 0.55
     
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['model'])
@@ -68,20 +88,17 @@ class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.or
         func = lambda p: self.rho_over_rhodel(xs, gamma=-0.2, alpha=1, rho0=10**p['logrho0'], xc=p['xc_k'], beta=p['beta_k'])
         return lambda p={}: factorfront*func(self.p0 | p)
     
-    def Pth2h(self, rs, zs, mshalo):  # TODO 1
-        Pth2h = np.interp(rs, self.rs2hfile, self.pth2hfile)  # Interpolate to requested rs 
-        Pth2h = Pth2h[:, None, None]*np.ones((rs.size, zs.size, mshalo.size))  # ensure proper dimension even without z/m dependence
-        
-        # Assign parameters
-        func = lambda p: p['A2h_t']*Pth2h
-        return lambda p={}: func(self.p0 | p)
+    def Pth2h(self, rs, zs, mshalo, rhocrit_func, r200c_func, Plin_func, bias_func, hmf_func, **kwargs):
+        prof_func = self.Pth1h(rs, zs, mshalo, rhocrit_func, r200c_func, **kwargs)
+        windfunc = lambda ks: np.array([1 if k>1/50 else 0 for k in ks])[:, None, None]
+        return self.twohalo(prof_func, rs, zs, mshalo, Plin_func, bias_func, hmf_func, windfunc=windfunc, **kwargs)
     
-    def rho2h(self, rs, zs, mshalo):  # TODO 1
-        rho2h = np.interp(rs, self.rs2hfile, self.rho2hfile)  # Interpolate to requested rs 
-        rho2h = rho2h[:, None, None]*np.ones((rs.size, zs.size, mshalo.size))  # ensure proper dimension even without z/m dependence
-        func = lambda p: p['A2h_k']*rho2h
-        return lambda p={}: func(self.p0 | p)
+    def rho2h(self, rs, zs, mshalo, rhocrit_func, r200c_func, Plin_func, bias_func, hmf_func, **kwargs):
+        prof_func = self.rho1h(rs, zs, mshalo, rhocrit_func, r200c_func, **kwargs)
+        windfunc = lambda ks: np.array([1 if k>1/50 else 0 for k in ks])[:, None, None]
+        return self.twohalo(prof_func, rs, zs, mshalo, Plin_func, bias_func, hmf_func, windfunc=windfunc, **kwargs)
 
+        
 
 class Battaglia2015(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/1607.02442)
     models = ['AGN', 'SH']
@@ -148,3 +165,21 @@ class Battaglia2012(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/110
                                             xc=self.PLmz(zs, ms200c, p['xc_A0'], p['xc_alpham'], p['xc_alphaz']),
                                             beta=self.PLmz(zs, ms200c, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
         return lambda p={}: factorfront*func(self.p0 | p)
+    
+    
+    
+    
+    
+    #     def Pth2h_file(self, rs, zs, mshalo):  # TODO 1
+    #     Pth2h = np.interp(rs, self.rs2hfile, self.pth2hfile)  # Interpolate to requested rs 
+    #     Pth2h = Pth2h[:, None, None]*np.ones((rs.size, zs.size, mshalo.size))  # ensure proper dimension even without z/m dependence
+        
+    #     # Assign parameters
+    #     func = lambda p: p['A2h_t']*Pth2h
+    #     return lambda p={}: func(self.p0 | p)
+    
+    # def rho2h_file(self, rs, zs, mshalo):  # TODO 1
+    #     rho2h = np.interp(rs, self.rs2hfile, self.rho2hfile)  # Interpolate to requested rs 
+    #     rho2h = rho2h[:, None, None]*np.ones((rs.size, zs.size, mshalo.size))  # ensure proper dimension even without z/m dependence
+    #     func = lambda p: p['A2h_k']*rho2h
+    #     return lambda p={}: func(self.p0 | p)

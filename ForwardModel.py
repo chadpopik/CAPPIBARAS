@@ -16,21 +16,22 @@ def weighting(galaxydist):
     return lambda Pths: np.sum(np.sum(gdist_norm * Pths, axis=1), axis=1)
 
 
-def HODweighting(rs, zs, mshalo, HOD, HMF, r200c_func, H_func, XH, **kwargs):
+def HODweighting(rs, zs, mshalo, Nc_func, Ns_func, uSat_func,
+                 HMF, r200c_func, H_func, XH, **kwargs):
     ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
     rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT1D()
     
     xs = rs[:, None, None]/r200c_func(zs[:, None], mshalo)
     # NOTE: These profiles also have some parameters that can be fit, but I'm not doing that here
-    usk_m_z = FFT_func(HOD.uSat(xs))
+    usk_m_z = FFT_func(uSat_func(xs)) 
     uck_m_z = np.ones(usk_m_z.shape)  # Set to one
     
     # Precalculating as much as possible
     yfac = (2+2*XH)/(3+5*XH)*(c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*r200c_func(zs[:, None], mshalo)**3*((1+zs)**2/H_func(zs))[:, None]  # Converting Pth to y
 
     def HODave(Pths, params):
-        Nc = HOD.Nc(mshalo, params)
-        Ns = HOD.Ns(mshalo, params)
+        Nc = Nc_func(mshalo, params)
+        Ns = Ns_func(mshalo, params)
         ngal = np.trapz(np.trapz((Nc+Ns)*HMF, mshalo), zs)
         HODTerm = (Nc*uck_m_z + Ns*usk_m_z)/ngal
 

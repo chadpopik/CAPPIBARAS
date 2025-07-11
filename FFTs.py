@@ -13,7 +13,7 @@ class mcfit_package:
     def __init__(self, rs):
         import mcfit
         self.mcfit = mcfit
-        
+                
         self.FFTraw= lambda funcx: self.mcfit.xi2P(rs)(funcx)[1]
         self.ks = self.mcfit.xi2P(rs)(rs)[0]
         self.IFFTraw = lambda funck: self.mcfit.P2xi(self.ks)(funck)[1]
@@ -21,6 +21,9 @@ class mcfit_package:
 
     def FFT3D(self):
         return self.ks, lambda funcx: np.array([[self.FFTraw(funcx[:, i, j]) for i in range(funcx.shape[1])] for j in range(funcx.shape[2])]).T
+    
+    def IFFT3D(self):
+        return self.rs_rev, lambda funck: np.array([[self.IFFTraw(funck[:, i, j]) for i in range(funck.shape[1])] for j in range(funck.shape[2])]).T
 
     def IFFT1D(self):
         return self.rs_rev, lambda funck: self.IFFTraw(funck)

@@ -17,20 +17,42 @@ class BASEHMF:
         
 class pyccl(BASEHMF):
     mfuncs = ['Angulo12', 'Bocquet16', 'Bocquet20', 'Despali16', 'Jenkins01', 'Nishimichi19', 'Press74', 'Sheth99', 'Tinker08', 'Tinker10', 'Watson13']
+    hbiass = ['Bhattacharya11', 'Sheth01', 'Sheth99', 'Tinker10']
     mdefs = ['200c', '200m', 'vir', '500c', '500m']  # can actaully use any overdensity number for c and m
     def __init__(self, spefs):
         import pyccl as ccl  # Import package only if using this model
         self.ccl = ccl
 
-        self.checkspefs(spefs, required=['mdef', 'mfunc'])
+        self.checkspefs(spefs, required=['mdef', 'mfunc', 'hbias'])
         
         self.hmffunc = getattr(ccl.halos.hmfunc, f"MassFunc{self.mfunc}")(mass_def=self.mdef)
+        self.hbias = getattr(self.ccl.halos.hbias, f"HaloBias{self.hbias}")(mass_def=self.mdef)
         
-    def HMF(self, zs, mshalo, hh, Omega_b, Omega_m, **kwargs):
+    def initcosmo(self, hh, Omega_b, Omega_m, **kwargs):
         self.cosmo = self.ccl.Cosmology(h=hh, Omega_c=Omega_m-Omega_b, Omega_b=Omega_b, n_s=0.95, sigma8=0.8,transfer_function='bbks')
+        return self.cosmo
+        
+    def HMF(self, zs, mshalo, **kwargs):
+        cosmo = self.initcosmo(**kwargs)
                 
-        HMF_m_z = np.array([self.hmffunc(cosmo=self.cosmo, M=mshalo, a=1/(1+z))for z in zs])
+        HMF_m_z = np.array([self.hmffunc(cosmo=cosmo, M=mshalo, a=1/(1+z))for z in zs])
         return HMF_m_z
+    
+    def bh(self, zs, mshalo, **kwargs):
+        cosmo = self.initcosmo(**kwargs)
+        
+        hbias_m_z = np.array([self.hbias(cosmo=cosmo, M=mshalo, a=1/(1+z))for z in zs])
+        return hbias_m_z
+    
+    def Plin(self, rs, zs, **kwargs):
+        import FFTs
+        ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
+        cosmo = self.initcosmo(**kwargs)
+
+        Plin = np.array([cosmo.linear_matter_power(ks, a=1/(1+z))for z in zs]).T
+        return Plin
+    
+
 
 
 class hmf_package(BASEHMF):  # https://hmf.readthaedocs.io/en/latest/index.html
