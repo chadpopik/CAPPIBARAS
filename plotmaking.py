@@ -21,14 +21,6 @@ class ProfPlot():
         self.ax1, self.ax2, self.ax3, self.ax4 = ax1, ax2, ax3, ax4
 
 
-
-        
-        
-
-
-    
-
-
     def plotmoser():
             ax1.loglog(rsSO, PthsSO, label='Moser 2021', c='k', lw=3), ax2.axhline(0, c='k')
             ax1.loglog(rsSO, PthsSO1h, c='k', lw=2, alpha=0.5, ls='--'), ax1.loglog(rsSO, PthsSO2h, c='k', alpha=0.25, ls=':')

@@ -1,2 +1,0 @@
-#        weight    minuslogpost         logrho0            xc_t          beta_t           A2h_t   minuslogprior minuslogprior__0            chi2 chi2__SOLikelihoods.TSZLikelihood
-              1       11.314065       2.8556745      0.97193918              10       4.9552452       5.0875963        5.0875963       12.452937                         12.452937

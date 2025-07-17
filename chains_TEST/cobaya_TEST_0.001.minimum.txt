@@ -1,2 +1,0 @@
-#        weight    minuslogpost           A0_P0      alpha_GNFW         A0_beta             A2h   minuslogprior minuslogprior__0            chi2 chi2__cobayatest_py.TSZLikelihoodTEST
-              1        77.74448      0.58955178      0.53798706       1.2093319      0.20443114       7.8463749        7.8463749       139.79621                             139.79621

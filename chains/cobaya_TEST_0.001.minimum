@@ -1,0 +1,17 @@
+ -log(Like) = 26.06923110807476
+  chi-sq    = 52.13846221614952
+
+    8  5.0               P0              P_0^{A_0}
+    9  6.579309203e-01   alpha_t         \alpha_t^{A_0}
+   10  4.046124037e+00   beta_t          \beta_t^{A_0}
+   11  5.0               A2h_t           A_{2h, t}
+
+    1  0.7               hh              hh
+    2  0.75              Omega_L         Omega\ L
+    3  0.25              Omega_m         Omega\ m
+    4  0.044             Omega_b         Omega\ b
+    5  2.725             T_CMB           T\ CMB
+    6  0.76              XH              XH
+    7  0.00106           v_rms           v\ rms
+
+   12  4.196326955e+01   chi2__tsztest   \chi^2_{\rm tsztest}

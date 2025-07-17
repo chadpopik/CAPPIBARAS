@@ -1,1 +1,2 @@
-from ..cobayatest_py import TSZLikelihoodTEST
+from .SOLikelihoods import TSZLikelihood
+from .SOLikelihoods import KSZLikelihood

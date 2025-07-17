@@ -3,16 +3,12 @@ Likelihood for SZ model
 """
 
 from Basics import *
-import ForwardModel, Measurements, Profiles, SHMRs, HODs, SMFs, HMFs
+from Models import ForwardModel, Measurements, Profiles, SHMRs, HODs, SMFs, HMFs
 
-from typing import Optional, Sequence, Dict, Any
 from cobaya.yaml import yaml_load_file
-from cobaya.theory import Theory
 
 sys.path.append('/global/homes/c/cpopik/SOLikeT')
 from soliket.gaussian import GaussianData, GaussianLikelihood
-
-
 
 
 class SZLikelihood(GaussianLikelihood):
@@ -46,26 +42,30 @@ class SZLikelihood(GaussianLikelihood):
         self.smf = getattr(SMFs, self.galaxy_distribution['name'])(self.galaxy_distribution['spefs'])
         self.gdist = self.smf.gdist(**self.cpars)
         self.mstars, self.zs = self.smf.mstars, self.smf.zs
-        
+
         print("Loading SHMR")
-        self.mhalos = getattr(SHMRs, self.SHMR['name'])(self.SHMR['spefs']).SHMR(self.mstars)
+        self.shmr = getattr(SHMRs, self.SHMR['name'])(self.SHMR['spefs'])
+        self.mhalos = self.shmr.SHMR(self.mstars)
         
         # Cut down the mrange
         mrange = self.mhalos < self.meas.mhalomax
         self.gdist, self.mstars, self.mhalos = self.gdist[:, mrange], self.mstars[mrange], self.mhalos[mrange]
+        self.mhaloave = self.shmr.SHMR(np.sum(self.gdist*self.mstars)/np.sum(self.gdist))
+        self.zave = np.sum(self.gdist*self.zs[:, None])/np.sum(self.gdist)
         
         print("Loading HMF")
-        self.hmf = getattr(HMFs, self.mass_function['name'])(self.mass_function['spefs']).HMF(self.zs, self.mhalos, **self.cpars)
+        self.halomodel = getattr(HMFs, self.mass_function['name'])(self.mass_function['spefs'])
+        self.hmf = self.halomodel.HMF(self.zs, self.mhalos, **self.cpars)
         
         print("Loading HOD")
         self.hod = getattr(HODs, self.HOD['name'])(self.HOD['spefs'])
-        
-        self.rs = np.logspace(-2, 2, 100)
-        
+
+        self.rs = np.logspace(-1, 1, 100)
+
         print("Loading Average Functions")
         self.ave_SMF = ForwardModel.weighting(self.gdist)
         self.ave_HOD = ForwardModel.HODweighting(self.rs, self.zs, self.mhalos, self.hod.Nc, self.hod.Ns, self.hod.uSat, self.hmf, self.r200c_func, self.H_func, **self.cpars)
-        
+
         print("Loading Projection Functions")
         self.proj = ForwardModel.project_Hankel(self.rs, self.meas.thetas, self.dA_func(self.smf.zave()), self.meas.beam_data, self.meas.beam_ells, self.meas.resp_data, self.meas.resp_ells)
 
@@ -75,7 +75,7 @@ class SZLikelihood(GaussianLikelihood):
     def logp(self, **params_values):
         theory = self._get_theory({**params_values})
         return self.data.loglike(theory)
-    
+
     def get_requirements(self):
         return {k: None for k in yaml_load_file(self.yaml_file)['params'].keys()}
 
@@ -88,7 +88,9 @@ class TSZLikelihood(SZLikelihood):
 
     def _init_model(self):
         self.pth_1h = getattr(Profiles, self.onehalo['name'])(self.onehalo['spefs']).Pth1h(self.rs, self.zs, self.mhalos, self.rhoc_func, self.r200c_func, **self.cpars)
-        self.pth_2h = getattr(Profiles, self.twohalo['name'])(self.twohalo['spefs']).Pth2h(self.rs, self.zs, self.mhalos)
+        
+        self.pth_2h = getattr(Profiles, self.twohalo['name'])(self.twohalo['spefs']).Pth2h(self.rs, np.array([self.zave]), self.mhalos, self.rhoc_func, self.r200c_func, self.halomodel.Plin, self.halomodel.bh, self.halomodel.HMF, **self.cpars)
+        
         self.prof = lambda params={}: self.pth_1h(params) + self.pth_2h(params)
         
         self.sign = ForwardModel.Pth_to_muK(freq=self.meas.freq, **self.cpars)
