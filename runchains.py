@@ -7,14 +7,10 @@ import getdist.plots as gdplt
 
 from cobaya.model import get_model
 
-# model = get_model("/global/homes/c/cpopik/Capybara/runchains.yaml")
-
 
 info_from_yaml = yaml_load_file("/global/homes/c/cpopik/Capybara/runchains.yaml")
 
 updated_info_minimizer, minimizer = run(info_from_yaml, force=True)
-
-updated_info_minimizer, minimizer = run(info_from_yaml, minimize=True, force=True)
 
 minimum = minimizer.products()["minimum"]
 
@@ -26,6 +22,6 @@ fitpars = [k for k, v in info_from_yaml['params'].items() if isinstance(v, dict)
 fitparsmark = {k: minimum[k] for k, v in info_from_yaml['params'].items() if isinstance(v, dict) and "prior" in v}
 fitparslab = {v['latex'] for k, v in info_from_yaml['params'].items() if isinstance(v, dict) and "prior" in v}
 
-gdplot.triangle_plot(name, params = fitpars,legend_labels=fitparslab, markers=fitparsmark, filled=True,title_limit=1)
+gdplot.triangle_plot(name, params = fitpars,legend_labels=fitparslab, markers=fitparsmark, filled=True)
 plt.savefig('chains/cornerplot.png',bbox_inches='tight')
 plt.close()

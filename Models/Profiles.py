@@ -23,18 +23,15 @@ class BaseGNFW:
     def Pth_over_Pdel(self, x, P0, xc, gamma, alpha, beta):
         return P0* (x/xc)**gamma * (1.+(x/xc)**alpha)**(-beta)
 
-    def twohalo(self, prof_func, rs, zs, mshalo, Plin_func, bias_func, hmf_func, windfunc=1, ave=False, **kwargs):
+    def twohalo(self, prof_func, rs, zs, mshalo, Plin_func, bias_func, hmf_func, windfunc=1,**kwargs):
         import Models.FFTs as FFTs
         ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
         rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT3D()
 
-        bias = bias_func(zs, mshalo, **kwargs)
-        hmf = hmf_func(zs, mshalo, **kwargs)
-        Plin = Plin_func(ks, zs, **kwargs)
         if windfunc!=1: windfunc=windfunc(ks)
-
-        infac = hmf*bias
-        prefac = bias*Plin[..., None]*windfunc
+        
+        infac = hmf_func(zs, mshalo, **kwargs)*bias_func(zs, mshalo, **kwargs)
+        prefac = bias_func(zs, mshalo, **kwargs)*Plin_func(ks, zs, **kwargs)[..., None]*windfunc
         logms = np.log10(mshalo)
 
         prof_k = lambda p: FFT_func(prof_func(p))
@@ -42,7 +39,7 @@ class BaseGNFW:
         prof2h = lambda p: IFFT_func(Pprof2h(p))
         
         return lambda p={}: prof2h(self.p0 | p)
-        
+
 
 class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.org/abs/2009.05558)
     models = ['GNFW']
@@ -103,7 +100,7 @@ class Amodeo2021(BaseGNFW):  # BOSS DR10 cross-correlated with ACT DR5 (arxiv.or
         twohalo = lambda p: p['A2h_k']*lin2h(p)
         return lambda p={}: twohalo(self.p0 | p)
 
-        
+
 
 class Battaglia2015(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/1607.02442)
     models = ['AGN', 'SH']
@@ -136,6 +133,11 @@ class Battaglia2015(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/160
                                             xc=0.5,
                                             beta=self.PLmz(zs, ms200c, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
         return lambda p={}: factorfront*func(self.p0 | p)
+    
+    def rho2h(self, rs, zs, mshalo, rhocrit_func, r200c_func, Plin_func, bias_func, hmf_func, **kwargs):
+        prof_func = self.rho1h(rs, zs, mshalo, rhocrit_func, r200c_func, **kwargs)
+        lin2h = self.twohalo(prof_func, rs, zs, mshalo, Plin_func, bias_func, hmf_func, **kwargs)
+        return lambda p={}: lin2h(self.p0 | p)
 
 
 class Battaglia2012(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/1109.3711)
@@ -170,6 +172,11 @@ class Battaglia2012(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/110
                                             xc=self.PLmz(zs, ms200c, p['xc_A0'], p['xc_alpham'], p['xc_alphaz']),
                                             beta=self.PLmz(zs, ms200c, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
         return lambda p={}: factorfront*func(self.p0 | p)
+    
+    def Pth2h(self, rs, zs, mshalo, rhocrit_func, r200c_func, Plin_func, bias_func, hmf_func, **kwargs):
+        prof_func = self.Pth1h(rs, zs, mshalo, rhocrit_func, r200c_func, **kwargs)
+        lin2h = self.twohalo(prof_func, rs, zs, mshalo, Plin_func, bias_func, hmf_func, **kwargs)
+        return lambda p={}: lin2h(self.p0 | p)
     
     
     

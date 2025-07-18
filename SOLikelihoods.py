@@ -37,21 +37,21 @@ class SZLikelihood(GaussianLikelihood):
         self.rhoc_func = lambda z: self.cosmology.critical_density(z).to(u.Msun/u.Mpc**3).value
         self.dA_func = lambda z: self.cosmology.angular_diameter_distance(z).value
         self.r200c_func = lambda z, m200c: (m200c/(4/3*np.pi*200*self.rhoc_func(z)))**(1/3)
+        
+        print("Loading SHMR")
+        self.shmr = getattr(SHMRs, self.SHMR['name'])(self.SHMR['spefs'])
 
         print("Loading Galaxy Distributions")
         self.smf = getattr(SMFs, self.galaxy_distribution['name'])(self.galaxy_distribution['spefs'])
+        
+         # Cut down on the range
+        self.smf.addcuts(mstarmin = self.shmr.HSMR(10**12),
+            mstarmax = self.shmr.HSMR(self.meas.mhalomax),
+            zmin = 0.4, zmax=0.7)
+        
         self.gdist = self.smf.gdist(**self.cpars)
         self.mstars, self.zs = self.smf.mstars, self.smf.zs
-
-        print("Loading SHMR")
-        self.shmr = getattr(SHMRs, self.SHMR['name'])(self.SHMR['spefs'])
         self.mhalos = self.shmr.SHMR(self.mstars)
-        
-        # Cut down the mrange
-        mrange = self.mhalos < self.meas.mhalomax
-        self.gdist, self.mstars, self.mhalos = self.gdist[:, mrange], self.mstars[mrange], self.mhalos[mrange]
-        self.mhaloave = self.shmr.SHMR(np.sum(self.gdist*self.mstars)/np.sum(self.gdist))
-        self.zave = np.sum(self.gdist*self.zs[:, None])/np.sum(self.gdist)
         
         print("Loading HMF")
         self.halomodel = getattr(HMFs, self.mass_function['name'])(self.mass_function['spefs'])
@@ -89,7 +89,7 @@ class TSZLikelihood(SZLikelihood):
     def _init_model(self):
         self.pth_1h = getattr(Profiles, self.onehalo['name'])(self.onehalo['spefs']).Pth1h(self.rs, self.zs, self.mhalos, self.rhoc_func, self.r200c_func, **self.cpars)
         
-        self.pth_2h = getattr(Profiles, self.twohalo['name'])(self.twohalo['spefs']).Pth2h(self.rs, np.array([self.zave]), self.mhalos, self.rhoc_func, self.r200c_func, self.halomodel.Plin, self.halomodel.bh, self.halomodel.HMF, **self.cpars)
+        self.pth_2h = getattr(Profiles, self.twohalo['name'])(self.twohalo['spefs']).Pth2h(self.rs, self.zs, self.mhalos, self.rhoc_func, self.r200c_func, self.halomodel.Plin, self.halomodel.bh, self.halomodel.HMF, **self.cpars)
         
         self.prof = lambda params={}: self.pth_1h(params) + self.pth_2h(params)
         

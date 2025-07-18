@@ -31,7 +31,15 @@ class BaseSMF:
     def mstarave(self, **cosmopars):
         gdist = self.gdist(**cosmopars)
         return np.sum(gdist*self.mstars)/np.sum(gdist)
-
+    
+    def addcuts(self, zmin=0, zmax=np.inf, mstarmin=0, mstarmax=np.inf):
+        mcut = (self.mstars>=mstarmin) & (self.mstars<=mstarmax)
+        zcut = (self.zs>=zmin) & (self.zs<=zmax)
+        self.mstars, self.zs = self.mstars[mcut], self.zs[zcut]
+        if hasattr(self, 'SMFraw'): 
+            self.SMFraw = self.SMFraw[zcut][:,mcut]
+        if hasattr(self, 'gdistraw'): 
+            self.gdistraw = self.gdistraw[zcut][:,mcut]
 
 class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
     zbins = ['all', 'bin_1', 'bin_2', 'bin_3', 'bin_4']
@@ -52,6 +60,21 @@ class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
         self.mstars = 10**pd.read_csv(f"{self.path}/Fig1_{self.sample}_z0.8.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[0]).Mstar.values  # [M_sol]
         self.SMFraw = np.array([pd.read_csv(f"{self.path}/Fig1_{self.sample}_z{z:.1f}.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[1]).n.values for z in self.zs])  # [(Mpc/h)^-3 dex^-1]
 
+    def gdist(self, **cosmopars):
+        gdist = self.SMFraw*cosmopars["hh"]**3*self.SMF_to_N(**cosmopars)[:, None]
+        if self.zweight=='True':
+            self.LRGXcorrzdist()
+            gdist = gdist*(self.zdistscale/np.sum(gdist, axis=1))[:, None]
+        return gdist
+
+    def SMF(self, **cosmopars):
+        SMF = self.SMFraw*cosmopars['hh']**3
+        if self.zweight=='True':
+            self.LRGXcorrzdist()
+            SMF = SMF*(self.zdistscale/self.SMF_to_N(**cosmopars)/np.trapz(SMF, np.log10(self.mstars), axis=1))[:, None]
+        return SMF
+    
+    def LRGXcorrzdist(self):
         # Read in the redshift distribution for each specific bin
         # Number density in N / deg^2, dataframe with 1D arrays of length [ndim_zs_zdist]
         self.zdistdf = pd.read_csv(self.redshift_dist_file, sep=" ", skiprows=1, names=pd.read_csv(self.redshift_dist_file, sep=" ").columns[1:])
@@ -60,18 +83,6 @@ class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
         # Sort/group/sum up the finer redshift bins to match the bins of the SMF distribution
         self.zdistdf['zbin'] = pd.cut(self.zdistdf['zmin'], bins=np.arange(self.zs[0], self.zs[-1]+0.2, 0.1))
         self.zdistscale = self.zdistdf.groupby('zbin')[f"{self.zbin}_{self.hemisphere}"].sum().values*self.surveyarea
-
-    def gdist(self, **cosmopars):
-        gdist = self.SMFraw*cosmopars["hh"]**3*self.SMF_to_N(**cosmopars)[:, None]
-        if self.zweight=='True':
-            gdist = gdist*(self.zdistscale/np.sum(gdist, axis=1))[:, None]
-        return gdist
-
-    def SMF(self, **cosmopars):
-        SMF = self.SMFraw*cosmopars['hh']**3
-        if self.zweight=='True':
-            SMF = SMF*(self.zdistscale/self.SMF_to_N(**cosmopars)/np.trapz(SMF, np.log10(self.mstars), axis=1))[:, None]
-        return SMF
 
     
 
@@ -97,7 +108,6 @@ class DR10CMASS(BaseSMF):
         elif self.group=='granada': 
             self.checkspefs(spefs, required=['IMF', 'time', 'dust'])
             fname, mcolname = f"fsps_{self.IMF}_{self.time}_{self.dust}", "MSTELLAR_MEDIAN"
-
 
         self.dfdata = Table.read(f"{self.path}/{self.group}_{fname}-v5_5_12.fits.gz")['Z', mcolname].to_pandas().rename(columns={mcolname: "LOGM"})
 

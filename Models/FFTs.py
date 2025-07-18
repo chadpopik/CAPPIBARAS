@@ -22,6 +22,9 @@ class mcfit_package:
     def FFT3D(self):
         return self.ks, lambda funcx: np.array([[self.FFTraw(funcx[:, i, j]) for i in range(funcx.shape[1])] for j in range(funcx.shape[2])]).T
     
+    def FFT1D(self):
+        return self.ks, lambda funcx: self.FFTraw(funcx)
+    
     def IFFT3D(self):
         return self.rs_rev, lambda funck: np.array([[self.IFFTraw(funck[:, i, j]) for i in range(funck.shape[1])] for j in range(funck.shape[2])]).T
 

@@ -6,24 +6,23 @@ Very initial version of the code, no judging.
 Things to come:
 - Mass definition conversions
 - DESI SMF from catalog
-- Calculating C_ells 
+- Calculating C_ells
 - Miscentering (maybe)
-
+- More details on mass/redshift ranges for all the models
+- Satellite dependent SHMR model
 
 
 
 HODs:
-- TODO 1: Add valid mass and redshift ranges for each model
-- TODO 2: Check to see if the other HODs have extra parts of their models, like different satellite profiles
+- TODO 1: Check to see if the other HODs have extra parts of their models, like different satellite profiles, and add if necessary
 
 
 SHMRs:
-- TODO 1: Add valid mass and redshift ranges for each model
-- TODO 3: Add satellite dependent model somehow
+- 
 
 
 HMFs:
-- TODO 1: Investigate more the cosmology dependence for both models
+- TODO 1: Investigate more detail to the cosmology dependence for both models
 
 
 SMFs:
@@ -31,22 +30,19 @@ SMFs:
 - TODO 2: Add zdistributions for CMASS
 
 
+FFTs:
+- TODO 1: test mcfit for forward/backward equivalency
+- TODO 2: understand better Emily's Hankel transform
+
+
 Profiles:
 - TODO 1: Various two-halo checks and tasks: how to handle the FFT? whether to take in functions or array for Plin? Specify the model? Check for mass definitions?
 
 
 Measurements:
-- TODO 1: Find better source of Schaan measurements/covariances and dust model (just using Emily's TNG for now). Also why is the covariances off from the error, shouldn't they be the same?
-- TODO 2: What are the units on the beam response and how should it be converted? Using it raw isn't right.
-- TODO 3: Find Liu response, and probably have to figure out conversions same as TODO 2.
-- TODO 4: Find dust model to use for Liu, just using Emily's TNG file for now.
-- TODO 5: Ask about dust file, should it be negative?
-- TODO 6: Find beam and responses for boryana measurements
-
-
-FFTs:
-- TODO 1: test mcfit for forward/backward equivalency
-- TODO 2: understand better Emily's Hankel transform
+- TODO 1: Find better source of Schaan measurements/covariances and dust model (covariances off from the error?), and dust profile
+- TODO 2: Find beam and response for Henry and Boryana measurements
+- TODO 3: Find dust profile for Henry and Boryana measurements
 
 
 ForwardModel:

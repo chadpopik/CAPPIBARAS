@@ -13,8 +13,8 @@ class BASEHMF:
                 raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s')}")
             else:
                 setattr(self, mname, spefs[mname])
-        
-        
+
+
 class pyccl(BASEHMF):
     mfuncs = ['Angulo12', 'Bocquet16', 'Bocquet20', 'Despali16', 'Jenkins01', 'Nishimichi19', 'Press74', 'Sheth99', 'Tinker08', 'Tinker10', 'Watson13']
     hbiass = ['Bhattacharya11', 'Sheth01', 'Sheth99', 'Tinker10']
@@ -68,9 +68,11 @@ class hmf_package(BASEHMF):  # https://hmf.readthaedocs.io/en/latest/index.html
         dlog10m = 0.1
 
         # Function only takes one z at a time so use list comprehension and then combine
-        haloMFsraw = [self.hmf.MassFunction(z=z, Mmin=np.log10(np.min(mshalo))-dlog10m, Mmax=np.log10(np.max(mshalo))+dlog10m, dlog10m=dlog10m, hmf_model=self.mfunc, mdef_model=self.mdef, cosmo_model=cosmo) for z in zs]  # TODO 2
+        haloMFsraw = [self.hmf.MassFunction(z=z, Mmin=np.log10(np.min(mshalo))-dlog10m, Mmax=np.log10(np.max(mshalo))+dlog10m, dlog10m=dlog10m, hmf_model=self.mfunc, mdef_model=self.mdef, cosmo_model=cosmo) for z in zs]
         HMF_m_z = np.array([np.interp(mshalo, haloMF.m, haloMF.dndlog10m*hh**3) for haloMF in haloMFsraw])
         return HMF_m_z
+
+
 
 
 # class hmvec(BASEHMF):

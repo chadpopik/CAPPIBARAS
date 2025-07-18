@@ -6,6 +6,11 @@ Classes should have consistently titled attributes and units.
 from Basics import *
 
 
+def fnu(nu, T_cmb):
+    x = (c.h * nu*u.GHz / (c.k_B * T_cmb*u.K)).decompose().value
+    ans = x / np.tanh(x / 2.0) - 4.0
+    return ans
+
 class BaseData:
     def checkspefs(self, spefs, required):  # Check if the spef is in the list
         for mname in required:
@@ -14,10 +19,6 @@ class BaseData:
             else:
                 setattr(self, mname, getattr(self, f'{mname}s')[spefs[mname]])
                 
-def fnu(nu, T_cmb):
-    x = (c.h * nu*u.GHz / (c.k_B * T_cmb*u.K)).decompose().value
-    ans = x / np.tanh(x / 2.0) - 4.0
-    return ans
 
 
 class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
@@ -27,11 +28,10 @@ class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/a
     zoutcuts = {'nocut': '', 'cut': 'sigmaz0.05000_'}
     
     path = "/global/homes/c/cpopik/Capybara/Data/Hadzhiyska2024"
-    beamfile = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220/ilc_beam.txt"
-    respfile = None
-    dustfile = None
+    beamfile = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220/ilc_beam.txt"  # TODO 2
+    respfile = None  # TODO 2
+    dustfile = None  # TODO 3
     freq = 90  # check this?
-    # TODO 6
     
 
     def __init__(self, spefs):       
@@ -63,9 +63,10 @@ class Liu2025(BaseData):  # ACT DR6 maps stacked on DESI LRGs for cross-correlat
     
     freq = 150
     dirname = "/global/homes/c/cpopik/Data/StackedProfiles_outputs_for_Nick"
-    beamfile = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220/ilc_beam.txt"
-    respfile = None  # TODO 3
-    dustfile = None  # TODO 4
+    beamfile = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220/ilc_beam.txt"  # TODO 2
+    respfile = None  # TODO 2
+    dustfile = None  # TODO 3
+    
 
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['zbin', 'dBeta'])
@@ -84,10 +85,11 @@ class Liu2025(BaseData):  # ACT DR6 maps stacked on DESI LRGs for cross-correlat
         self.respfile = f"/global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary/responses/act_planck_dr5.01_s08s18_AA_f150_daynight_response_tsz.txt"
         self.resp_ells, self.resp_data = np.genfromtxt(self.respfile).T[0:2]
         self.resp_data = -self.resp_data 
+        
         roughdustx, roughdusty = np.array([1.64, 1.83, 2.01, 2.17, 2.34, 2.54, 2.71, 2.9 , 3.1 , 3.27, 3.49, 3.49, 3.66, 3.85, 4.06, 4.06, 4.29, 4.45, 4.45, 4.64, 4.64, 4.83, 4.83, 5.02, 5.02, 5.2 , 5.2 , 5.39, 5.58, 5.77, 5.77, 5.93, 5.93]), np.array([1.05, 1.23, 1.31, 1.43, 1.58, 1.65, 1.77, 1.75, 1.8 , 1.85, 1.85, 1.85, 1.75, 1.69, 1.54, 1.54, 1.45, 1.31, 1.31, 1.11, 1.11, 0.97, 0.97, 0.84, 0.84, 0.73, 0.73, 0.57, 0.46, 0.34, 0.34, 0.15, 0.15])
         self.dustprof = np.interp(self.thetas, roughdustx, roughdusty)  # [muK*arcmin^2]
         
-    def tSZdata_in_muK(self, T_CMB, **kwargs):  # Convert data/cov to muK*arcmin^2 to match model, needs a T_CMB value
+    def tSZdata_in_muK(self, T_CMB, **kwargs):  # Convert data/cov to muK*arcmin^2 to match model, needs a T_CMB value which we won't assume
         self.tSZdata = self.tSZdata*fnu(self.freq, T_CMB)*T_CMB*1e6
         self.tSZerr = -self.tSZerr*fnu(self.freq, T_CMB)*T_CMB*1e6
         self.tSZcov = self.tSZcov*(fnu(self.freq, T_CMB)*T_CMB*1e6)**2
@@ -98,6 +100,9 @@ class Schaan2021:  # ACT DR5 maps stacked on CMASS DR10/DR12 (arxiv.org/abs/2009
     datafile = "/global/homes/c/cpopik/Capybara/Data/emu4d_match_ACT_profiles.txt"  # TODO 1
     tSZcovfile = "/global/homes/c/cpopik/Capybara/Data/cov_diskring_tsz_varweight_bootstrap.txt"  # TODO 1
     kSZcovfile = "/global/homes/c/cpopik/Capybara/Data/cov_diskring_ksz_varweight_bootstrap.txt"  # TODO 1
+    
+    beamfiles = lambda self, freq: f"/global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary/beams/act_planck_dr5.01_s08s18_f{freq}_daynight_beam.txt"
+    respfiles = lambda self, freq: f"/global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary/responses/act_planck_dr5.01_s08s18_AA_f{freq}_daynight_response_tsz.txt"
     freq = 150
     mhalomax = 1e14
 
@@ -109,12 +114,13 @@ class Schaan2021:  # ACT DR5 maps stacked on CMASS DR10/DR12 (arxiv.org/abs/2009
         self.tSZcov = np.genfromtxt(self.tSZcovfile).T*u.sr.to(u.arcmin**2)**2  # [muK*ster]->[muK*arcmin^2]
         self.kSZcov = np.genfromtxt(self.kSZcovfile).T*u.sr.to(u.arcmin**2)**2  # [muK*ster]->[muK*arcmin^2]
 
-        self.beamfile = f"/global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary/beams/act_planck_dr5.01_s08s18_f{self.freq}_daynight_beam.txt"
+        self.beamfile = self.beamfiles(self.freq)
         self.beam_ells, self.beam_data = np.genfromtxt(self.beamfile).T  # [ells, unitless]
 
-        self.respfile = f"/global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary/responses/act_planck_dr5.01_s08s18_AA_f{self.freq}_daynight_response_tsz.txt"
+        self.respfile = self.respfiles(self.freq)
         self.resp_ells, self.resp_data = np.genfromtxt(self.respfile).T[0:2]
-        self.resp_data = -self.resp_data  # TODO 2
+        self.resp_data = -self.resp_data  # Is negative for some reason
         
+        # TODO 1
         roughdustx, roughdusty = np.array([1.64, 1.83, 2.01, 2.17, 2.34, 2.54, 2.71, 2.9 , 3.1 , 3.27, 3.49, 3.49, 3.66, 3.85, 4.06, 4.06, 4.29, 4.45, 4.45, 4.64, 4.64, 4.83, 4.83, 5.02, 5.02, 5.2 , 5.2 , 5.39, 5.58, 5.77, 5.77, 5.93, 5.93]), np.array([1.05, 1.23, 1.31, 1.43, 1.58, 1.65, 1.77, 1.75, 1.8 , 1.85, 1.85, 1.85, 1.75, 1.69, 1.54, 1.54, 1.45, 1.31, 1.31, 1.11, 1.11, 0.97, 0.97, 0.84, 0.84, 0.73, 0.73, 0.57, 0.46, 0.34, 0.34, 0.15, 0.15])
         self.dustprof = np.interp(self.thetas, roughdustx, roughdusty)  # [muK*arcmin^2]

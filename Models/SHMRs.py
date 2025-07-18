@@ -31,8 +31,6 @@ class BASESHMR:
         Mss_from_Mhs = self.HSMR(Mhs, self.p0 | p)
         return np.interp(Ms, Mss_from_Mhs, Mhs)
     
-    # TODO 1
-
 
 class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.02665)
     samples = ["Main_BP13", "LOWZ_BP13", "CMASS_BP13", "Main_DP", "LOWZ_DP", "CMASS_DP"]
