@@ -19,14 +19,15 @@ class BaseHOD:  # For general functions
                 setattr(self, mname, spefs[mname])
         self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
 
-    def Nc_Zheng2005(self, M, logM_min, sigma_logM):  # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564), uses Mvir
-        return 0.5*(1+scipy.special.erf((np.log10(M)-logM_min)/sigma_logM))
+    def Nc_Zheng2005(self, logM, logM_min, sigma_logM):  # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564), uses Mvir
+        return 0.5*(1+scipy.special.erf((logM-logM_min)/sigma_logM))
 
-    def Ns_Zheng2005(self, M, logM_0, logM_1, alpha):  # Expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564), uses Mvir
-        return ((M-10**logM_0)/10**logM_1)**alpha
+    def Ns_Zheng2005(self, logM, logM_0, logM_1, alpha):  # Expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564), uses Mvir
+        M, M_0, M_1 = 10**logM, 10**logM_0, 10**logM_1
+        return ((M-M_0)/M_1)**alpha
 
-    def f_inc_More2015(self, M, alpha_inc, logM_inc):  # CMASS incompleteness function (arxiv.org/abs/1407.1856)
-        return np.clip(1+alpha_inc*(np.log10(M)-logM_inc), 0, 1)
+    def f_inc_More2015(self, logM, alpha_inc, logM_inc):  # CMASS incompleteness function (arxiv.org/abs/1407.1856)
+        return np.clip(1+alpha_inc*(logM-logM_inc), 0, 1)
     
     def GNFW(self, x, gamma, alpha, beta):  # Used for satellite density profile
         return 1/(x**gamma * (1+x**alpha)**((beta-gamma)/alpha))
@@ -54,13 +55,13 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
         self.checkspefs(spefs, required=['sample'])
         self.mstermin = self.mstarmins[self.samples.index(self.sample)]
 
-    def Nc(self, M, p={}):
+    def Nc(self, logM, p={}):
         p = self.p0 | p
-        return self.Nc_Zheng2005(M, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc_More2015(M, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
+        return self.Nc_Zheng2005(logM, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc_More2015(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
 
-    def Ns(self, M, p={}):
+    def Ns(self, logM, p={}):
         p = self.p0 | p
-        return self.Ns_Zheng2005(M, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(M-10**p['logM_min'],1) * self.Nc(M, p)
+        return self.Ns_Zheng2005(logM, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(logM-p['logM_min'],1) * self.Nc(logM, p)
 
     def uSat(self, x, p={}):
         p = self.p0 | p
@@ -89,16 +90,16 @@ class Yuan2023(BaseHOD):  # DESI 1% LRGs/QSOs (arxiv.org/abs/2306.06314)
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
     
-    def Nc(self, M, p={}):
+    def Nc(self, logM, p={}):
         p = self.p0 | p
-        return self.Nc_Zheng2005(M, logM_min=p['logM_cut'], sigma_logM=np.sqrt(2)*p['sigma']) * p['f_ic']
+        return self.Nc_Zheng2005(logM, logM_min=p['logM_cut'], sigma_logM=np.sqrt(2)*p['sigma']) * p['f_ic']
     
-    def Ns(self, M, p={}):
+    def Ns(self, logM, p={}):
         p = self.p0 | p
         if self.sample=="QSO 0.8<z<2.1":
-            return self.Ns_Zheng2005(M, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha'])
+            return self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha'])
         else:
-            return self.Ns_Zheng2005(M, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(M, p)
+            return self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(logM, p)
 
         
 
@@ -122,13 +123,13 @@ class Kusiak2022(BaseHOD):  # unWISE (arxiv.org/abs/2203.12583)
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
     
-    def Nc(self, M, p={}):
+    def Nc(self, logM, p={}):
         p = self.p0 | p
-        return self.Nc_Zheng2005(M, logM_min=p['logM_min^HOD'], sigma_logM=p['sigma_logM'])
+        return self.Nc_Zheng2005(logM, logM_min=p['logM_min^HOD'], sigma_logM=p['sigma_logM'])
     
-    def Ns(self, M, p={}):
+    def Ns(self, logM, p={}):
         p = self.p0 | p
-        return self.Ns_Zheng2005(M, logM_0=0, logM_1 = p['logM_1'], alpha=p['alpha_s']) * self.Nc(M, p)
+        return self.Ns_Zheng2005(logM, logM_0=0, logM_1 = p['logM_1'], alpha=p['alpha_s']) * self.Nc(logM, p)
     
     
 class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.org/abs/2204.02418)
@@ -153,13 +154,13 @@ class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.o
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
         
-    def Nc(self, M, p={}):
+    def Nc(self, logM, p={}):
         p = self.p0 | p
-        return self.Nc_Zheng2005(M, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a']) * p['alpha^a']
+        return self.Nc_Zheng2005(logM, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a']) * p['alpha^a']
     
-    def Ns(self, M, p={}):
+    def Ns(self, logM, p={}):
         p = self.p0 | p
-        return self.Ns_Zheng2005(M, logM_0=0, logM_1 = np.log10(p['M^a']*1e13), alpha=p['beta^a']) * self.Nc_Zheng2005(M, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a'])
+        return self.Ns_Zheng2005(logM, logM_0=0, logM_1 = np.log10(p['M^a']*1e13), alpha=p['beta^a']) * self.Nc_Zheng2005(logM, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a'])
 
 
 class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
@@ -189,10 +190,10 @@ class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
 
-    def Nc(self, M, p={}):
+    def Nc(self, logM, p={}):
         p = self.p0 | p
-        return self.Nc_Zheng2005(M, logM_min=p['logM_min'], sigma_logM=p['sigma^2']**0.5) * self.f_inc_More2015(M, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
+        return self.Nc_Zheng2005(logM, logM_min=p['logM_min'], sigma_logM=p['sigma^2']**0.5) * self.f_inc_More2015(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
     
-    def Ns(self, M, p={}):
+    def Ns(self, logM, p={}):
         p = self.p0 | p
-        return self.Ns_Zheng2005(M, logM_0=np.log10(p['kappa'])+p['logM_min'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(M, p)
+        return self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_min'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(logM, p)

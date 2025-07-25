@@ -52,6 +52,7 @@ ForwardModel:
 - TODO 4: Should i just drop the y conversion? like why is it in there? for rho it's incorrect, and for Pth it might be unneeded.
 
 
+
 SOLikelihoods:
 - TODO 1: Is there a way to not way to write a preinit line for each value that's needed?
 - TODO 2: Is there a way to just know the yaml file and more easily load the original params?
@@ -60,5 +61,4 @@ SOLikelihoods:
 
 
 runchains:
-- TODO 1: Make the corner plot automatically find and assign the fit parameters (.py)
-- TODO 2: Find a way to make the general model things (HOD, SHMR, mass_function, etc) apply to every likelihood
+- TODO 1: Find a way to make the general model things (HOD, SHMR, mass_function, etc) apply to every likelihood

@@ -1,0 +1,135 @@
+theory: null
+likelihood:
+  tsztest:
+    DataUse:
+      name: Schaan2021
+      spefs: null
+    onehalo:
+      name: Amodeo2021
+      spefs:
+        model: GNFW
+    twohalo:
+      name: Amodeo2021
+      spefs:
+        model: GNFW
+    galaxy_distribution:
+      name: DR10CMASS
+      spefs:
+        group: portsmouth
+        template: passive
+        IMF: krou
+    HOD:
+      name: Kou2023
+      spefs:
+        sample: M*>10.8
+    SHMR:
+      name: Kravstov2014
+      spefs:
+        sample: M200c
+    mass_function:
+      name: pyccl
+      spefs:
+        mfunc: Tinker08
+        mdef: 200c
+        hbias: Tinker10
+    yaml_file: /global/homes/c/cpopik/Capybara/runchains.yaml
+    name: Gaussian
+    datapath: null
+    covpath: null
+    ncovsims: null
+    type: []
+    speed: -1
+    stop_at_error: false
+    version: null
+    class: SOLikelihoods.TSZLikelihood
+    input_params:
+    - hh
+    - Omega_L
+    - Omega_m
+    - Omega_b
+    - T_CMB
+    - XH
+    - v_rms
+    - P0
+    - alpha_t
+    - beta_t
+    - A2h_t
+    output_params: []
+params:
+  hh:
+    value: 0.7
+  Omega_L:
+    value: 0.75
+  Omega_m:
+    value: 0.25
+  Omega_b:
+    value: 0.044
+  T_CMB:
+    value: 2.725
+  XH:
+    value: 0.76
+  v_rms:
+    value: 0.00106
+  P0:
+    latex: P_0^{A_0}
+    ref: 2
+    prior:
+      min: 1
+      max: 5
+  alpha_t:
+    latex: \alpha_t^{A_0}
+    ref: 0.8
+    prior:
+      min: 0.1
+      max: 1
+  beta_t:
+    latex: \beta_t^{A_0}
+    ref: 2.6
+    prior:
+      min: 1
+      max: 10
+  A2h_t:
+    latex: A_{2h, t}
+    ref: 0.7
+    prior:
+      min: 0
+      max: 5
+sampler:
+  mcmc:
+    burn_in: 0
+    max_tries: 200d
+    covmat: null
+    covmat_params: null
+    proposal_scale: 2.4
+    output_every: 10s
+    learn_every: 40d
+    temperature: 1
+    learn_proposal: true
+    learn_proposal_Rminus1_max: 2.0
+    learn_proposal_Rminus1_max_early: 30.0
+    learn_proposal_Rminus1_min: 0.0
+    max_samples: .inf
+    Rminus1_stop: 0.01
+    Rminus1_cl_stop: 0.2
+    Rminus1_cl_level: 0.95
+    Rminus1_single_split: 4
+    measure_speeds: true
+    oversample_power: 0.4
+    oversample_thin: true
+    drag: false
+    blocking:
+    - - 1
+      - - P0
+        - alpha_t
+        - beta_t
+        - A2h_t
+    callback_function: null
+    callback_every: null
+    seed: null
+    check_every: null
+    oversample: null
+    drag_limits: null
+    fallback_covmat_scale: 4
+    version: 3.5.7
+output: cobaya_TEST_0.00121-07-25_09-42
+version: 3.5.7

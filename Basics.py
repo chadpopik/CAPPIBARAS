@@ -8,6 +8,7 @@ from astropy.io import fits
 from astropy.table import Table
 import astropy, os, sys, h5py, time, random, scipy, pickle, h5py
 from typing import Optional, Sequence, Dict, Any
+from datetime import datetime
 
 import astropy.units as u
 import astropy.constants as c

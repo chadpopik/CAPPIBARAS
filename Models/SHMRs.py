@@ -17,19 +17,21 @@ class BASESHMR:
                 setattr(self, mname, spefs[mname])
         self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
 
-    def Behroozi(self, Mh, logM1, logeps, alpha, delta, gamma):  # (arxiv.org/abs/1207.6105), virial mass
-        M1, eps = 10**logM1, 10**logeps
+    def Behroozi(self, logMh, logM1, logeps, alpha, delta, gamma):  # (arxiv.org/abs/1207.6105), virial mass
+        Mh, M1, eps = 10**logMh, 10**logM1, 10**logeps
         f = lambda x : -np.log10(10**(alpha*x)+1) + delta*(np.log10(1+np.exp(x)))**gamma/(1+np.exp(10**(-x)))
-        return 10**( np.log10(eps*M1) + f(np.log10(Mh/M1)) - f(0) )
+        Ms = 10**( np.log10(eps*M1) + f(np.log10(Mh/M1)) - f(0) )
+        return np.log10(Ms)
     
-    def DoublePowerLaw(self, Mh, logM1, N, beta, gamma):  # (arxiv.org/abs/1205.5807), "virial masses are computed with respect to 200 times the critical density"????
-        M1 = 10**logM1
-        return 2*N/( (Mh/M1)**(-beta) + (Mh/M1)**(gamma) )
+    def DoublePowerLaw(self, logMh, logM1, N, beta, gamma):  # (arxiv.org/abs/1205.5807), "virial masses are computed with respect to 200 times the critical density"????
+        Mh, M1 = 10**logMh, 10**logM1
+        Ms = 2*N/( (Mh/M1)**(-beta) + (Mh/M1)**(gamma) )
+        return np.log10(Ms)
     
-    def SHMR(self, Ms, p={}):  # Interpolate to get halo masses from stellar mass
-        Mhs = np.logspace(10, 20, 1000)
-        Mss_from_Mhs = self.HSMR(Mhs, self.p0 | p)
-        return np.interp(Ms, Mss_from_Mhs, Mhs)
+    def SHMR(self, logMs, p={}):  # Interpolate to get halo masses from stellar mass
+        logMhs = np.linspace(10, 20, 1000)
+        logMss_from_logMhs = self.HSMR(logMhs, self.p0 | p)
+        return np.interp(logMs, logMss_from_logMhs, logMhs)
     
 
 class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.02665)
@@ -48,12 +50,12 @@ class Xu2023(BASESHMR):  #SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.0
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
 
-    def HSMR(self, Mh, p={}):
+    def HSMR(self, logMh, p={}):
         p = self.p0 | p
         if self.sample.split('_')[-1]=='BP13':
-            return self.Behroozi(Mh, logM1=p['logM0'], logeps=p['logeps'], alpha=-p['beta'], delta=p['delta'], gamma=p['alpha'])
+            return self.Behroozi(logMh, logM1=p['logM0'], logeps=p['logeps'], alpha=-p['beta'], delta=p['delta'], gamma=p['alpha'])
         elif self.sample.split('_')[-1]=='DP':
-            return self.DoublePowerLaw(Mh, logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
+            return self.DoublePowerLaw(logMh, logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
 
 
 class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
@@ -70,9 +72,9 @@ class Gao2023(BASESHMR):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
 
-    def HSMR(self, Mh, p={}):
+    def HSMR(self, logMh, p={}):
         p = self.p0 | p
-        return self.DoublePowerLaw(Mh, logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
+        return self.DoublePowerLaw(logMh, logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
 
 
 class Kravstov2014(BASESHMR):  # SDSS DR8 (arxiv.org/abs/1401.7329)
@@ -87,6 +89,6 @@ class Kravstov2014(BASESHMR):  # SDSS DR8 (arxiv.org/abs/1401.7329)
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
 
-    def HSMR(self, Mh, p={}):
+    def HSMR(self, logMh, p={}):
         p = self.p0 | p
-        return self.Behroozi(Mh, logM1=p['logM1'], logeps=p['logeps'], alpha=-p['alpha'], delta=p['delta'], gamma=p['gamma'])
+        return self.Behroozi(logMh, logM1=p['logM1'], logeps=p['logeps'], alpha=-p['alpha'], delta=p['delta'], gamma=p['gamma'])

@@ -26,10 +26,7 @@ class SZLikelihood(GaussianLikelihood):
 
     # Anything that should be used for multiple likelihoods should be defind in the initalize 
     def initialize(self):
-        self.cpars = {k: v["value"] for k, v in yaml_load_file(self.yaml_file)['params'].items() if isinstance(v, dict) and "value" in v}
-        
-        print("Loading Data")
-        self._get_data()   
+        self.cpars = {k: v["value"] for k, v in yaml_load_file(self.yaml_file)['params'].items() if isinstance(v, dict) and "value" in v}  
 
         print("Loading Cosmology functions")
         self.cosmology = astropy.cosmology.LambdaCDM(H0=self.cpars["hh"]*100, Tcmb0=2.726, Om0=self.cpars["Omega_m"], Ode0=self.cpars["Omega_L"], Ob0=self.cpars["Omega_b"])
@@ -40,15 +37,19 @@ class SZLikelihood(GaussianLikelihood):
         
         print("Loading SHMR")
         self.shmr = getattr(SHMRs, self.SHMR['name'])(self.SHMR['spefs'])
-
+        
+        print("Loading HOD")
+        self.hod = getattr(HODs, self.HOD['name'])(self.HOD['spefs'])
+        
+        print("Loading Data")
+        self._get_data()
+        
+        self.rs = np.logspace(-1.5, 1.5, 100)
+        
         print("Loading Galaxy Distributions")
         self.smf = getattr(SMFs, self.galaxy_distribution['name'])(self.galaxy_distribution['spefs'])
-        
-         # Cut down on the range
-        self.smf.addcuts(mstarmin = self.shmr.HSMR(10**12),
-            mstarmax = self.shmr.HSMR(self.meas.mhalomax),
-            zmin = 0.4, zmax=0.7)
-        
+         # Cut down on the mass/redshift range
+        self.smf.addcuts(self.zmin, self.zmax, self.mstarmin, self.mstarmax)
         self.gdist = self.smf.gdist(**self.cpars)
         self.mstars, self.zs = self.smf.mstars, self.smf.zs
         self.mhalos = self.shmr.SHMR(self.mstars)
@@ -56,11 +57,6 @@ class SZLikelihood(GaussianLikelihood):
         print("Loading HMF")
         self.halomodel = getattr(HMFs, self.mass_function['name'])(self.mass_function['spefs'])
         self.hmf = self.halomodel.HMF(self.zs, self.mhalos, **self.cpars)
-        
-        print("Loading HOD")
-        self.hod = getattr(HODs, self.HOD['name'])(self.HOD['spefs'])
-
-        self.rs = np.logspace(-1, 1, 100)
 
         print("Loading Average Functions")
         self.ave_SMF = ForwardModel.weighting(self.gdist)
@@ -85,6 +81,11 @@ class TSZLikelihood(SZLikelihood):
         self.meas = getattr(Measurements, self.DataUse['name'])(self.DataUse['spefs'])
         
         self.data = GaussianData("SZModel", self.meas.thetas, self.meas.tSZdata, self.meas.tSZcov)
+        
+        self.mstarmin = self.shmr.HSMR(10**12)
+        self.mstarmax = self.shmr.HSMR(self.meas.mhalomax)
+        self.zmin = 0.4
+        self.zmax = 0.7
 
     def _init_model(self):
         self.pth_1h = getattr(Profiles, self.onehalo['name'])(self.onehalo['spefs']).Pth1h(self.rs, self.zs, self.mhalos, self.rhoc_func, self.r200c_func, **self.cpars)

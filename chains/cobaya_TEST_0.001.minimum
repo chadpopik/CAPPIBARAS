@@ -1,10 +1,10 @@
- -log(Like) = 5.693378135965265
-  chi-sq    = 11.38675627193053
+ -log(Like) = 22.601046140471674
+  chi-sq    = 45.20209228094335
 
-    8  1.442680574e+00   P0              P_0^{A_0}
-    9  9.915714747e-01   alpha_t         \alpha_t^{A_0}
-   10  2.290205957e+00   beta_t          \beta_t^{A_0}
-   11  2.795594532e+00   A2h_t           A_{2h, t}
+    8  5.0               P0              P_0^{A_0}
+    9  6.364913190e-01   alpha_t         \alpha_t^{A_0}
+   10  4.143636745e+00   beta_t          \beta_t^{A_0}
+   11  3.867190263e+00   A2h_t           A_{2h, t}
 
     1  0.7               hh              hh
     2  0.75              Omega_L         Omega\ L
@@ -14,4 +14,4 @@
     6  0.76              XH              XH
     7  0.00106           v_rms           v\ rms
 
-   12  1.211563601e+00   chi2__tsztest   \chi^2_{\rm tsztest}
+   12  3.502689961e+01   chi2__tsztest   \chi^2_{\rm tsztest}

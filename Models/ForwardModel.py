@@ -13,37 +13,8 @@ from scipy.interpolate import interp1d  # Do we need this? can we just use norma
 
 
 def weighting(galaxydist):
-    gdist_norm = galaxydist/np.sum(galaxydist)
+    gdist_norm = galaxydist/np.sum(galaxydist)  # Normalize the distribution
     return lambda Pths: np.sum(np.sum(gdist_norm * Pths, axis=1), axis=1)
-
-
-def HODweighting(rs, zs, mshalo, Nc_func, Ns_func, uSat_func,
-                 HMF, r200c_func, H_func, XH, **kwargs):
-    ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
-    rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT1D()
-    
-    xs = rs[:, None, None]/r200c_func(zs[:, None], mshalo)
-    # NOTE: These profiles also have some parameters that can be fit, but I'm not doing that here
-    usk_m_z = FFT_func(uSat_func(xs)) 
-    uck_m_z = np.ones(usk_m_z.shape)  # Set to one
-    
-    # Precalculating as much as possible
-    yfac = (2+2*XH)/(3+5*XH)*(c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*r200c_func(zs[:, None], mshalo)**3*((1+zs)**2/H_func(zs))[:, None]  # Converting Pth to y
-
-    def HODave(Pths, params):
-        Nc = Nc_func(mshalo, params)
-        Ns = Ns_func(mshalo, params)
-        ngal = np.trapz(np.trapz((Nc+Ns)*HMF, mshalo), zs)
-        HODTerm = (Nc*uck_m_z + Ns*usk_m_z)/ngal
-
-        dndzdm_norm = HODTerm*HMF/np.trapz(np.trapz(HODTerm*HMF, mshalo), zs)[:, None, None]
-        yk_m_z = FFT_func(Pths)*yfac
-        Pgy1h = np.trapz(np.trapz(yk_m_z*dndzdm_norm, mshalo), zs)
-
-        yfacave = np.trapz(np.trapz(yfac*dndzdm_norm, mshalo), zs)
-        return IFFT_func(Pgy1h/yfacave)
-
-    return lambda Pths, params: HODave(Pths, params)
 
 
 # Want this to return a lambda function in terms of r and Pth
@@ -106,9 +77,34 @@ def rho_to_muK(v_rms, XH, T_CMB, **kwargs):
 
 
 
+def HODweighting(rs, zs, logmshalo, Nc_func, Ns_func, uSat_func,
+                 HMF, r200c_func, H_func, XH, **kwargs):
+    ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
+    rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT1D()
 
+    rs200c, Hs = r200c_func(zs, logmshalo), H_func(zs)
+    xs = rs[:, None, None]/rs200c
+    # NOTE: These profiles also have some parameters that can be fit, but I'm not doing that here
+    usk_m_z = FFT_func(uSat_func(xs)) 
+    uck_m_z = np.ones(usk_m_z.shape)  # Set to one
+    
+    # Precalculating as much as possible
+    yfac = (2+2*XH)/(3+5*XH)*(c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*rs200c**3*((1+zs)**2/Hs)[:, None]  # Converting Pth to y
 
+    def HODave(Pths, params):
+        Nc = Nc_func(logmshalo, params)
+        Ns = Ns_func(logmshalo, params)
+        ngal = np.trapz(np.trapz((Nc+Ns)*HMF, logmshalo), zs)
+        HODTerm = (Nc*uck_m_z + Ns*usk_m_z)/ngal
 
+        dndzdm_norm = HODTerm*HMF/np.trapz(np.trapz(HODTerm*HMF, logmshalo), zs)[:, None, None]
+        yk_m_z = FFT_func(Pths)*yfac
+        Pgy1h = np.trapz(np.trapz(yk_m_z*dndzdm_norm, logmshalo), zs)
+
+        yfacave = np.trapz(np.trapz(yfac*dndzdm_norm, logmshalo), zs)
+        return IFFT_func(Pgy1h/yfacave)
+
+    return lambda Pths, params: HODave(Pths, params)
 
 
 # from hmvec
@@ -141,47 +137,58 @@ def C_gg_new(self,ells,zs,ks,Pgg,gzs,gdndz=None,zmin=None,zmax=None):
     return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s,Wz2s,hzs,chis)
 
 
+def u_y(zs, mshalo, r200_func, dA_func):
+    l200c = dA_func(zs)[:, None]/r200_func(zs, mshalo)
+    prefac = 4*np.pi*r200_func(zs, mshalo)/l200c**2 * (c.sigma_T/c.m_e/c.c**2)
+    return lambda Pek: prefac*Pek
+
+def u_g(zs, mshalo, Nc, Ns, hmf):
+    ng = np.trapz((Nc(mshalo)+Ns(mshalo))*hmf(zs, mshalo), np.log10(mshalo))
+    
+    
+
+
 
 # Limber Integral from hmvec
-def limber_integral2(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis):
-    """
-    Get C(ell) = \int dz (H(z)/c) W1(z) W2(z) Pzks(z,k=ell/chi) / chis**2.
-    ells: (nells,) multipoles looped over
-    zs: redshifts (npzs,) corresponding to Pzks
-    ks: comoving wavenumbers (nks,) corresponding to Pzks
-    Pzks: (npzs,nks) power specrum
-    gzs: (nzs,) corersponding to Wz1s, W2zs, Hzs and chis
-    Wz1s: weight function (nzs,)
-    Wz2s: weight function (nzs,)
-    hzs: Hubble parameter (nzs,) in *1/Mpc* (e.g. camb.results.h_of_z(z))
-    chis: comoving distances (nzs,)
+# def limber_integral2(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis):
+#     """
+#     Get C(ell) = \int dz (H(z)/c) W1(z) W2(z) Pzks(z,k=ell/chi) / chis**2.
+#     ells: (nells,) multipoles looped over
+#     zs: redshifts (npzs,) corresponding to Pzks
+#     ks: comoving wavenumbers (nks,) corresponding to Pzks
+#     Pzks: (npzs,nks) power specrum
+#     gzs: (nzs,) corersponding to Wz1s, W2zs, Hzs and chis
+#     Wz1s: weight function (nzs,)
+#     Wz2s: weight function (nzs,)
+#     hzs: Hubble parameter (nzs,) in *1/Mpc* (e.g. camb.results.h_of_z(z))
+#     chis: comoving distances (nzs,)
 
-    We interpolate P(z,k)
-    """
+#     We interpolate P(z,k)
+#     """
 
-    hzs = np.array(hzs).reshape(-1)
-    Wz1s = np.array(Wz1s).reshape(-1)
-    Wz2s = np.array(Wz2s).reshape(-1)
-    chis = np.array(chis).reshape(-1)
+#     hzs = np.array(hzs).reshape(-1)
+#     Wz1s = np.array(Wz1s).reshape(-1)
+#     Wz2s = np.array(Wz2s).reshape(-1)
+#     chis = np.array(chis).reshape(-1)
     
-    prefactor = hzs * Wz1s * Wz2s   / chis**2.
-    zevals = gzs
-    if zs.size>1:            
-         f = interp2d(ks,zs,Pzks,bounds_error=True)     
-    else:      
-         f = interp1d(ks,Pzks[0],bounds_error=True)
-    Cells = np.zeros(ells.shape)
-    for i,ell in enumerate(ells):
-        kevals = (ell+0.5)/chis
-        if zs.size>1:
-            # hack suggested in https://stackoverflow.com/questions/47087109/evaluate-the-output-from-scipy-2d-interpolation-along-a-curve
-            # to get around scipy.interpolate limitations
-            interpolated = si.dfitpack.bispeu(f.tck[0], f.tck[1], f.tck[2], f.tck[3], f.tck[4], kevals, zevals)[0]
-        else:
-            interpolated = f(kevals)
-        if zevals.size==1: Cells[i] = interpolated * prefactor
-        else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
-    return Cells
+#     prefactor = hzs * Wz1s * Wz2s   / chis**2.
+#     zevals = gzs
+#     if zs.size>1:            
+#          f = interp2d(ks,zs,Pzks,bounds_error=True)     
+#     else:      
+#          f = interp1d(ks,Pzks[0],bounds_error=True)
+#     Cells = np.zeros(ells.shape)
+#     for i,ell in enumerate(ells):
+#         kevals = (ell+0.5)/chis
+#         if zs.size>1:
+#             # hack suggested in https://stackoverflow.com/questions/47087109/evaluate-the-output-from-scipy-2d-interpolation-along-a-curve
+#             # to get around scipy.interpolate limitations
+#             interpolated = si.dfitpack.bispeu(f.tck[0], f.tck[1], f.tck[2], f.tck[3], f.tck[4], kevals, zevals)[0]
+#         else:
+#             interpolated = f(kevals)
+#         if zevals.size==1: Cells[i] = interpolated * prefactor
+#         else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
+#     return Cells
 
 
 

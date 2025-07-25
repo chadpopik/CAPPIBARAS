@@ -11,119 +11,137 @@ class BaseSMF:
     # Checks if the model specification is in the list
     def checkspefs(self, spefs, required):
         for mname in required:
-            if spefs[mname] not in getattr(self, f"{mname}s"): 
-                raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s')}")
+            if spefs[mname] not in getattr(self, f"{mname}s").keys(): 
+                raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s').keys()}")
             else:
                 setattr(self, mname, spefs[mname])
-
-    # conversion factor to go from typical SMF units of Mpc^-3 dex^-1 to pure number counts
-    def SMF_to_N(self, hh, T_CMB, Omega_m, Omega_L, Omega_b, **kwargs):
+    
+    # Get a distribution of N values from a catalog
+    def smf_from_catalog(self, zsraw, logmsraw):
+        self.zmin, self.zmax = np.round(np.floor(zsraw.min()/self.dz)*self.dz, 10), np.round((np.ceil(zsraw.max()/self.dz)+1)*self.dz, 10)
+        self.logmmin, self.logmmax = np.round(np.floor(logmsraw.min()/self.dlogmstar)*self.dlogmstar, 10), np.round((np.ceil(logmsraw.max()/self.dlogmstar)+1)*self.dlogmstar, 10)
+        self.zbins = np.arange(self.zmin, self.zmax, self.dz)
+        self.logmstarbins = np.arange(self.logmmin, self.logmmax, self.dlogmstar)
+        
+        smf, zs, logms = np.histogram2d(zsraw, logmsraw, bins=[self.zbins, self.logmstarbins])
+        return smf, zs[:-1]+self.dz/2, logms[:-1]+self.dlogmstar/2
+    
+    # Volume to convert from typical SMF units of Mpc^-3 to pure number counts
+    def volumes(self, hh, T_CMB, Omega_m, Omega_L, Omega_b, **kwargs):
         cosmo = astropy.cosmology.LambdaCDM(H0=hh*100, Tcmb0=T_CMB, Om0=Omega_m, Ode0=Omega_L, Ob0=Omega_b)
 
-        vols = np.array([(cosmo.comoving_volume(z+0.1).value-cosmo.comoving_volume(z).value)/(1+z+0.05)**3 for z in self.zs])
+        vols = np.array([(cosmo.comoving_volume(z+self.dz/2).value-cosmo.comoving_volume(z-self.dz/2).value)/(1+z)**3 for z in self.z])
 
-        return vols*np.log10(self.mstars[1]/self.mstars[0])
-
-    def zave(self, **cosmopars):
-        gdist = self.gdist(**cosmopars)
-        return np.sum(gdist*self.zs[:, None])/np.sum(gdist)
+        return vols * (self.area/(4*np.pi*(180/np.pi)**2))
     
-    def mstarave(self, **cosmopars):
-        gdist = self.gdist(**cosmopars)
-        return np.sum(gdist*self.mstars)/np.sum(gdist)
-    
-    def addcuts(self, zmin=0, zmax=np.inf, mstarmin=0, mstarmax=np.inf):
-        mcut = (self.mstars>=mstarmin) & (self.mstars<=mstarmax)
-        zcut = (self.zs>=zmin) & (self.zs<=zmax)
-        self.mstars, self.zs = self.mstars[mcut], self.zs[zcut]
-        if hasattr(self, 'SMFraw'): 
-            self.SMFraw = self.SMFraw[zcut][:,mcut]
-        if hasattr(self, 'gdistraw'): 
-            self.gdistraw = self.gdistraw[zcut][:,mcut]
+    def reweight_on_dist(self, z1, N1, z2, N2):  # If you want to reweight N1 by some array N2
+        if z1[1]-z1[0]>=z2[1]-z2[0]:  zf, Nf, zc, Nc = z1, N1, z2, N2
+        else: zf, Nf, zc, Nc = z2, N2, z1, N1
+        
+        binidxs, binvalid = np.digitize(zf, zc)-1, (zf>=zc[0]) & (zf<=zc[-1])
+        Nfc = np.bincount(binidxs[binvalid], weights=Nf[binvalid], minlength=zc.size)
+        
+        Nc_adj = np.where(np.isinf(Nfc/Nc), 0, Nfc/Nc)
+        Nf_adj = np.where(np.isinf((Nc/Nfc)[binidxs]), 0, (Nc/Nfc)[binidxs])
+        
+        return 
 
-class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
-    zbins = ['all', 'bin_1', 'bin_2', 'bin_3', 'bin_4']
-    samples = ['LRG', 'ELG']
-    hemispheres = ['combined', 'north', 'south']
-    zweights = ['True', 'False']
+        
+        
+    
+    
+class DESILRGsCrossCorr(BaseSMF):
+    zbins = {'all', '1', '2', '3', '4'}
+    hemispheres = {'combined':'', 'north':'', 'south':''}
+    
+    zdistfile="/global/cfs/projectdirs/desi/public/papers/c3/lrg_xcorr_2023/v1/redshift_dist/main_lrg_pz_dndz_iron_v0.4_dz_0.01.txt"
+    area = 140  # Check this
+    
+    def __init__(self, spefs):
+        self.checkspefs(spefs, required=['zbin', 'hemipshere'])
+        
+        self.zdfdata = pd.read_csv(self.zdistfile, sep=" ", skiprows=1, names=pd.read_csv(self.zdistfile, sep=" ").columns[1:])
+        self.z, self.dz = (self.zdfdata.zmax+self.zdfdata.zmin)/2, self.zdfdata.zmax[1]-self.zdfdata.zmin[1]
+        self.zbins = np.concatenate([self.zdfdata.zmin, self.zdfdata.zmax[-1:]])
+        
+        self.N_deg2 = self.zdfdata[f"{self.zbin}_{self.hemisphere}"]
+        
+    def N(self):
+        return self.N_deg2*self.area
+        
+
+
+    
+class DESI1Percent(BaseSMF):  # DESI 1% LRGs and ELGs (arxiv.org/abs/2306.06317)
+    samples = {'LRG':'', 'ELG':''}
     
     path = "/pscratch/sd/c/cpopik/save_data_point_DESI-2023-0213"
-    redshift_dist_file = "/global/cfs/projectdirs/desi/public/papers/c3/lrg_xcorr_2023/v1/redshift_dist/main_lrg_pz_dndz_iron_v0.4_dz_0.01.txt"  # arxiv.org/abs/2309.06443
-    surveyarea = 16700
+    area = 140  # TODO: Check this
     
     def __init__(self, spefs):
-        self.checkspefs(spefs, required=['sample', 'zbin', 'hemisphere', 'zweight'])
+        self.checkspefs(spefs, required=['sample'])
 
-        if self.sample=='LRG': self.zs = np.arange(0.4, 1.1, 0.1)
-        elif self.sample=='ELG': self.zs = np.arange(0.6, 1.6, 0.1)
+        self.dz = 0.1
+        if self.sample=='LRG': self.zbins = np.arange(0.4, 1.2, self.dz)
+        elif self.sample=='ELG': self.zbins = np.arange(0.6, 1.6, self.dz)
+        self.z = self.zbins[:-1] + self.dz/2
 
-        self.mstars = 10**pd.read_csv(f"{self.path}/Fig1_{self.sample}_z0.8.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[0]).Mstar.values  # [M_sol]
-        self.SMFraw = np.array([pd.read_csv(f"{self.path}/Fig1_{self.sample}_z{z:.1f}.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[1]).n.values for z in self.zs])  # [(Mpc/h)^-3 dex^-1]
+        self.logmstar = pd.read_csv(f"{self.path}/Fig1_{self.sample}_z0.8.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[0]).Mstar.values  # [M_sol]
+        self.dlogmstar = self.logmstar[1]-self.logmstar[0]
+        self.logmstarbins = np.arange(self.logmstar[0]-self.dlogmstar/2, self.logmstar[-1]+self.dlogmstar, self.dlogmstar)
+        
+        self.dndlogmstar_h3 = np.array([pd.read_csv(f"{self.path}/Fig1_{self.sample}_z{z:.1f}.txt", sep=' ', names=['Mstar',f"n", f"err"], usecols=[1]).n.values for z in self.zbins[:-1]])  # [(Mpc/h)^-3 dex^-1]
 
-    def gdist(self, **cosmopars):
-        gdist = self.SMFraw*cosmopars["hh"]**3*self.SMF_to_N(**cosmopars)[:, None]
-        if self.zweight=='True':
-            self.LRGXcorrzdist()
-            gdist = gdist*(self.zdistscale/np.sum(gdist, axis=1))[:, None]
-        return gdist
-
-    def SMF(self, **cosmopars):
-        SMF = self.SMFraw*cosmopars['hh']**3
-        if self.zweight=='True':
-            self.LRGXcorrzdist()
-            SMF = SMF*(self.zdistscale/self.SMF_to_N(**cosmopars)/np.trapz(SMF, np.log10(self.mstars), axis=1))[:, None]
-        return SMF
+    def dndlogmstar(self, **cosmopars):
+        return cosmopars['hh']**3*self.dndlogmstar_h3
     
-    def LRGXcorrzdist(self):
-        # Read in the redshift distribution for each specific bin
-        # Number density in N / deg^2, dataframe with 1D arrays of length [ndim_zs_zdist]
-        self.zdistdf = pd.read_csv(self.redshift_dist_file, sep=" ", skiprows=1, names=pd.read_csv(self.redshift_dist_file, sep=" ").columns[1:])
-        self.zdist = self.zdistdf[f"{self.zbin}_{self.hemisphere}"]
-
-        # Sort/group/sum up the finer redshift bins to match the bins of the SMF distribution
-        self.zdistdf['zbin'] = pd.cut(self.zdistdf['zmin'], bins=np.arange(self.zs[0], self.zs[-1]+0.2, 0.1))
-        self.zdistscale = self.zdistdf.groupby('zbin')[f"{self.zbin}_{self.hemisphere}"].sum().values*self.surveyarea
-
-    
-
-class DR10CMASS(BaseSMF):
-    groups = ['portsmouth', 'wisconsin', 'granada']
-    IMFs = ['krou', 'salp']
-    templates = ['starforming', 'passive']
-    pops = ['bc03', 'm11']
-    times = ['earlyform', 'wideform']
-    dusts = ['dust', 'nodust']
+    def N(self, **cosmopars):
+        return self.dndlogmstar_h3*cosmopars['hh']**3*self.dlogmstar*self.volumes(**cosmopars)[:, None]
+        
+        
+class BOSSDR10(BaseSMF):  # arxiv.org/abs/1307.7735
+    galaxys = {'CMASS':7, 'LOWZ':0}
+    # All possible options for the group models
+    groups = {'portsmouth':'LOGMASS', 'wisconsin':'MSTELLAR_MEDIAN', 'granada':'MSTELLAR_MEDIAN'}
+    IMFs = {'Kroupa':'krou', 'Salpeter':'salp'}
+    templates = {'starforming':'', 'passive':''}
+    pops = {'Bruzual-Charlot':'bc03', 'Maraston':'m11'}
+    times = {'EarlySF':'earlyform', 'ExtendedSF':'wideform'}
+    dusts = {'dust':'', 'nodust':''}
     
     path = "/global/cfs/projectdirs/sdss/data/sdss/dr10/boss/spectro/redux/galaxy/v1_0"
-    skyfrac = (6373.2/41253) 
+    area = 6373.2  # TODO: Check this
+    dz, dlogmstar = 0.01, 0.1  # These can be changed as desired
 
     def __init__(self, spefs):
-        self.checkspefs(spefs, required=['group'])
+        self.checkspefs(spefs, required=['group', 'galaxy'])
+        # Different group models require different specifications
         if self.group=='portsmouth': 
             self.checkspefs(spefs, required=['template', 'IMF'])
-            fname, mcolname = f"stellarmass_{self.template}_{self.IMF}", "LOGMASS"
+            self.fname = f"{self.group}_stellarmass_{self.template}_{self.IMFs[self.IMF]}-v5_5_12.fits.gz"
         elif self.group=='wisconsin': 
             self.checkspefs(spefs, required=['pop'])
-            fname, mcolname = f"pca_{self.pop}", "MSTELLAR_MEDIAN"
+            self.fname = f"{self.group}_pca_{self.pops[self.pop]}-v5_5_12.fits.gz"
         elif self.group=='granada': 
             self.checkspefs(spefs, required=['IMF', 'time', 'dust'])
-            fname, mcolname = f"fsps_{self.IMF}_{self.time}_{self.dust}", "MSTELLAR_MEDIAN"
+            self.fname  = f"{self.group}_fsps_{self.IMFS[self.IMF]}_{self.time}_{self.dust}-v5_5_12.fits.gz"
 
-        self.dfdata = Table.read(f"{self.path}/{self.group}_{fname}-v5_5_12.fits.gz")['Z', mcolname].to_pandas().rename(columns={mcolname: "LOGM"})
+        # Properly call the mass column and get the correct galaxy selection
+        mcolname, bitmask = self.groups[self.group], self.galaxys[self.galaxy]
+        self.dfdata = Table.read(f"{self.path}/{self.fname}")['Z', mcolname, 'BOSS_TARGET1'].to_pandas().rename(columns={mcolname: "LOGM"})
 
-        zbins = np.arange((np.floor(self.dfdata.Z.min()*10)/10).round(1), (np.ceil(self.dfdata.Z.max()*10)/10+0.1).round(1), 0.1)
-        mbins = np.arange((np.floor(self.dfdata.LOGM.min()*10)/10).round(1), (np.ceil(self.dfdata.LOGM.max()*10)/10+0.1).round(1), 0.1)
+        decode_bitmask = lambda val: [i for i in range(val.bit_length()) if (val >> i) & 1]
+        self.dfdata['bits'] = self.dfdata['BOSS_TARGET1'].apply(decode_bitmask)
+        self.dfdata = self.dfdata[self.dfdata["bits"].apply(lambda bits: (bitmask in bits))]
         
-        self.gdistraw, self.zs, self.mstars = np.histogram2d(self.dfdata.Z, self.dfdata.LOGM, bins=[zbins, mbins])
-        self.mstars, self.zs = 10**self.mstars[:-1], self.zs[:-1]
+        # Create the distribution
+        self.Ndist, self.z, self.logmstar = self.smf_from_catalog(zsraw=self.dfdata.Z, logmsraw=self.dfdata.LOGM)
 
-    def SMF(self, **cosmopars):
-        SMF = self.gdistraw/self.SMF_to_N(**cosmopars)[:, None]
-        return SMF
-
-    def gdist(self, **cosmopars):
-        gdist = self.gdistraw
-        return gdist
+    def dndlogmstar(self, **cosmopars):
+        return self.Ndist/self.volumes(**cosmopars)[:, None]/self.dlogmstar
+    
+    def N(self, **cosmopars):
+        return self.Ndist
         
 
 
@@ -135,10 +153,19 @@ class DR10CMASS(BaseSMF):
 
 
 # class Amodeo2021():
+#     mfile = "/global/homes/c/cpopik/Capybara/Data/mass_distrib.txt"
 #     def __init__(self):
-#         self.allms = np.genfromtxt("/global/homes/c/cpopik/Git/Capybara/Data/mass_distrib.txt")
-#         mbins = np.arange((np.floor(self.allms.min()*10)/10).round(1), (np.ceil(self.allms.max()*10)/10+0.1).round(1), 0.1)
-#         self.SMF, self.mstars = np.histogram(self.allms, bins=mbins)
-        
-#         self.zs = 
+#         self.logmraws = np.log10(np.genfromtxt(self.mfile))
+#         mbins = np.arange((np.floor(self.logmraws.min()*10)/10).round(1), (np.ceil(self.logmraws.max()*10)/10+0.1).round(1), 0.1)
+#         self.SMF, self.mstars = np.histogram(self.logmraws, bins=mbins)
+#         self.SMF = self.SMF[None, :]
+#         self.zs = np.array([0.55])
 
+
+# class Amodeo2021():
+#     # These are how the centers are determind in mop-c-gt and SOLikeT_szlike, then uses Kravstov2014 Mvir_scatter
+#     logmstarbins = np.linspace(9.42, 11.73, 10)
+#     logmstar = (logmstarbins[1:]+logmstarbins[:-1])/2
+    
+#     def __init__(self):
+#         pass

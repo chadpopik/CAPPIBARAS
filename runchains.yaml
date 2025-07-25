@@ -6,10 +6,9 @@ sampler:
     #minimize:
     #  ignore_prior: True
 
-output: chains/cobaya_TEST_0.001
+output: chains/7-21-25/test1
 debug: False
 
-# TODO 2
 likelihood:
     tsztest:
         class: SOLikelihoods.TSZLikelihood
