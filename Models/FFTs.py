@@ -6,7 +6,8 @@ This file contains various methods of performing FFTs collected from various pac
 The ideal being ones that are as fast as possible, while being able to maintain the profile values if just doing a conversion back and forth (which is what the HOD method does, and we want to make sure the FFT-IFFT process doesn't insert any changes).
 """
 
-from Basics import *
+import numpy as np
+import scipy
 
 
 class mcfit_package:
@@ -27,6 +28,9 @@ class mcfit_package:
     
     def IFFT3D(self):
         return self.rs_rev, lambda funck: np.array([[self.IFFTraw(funck[:, i, j]) for i in range(funck.shape[1])] for j in range(funck.shape[2])]).T
+    
+    def IFFT2D(self):
+        return self.rs_rev, lambda funck: np.array([self.IFFTraw(funck[:, i]) for i in range(funck.shape[1])]).T
 
     def IFFT1D(self):
         return self.rs_rev, lambda funck: self.IFFTraw(funck)
@@ -131,20 +135,3 @@ class RadialFourierTransformHankel:
             res = tuple([arr[..., self.pad: -self.pad] for arr in arrs])
         return res[0] if len(arrs) == 1 else res
     
-    
-
-
-
-# Classes = {
-#     "mcfit_package": mcfit_package,
-#     "RadialFourierTransformHankel": RadialFourierTransformHankel
-# }
-
-# def get_Class(class_name):
-#     print("Loading FFT")
-#     try:
-#         return Classes[class_name]
-#     except KeyError:
-#         raise ValueError(f"Unknown class: {class_name}. Choose from {list(Classes.keys())}")
-
-

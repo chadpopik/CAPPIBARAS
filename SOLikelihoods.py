@@ -3,7 +3,8 @@ Likelihood for SZ model
 """
 
 from Basics import *
-from Models import ForwardModel, Measurements, Profiles, SHMRs, HODs, SMFs, HMFs
+from Capybara.Models import Data, HaloModels
+from Models import ForwardModel, Profiles, SHMRs, HODs, SMFs
 
 from cobaya.yaml import yaml_load_file
 
@@ -55,7 +56,7 @@ class SZLikelihood(GaussianLikelihood):
         self.mhalos = self.shmr.SHMR(self.mstars)
         
         print("Loading HMF")
-        self.halomodel = getattr(HMFs, self.mass_function['name'])(self.mass_function['spefs'])
+        self.halomodel = getattr(HaloModels, self.mass_function['name'])(self.mass_function['spefs'])
         self.hmf = self.halomodel.HMF(self.zs, self.mhalos, **self.cpars)
 
         print("Loading Average Functions")
@@ -78,7 +79,7 @@ class SZLikelihood(GaussianLikelihood):
 
 class TSZLikelihood(SZLikelihood):    
     def _get_data(self):
-        self.meas = getattr(Measurements, self.DataUse['name'])(self.DataUse['spefs'])
+        self.meas = getattr(Data, self.DataUse['name'])(self.DataUse['spefs'])
         
         self.data = GaussianData("SZModel", self.meas.thetas, self.meas.tSZdata, self.meas.tSZcov)
         
@@ -110,7 +111,7 @@ class TSZLikelihood(SZLikelihood):
 class KSZLikelihood(SZLikelihood):
     # Data is specific to measurement, so describe in the topmost likelihood
     def _get_data(self):
-        self.meas = getattr(Measurements, self.DataUse['name'])(self.DataUse['spefs'])
+        self.meas = getattr(Data, self.DataUse['name'])(self.DataUse['spefs'])
         
         self.data = GaussianData("SZModel", self.meas.thetas, self.meas.kSZdata, self.meas.kSZcov)
 

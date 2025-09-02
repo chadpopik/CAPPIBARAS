@@ -4,53 +4,44 @@
 Very initial version of the code, no judging.
 
 Things to come:
-- Mass definition conversions
+- Calculating C_ells (working on it)
 - DESI SMF from catalog
-- Calculating C_ells
-- Miscentering (maybe)
-- More details on mass/redshift ranges for all the models
+- Mass definition conversions
 - Satellite dependent SHMR model
-
+- Miscentering (maybe)
 
 
 HODs:
-- TODO 1: Check to see if the other HODs have extra parts of their models, like different satellite profiles, and add if necessary
-
 
 SHMRs:
-- 
-
 
 HMFs:
-- TODO 1: Investigate more detail to the cosmology dependence for both models
-
+- TODO 1: Check about adding more detail to the cosmology dependence
 
 SMFs:
 - TODO 1: Check for units and factors of h/dex
 - TODO 2: Add zdistributions for CMASS
 
+Measurements:
+- TODO 1: Find beam and response for Henry and Boryana measurements
+- TODO 2: Use proper source of kSZ measurements
+- TODO 3: Add info about the measurement like window function/aperture photometry info or m/z selection
 
 FFTs:
 - TODO 1: test mcfit for forward/backward equivalency
-- TODO 2: understand better Emily's Hankel transform
-
+- TODO 2: Check in detail Emily's Hankel transform
 
 Profiles:
 - TODO 1: Various two-halo checks and tasks: how to handle the FFT? whether to take in functions or array for Plin? Specify the model? Check for mass definitions?
 
 
-Measurements:
-- TODO 1: Find better source of Schaan measurements/covariances and dust model (covariances off from the error?), and dust profile
-- TODO 2: Find beam and response for Henry and Boryana measurements
-- TODO 3: Find dust profile for Henry and Boryana measurements
-
-
-ForwardModel:
+Projections:
 - TODO 1: clean up the projection and aperture functions
 - TODO 2: Maybe too much of th FFT mess is done in this file, it can be put into the FFT file?
 - TODO 3: check if intergrating over zs is really necessary, maybe just use the medium z?
 - TODO 4: Should i just drop the y conversion? like why is it in there? for rho it's incorrect, and for Pth it might be unneeded.
 
+Spectra:
 
 
 SOLikelihoods:

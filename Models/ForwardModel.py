@@ -7,9 +7,24 @@ The goal in all of these is to do as much precalculation as possible, as the onl
 from Basics import *
 
 import Models.FFTs as FFTs
-from Models.Measurements import fnu
 from scipy.interpolate import interp1d  # Do we need this? can we just use normal numpy?
 
+
+# Frequency dependence of the tSZ temperature anisotropy
+def fnu(freq, T_CMB, **kwargs):
+    x = (c.h * freq*u.GHz / (c.k_B * T_CMB*u.K)).decompose().value
+    ans = x / np.tanh(x / 2.0) - 4.0
+    return ans
+
+# Conversion between thermal pressure and muK for tSZ
+def Pth_to_muK(XH, T_CMB, freq, **kwargs):
+    factor = (c.sigma_T/c.m_e/c.c**2).cgs.value * (2+2*XH)/(3+5*XH) * fnu(freq, T_CMB) * T_CMB*1e6
+    return lambda tSZ_sig: factor * tSZ_sig
+
+# Conversion between gas density and muK for kSZ
+def rho_to_muK(v_rms, XH, T_CMB, **kwargs):
+    factor = v_rms * (c.sigma_T/c.m_p).cgs.value * (1+XH)/2 * T_CMB*1e6
+    return lambda kSZ_sig: factor * kSZ_sig
 
 
 def weighting(galaxydist):
@@ -50,7 +65,10 @@ def project_Hankel(rs, thetas, AngDist, beam_data, beam_ells, resp_data, resp_el
     return lambda prof3D: project_convolve(prof3D)*unitconv
 
 
-def aperture_photometry(thts, prof2D_beam, NNR, disc_fac):
+def aperture_photometry(thts, # angular size of the measurements
+                        prof2D_beam, # function that 
+                        NNR, 
+                        disc_fac):
     sig_all_p_beam = [] 
     for tht in thts:
         dtht_use = np.arctan(np.arctan(np.radians(tht / 60.0))) / NNR
@@ -66,129 +84,8 @@ def aperture_photometry(thts, prof2D_beam, NNR, disc_fac):
     return np.array(sig_all_p_beam)
 
 
-def Pth_to_muK(XH, T_CMB, freq, **kwargs):
-    factor = (c.sigma_T/c.m_e/c.c**2).cgs.value * (2+2*XH)/(3+5*XH) * fnu(freq, T_CMB) * T_CMB*1e6
-    return lambda tSZ_sig: factor * tSZ_sig
 
 
-def rho_to_muK(v_rms, XH, T_CMB, **kwargs):
-    factor = v_rms * (c.sigma_T/c.m_p).cgs.value * (1+XH)/2 * T_CMB*1e6
-    return lambda kSZ_sig: factor * kSZ_sig
-
-
-
-def HODweighting(rs, zs, logmshalo, Nc_func, Ns_func, uSat_func,
-                 HMF, r200c_func, H_func, XH, **kwargs):
-    ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
-    rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT1D()
-
-    rs200c, Hs = r200c_func(zs, logmshalo), H_func(zs)
-    xs = rs[:, None, None]/rs200c
-    # NOTE: These profiles also have some parameters that can be fit, but I'm not doing that here
-    usk_m_z = FFT_func(uSat_func(xs)) 
-    uck_m_z = np.ones(usk_m_z.shape)  # Set to one
-    
-    # Precalculating as much as possible
-    yfac = (2+2*XH)/(3+5*XH)*(c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*rs200c**3*((1+zs)**2/Hs)[:, None]  # Converting Pth to y
-
-    def HODave(Pths, params):
-        Nc = Nc_func(logmshalo, params)
-        Ns = Ns_func(logmshalo, params)
-        ngal = np.trapz(np.trapz((Nc+Ns)*HMF, logmshalo), zs)
-        HODTerm = (Nc*uck_m_z + Ns*usk_m_z)/ngal
-
-        dndzdm_norm = HODTerm*HMF/np.trapz(np.trapz(HODTerm*HMF, logmshalo), zs)[:, None, None]
-        yk_m_z = FFT_func(Pths)*yfac
-        Pgy1h = np.trapz(np.trapz(yk_m_z*dndzdm_norm, logmshalo), zs)
-
-        yfacave = np.trapz(np.trapz(yfac*dndzdm_norm, logmshalo), zs)
-        return IFFT_func(Pgy1h/yfacave)
-
-    return lambda Pths, params: HODave(Pths, params)
-
-
-# from hmvec
-def C_yy_new(self,ells,zs,ks,Ppp,gzs,dndz=None,zmin=None,zmax=None):
-    chis = self.comoving_radial_distance(gzs)
-    hzs = self.h_of_z(gzs) # 1/Mpc
-    Wz1s = 1/(1+gzs)
-    Wz2s = 1/(1+gzs)
-    # Convert to y units
-    # 
-
-def C_gy_new(self,ells,zs,ks,Pgp,gzs,gdndz=None,zmin=None,zmax=None):
-    gzs = np.asarray(gzs)
-    chis = self.comoving_radial_distance(gzs)
-    hzs = self.h_of_z(gzs) # 1/Mpc
-    nznorm = np.trapz(gdndz,gzs)
-    term = (c.sigma_T/(c.m_e*c.c**2)).to(u.s**2/u.M_sun)*u.M_sun/u.s**2
-    Wz1s = gdndz/nznorm
-    Wz2s = 1/(1+gzs)
-
-    return limber_integral(ells,zs,ks,Pgp,gzs,Wz1s,Wz2s,hzs,chis)
-
-def C_gg_new(self,ells,zs,ks,Pgg,gzs,gdndz=None,zmin=None,zmax=None):
-    gzs = np.asarray(gzs)
-    chis = self.comoving_radial_distance(gzs)
-    hzs = self.h_of_z(gzs) # 1/Mpc
-    nznorm = np.trapz(gdndz,gzs)
-    Wz1s = gdndz/nznorm
-    Wz2s = gdndz/nznorm
-    return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s,Wz2s,hzs,chis)
-
-
-def u_y(zs, mshalo, r200_func, dA_func):
-    l200c = dA_func(zs)[:, None]/r200_func(zs, mshalo)
-    prefac = 4*np.pi*r200_func(zs, mshalo)/l200c**2 * (c.sigma_T/c.m_e/c.c**2)
-    return lambda Pek: prefac*Pek
-
-def u_g(zs, mshalo, Nc, Ns, hmf):
-    ng = np.trapz((Nc(mshalo)+Ns(mshalo))*hmf(zs, mshalo), np.log10(mshalo))
-    
-    
-
-
-
-# Limber Integral from hmvec
-# def limber_integral2(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis):
-#     """
-#     Get C(ell) = \int dz (H(z)/c) W1(z) W2(z) Pzks(z,k=ell/chi) / chis**2.
-#     ells: (nells,) multipoles looped over
-#     zs: redshifts (npzs,) corresponding to Pzks
-#     ks: comoving wavenumbers (nks,) corresponding to Pzks
-#     Pzks: (npzs,nks) power specrum
-#     gzs: (nzs,) corersponding to Wz1s, W2zs, Hzs and chis
-#     Wz1s: weight function (nzs,)
-#     Wz2s: weight function (nzs,)
-#     hzs: Hubble parameter (nzs,) in *1/Mpc* (e.g. camb.results.h_of_z(z))
-#     chis: comoving distances (nzs,)
-
-#     We interpolate P(z,k)
-#     """
-
-#     hzs = np.array(hzs).reshape(-1)
-#     Wz1s = np.array(Wz1s).reshape(-1)
-#     Wz2s = np.array(Wz2s).reshape(-1)
-#     chis = np.array(chis).reshape(-1)
-    
-#     prefactor = hzs * Wz1s * Wz2s   / chis**2.
-#     zevals = gzs
-#     if zs.size>1:            
-#          f = interp2d(ks,zs,Pzks,bounds_error=True)     
-#     else:      
-#          f = interp1d(ks,Pzks[0],bounds_error=True)
-#     Cells = np.zeros(ells.shape)
-#     for i,ell in enumerate(ells):
-#         kevals = (ell+0.5)/chis
-#         if zs.size>1:
-#             # hack suggested in https://stackoverflow.com/questions/47087109/evaluate-the-output-from-scipy-2d-interpolation-along-a-curve
-#             # to get around scipy.interpolate limitations
-#             interpolated = si.dfitpack.bispeu(f.tck[0], f.tck[1], f.tck[2], f.tck[3], f.tck[4], kevals, zevals)[0]
-#         else:
-#             interpolated = f(kevals)
-#         if zevals.size==1: Cells[i] = interpolated * prefactor
-#         else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
-#     return Cells
 
 
 

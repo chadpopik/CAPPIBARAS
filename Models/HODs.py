@@ -1,5 +1,5 @@
 """
-Collections of Halo Occupancy Distribution model and parameterizations calibrated off different studies/samples. 
+Collections of Halo Occupancy Distribution model and parameterizations calibrated off different studies/samples.
 
 Classes should contain functions to calculate the average number of central and satellite galaxies (Nc/Ns) as a function of halo mass (in m200c) and the parameters values outlined in the papers, with other components of specific models (like density profile of satellite galaxies) added as needed.
 
@@ -7,11 +7,13 @@ Functions should also take an input dictionary to specify custom values for para
 To more easily compare parameter values between models, they should be built off the Base Model functions.
 """
 
-from Basics import *
+import numpy as np
+import scipy
 
 
-class BaseHOD:  # For general functions 
-    def checkspefs(self, spefs, required): # Check specification validity and assign parameters
+class BaseHOD:
+    # Check specification validity and assign parameters
+    def checkspefs(self, spefs, required):
         for mname in required:
             if spefs[mname] not in getattr(self, f"{mname}s"):
                 raise NameError(f"{mname} {spefs[mname]} doesn't exist, choose from available {mname}s: {getattr(self, f'{mname}s')}")
@@ -19,21 +21,33 @@ class BaseHOD:  # For general functions
                 setattr(self, mname, spefs[mname])
         self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
 
-    def Nc_Zheng2005(self, logM, logM_min, sigma_logM):  # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564), uses Mvir
+    # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564)
+    def Nc_Zheng2005(self, logM, logM_min, sigma_logM):  
         return 0.5*(1+scipy.special.erf((logM-logM_min)/sigma_logM))
 
-    def Ns_Zheng2005(self, logM, logM_0, logM_1, alpha):  # Expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564), uses Mvir
+    # Expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564)
+    def Ns_Zheng2005(self, logM, logM_0, logM_1, alpha):
         M, M_0, M_1 = 10**logM, 10**logM_0, 10**logM_1
         return ((M-M_0)/M_1)**alpha
 
-    def f_inc_More2015(self, logM, alpha_inc, logM_inc):  # CMASS incompleteness function (arxiv.org/abs/1407.1856)
+    # CMASS incompleteness function (arxiv.org/abs/1407.1856)
+    def f_inc_More2015(self, logM, alpha_inc, logM_inc):
         return np.clip(1+alpha_inc*(logM-logM_inc), 0, 1)
-    
-    def GNFW(self, x, gamma, alpha, beta):  # Used for satellite density profile
-        return 1/(x**gamma * (1+x**alpha)**((beta-gamma)/alpha))
+
+    # Default central density distribution (FFT of dirac delta)
+    def uck(self):
+        return 1
+
+    # Default satellite distribution (FFT of NFW)
+    def usk(self, rs, rs200c, FFTf):
+        x = rs[:, None, None]/rs200c
+        NFW = 1 / (x * (1+x)**2)
+        return lambda p={}: FFTf(NFW)
 
 
 class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
+    info = {'mdef': '200m', 'zmin': 0.47, 'zmax': 0.59, 'zmed': 0.53}
+    
     samples = ["M*>10.8", "M*>11.1", "M*>11.25", "M*>11.4"]
     params = {
         "logM_min": [13.47, 13.58, 13.84, 14.20],  # minimum halo mass for a central galaxy/value at which halos contain 0.5 central galaxies on average
@@ -46,30 +60,33 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
         "logM_inc": [13.39, 13.42, 13.69, 13.96],
         "beta_m": [4.97, 5.91, 4.16, 10],
         }
-    
-    mdef = "200m"
-    zmin, zmax, zmed = 0.47, 0.59, 0.53
-    mstarmins = [10.8, 11.1, 11.25, 11.4]
 
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
-        self.mstermin = self.mstarmins[self.samples.index(self.sample)]
+        self.info['mstarmin'] = np.float32(self.sample[3:])
 
-    def Nc(self, logM, p={}):
-        p = self.p0 | p
-        return self.Nc_Zheng2005(logM, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc_More2015(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
+    def Nc(self, logM):
+        func = lambda p: self.Nc_Zheng2005(logM, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc_More2015(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
+        return lambda p={}: func(self.p0 | p)
 
-    def Ns(self, logM, p={}):
-        p = self.p0 | p
-        return self.Ns_Zheng2005(logM, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(logM-p['logM_min'],1) * self.Nc(logM, p)
-
-    def uSat(self, x, p={}):
-        p = self.p0 | p
-        return self.GNFW(x, gamma=1, alpha=1, beta=p['beta_s'])
+    def Ns(self, logM):
+        func = lambda p: self.Ns_Zheng2005(logM, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(logM-p['logM_min'],1) * self.Nc(logM)(p)
+        return lambda p={}: func(self.p0 | p)
+    
+    def uSat(self, rs, rs200c, FFTf):
+        x = rs[:, None, None]/rs200c
+        GNFW = lambda p: 1/(x * (1+x)**(p['beta_s']-1))
+        func = lambda p: FFTf(GNFW(p))
+        return lambda p={}: func(self.p0 | p)
 
 
 class Yuan2023(BaseHOD):  # DESI 1% LRGs/QSOs (arxiv.org/abs/2306.06314)
+    info = {'mdef': '200c', # M not clear, maybe same as zheng 2005/2007? or cmass?
+            'mhalomin': 1.3e11,  # Msun/h
+            }
     samples = ["LRG 0.4<z<0.6", "LRG 0.6<z<0.8", "QSO 0.8<z<2.1"]
+    zmaxs= [0.6, 0.8, 2.1]
+    zmins = [0.4, 0.6, 0.8]
     params = {
         "logM_cut": [12.89, 12.78, 12.67],  # Msun/h
         "logM_1": [14.08, 13.94, 15.00],  # Msun/h
@@ -81,29 +98,29 @@ class Yuan2023(BaseHOD):  # DESI 1% LRGs/QSOs (arxiv.org/abs/2306.06314)
         "logM_h_mean": [13.42, 13.26, 12.74],  # Msun/h
         "b_lin": [1.94, 2.11, 2.56],
     }
-    
-    mdef = "200c"  # M not clear, maybe same as zheng 2005/2007? or cmass?
-    zmaxs= [0.6, 0.8, 2.1]
-    zmins = [0.4, 0.6, 0.8]
-    mhalomin = 1.3e11  # Msun/h
-    
+
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
     
-    def Nc(self, logM, p={}):
-        p = self.p0 | p
-        return self.Nc_Zheng2005(logM, logM_min=p['logM_cut'], sigma_logM=np.sqrt(2)*p['sigma']) * p['f_ic']
-    
-    def Ns(self, logM, p={}):
-        p = self.p0 | p
-        if self.sample=="QSO 0.8<z<2.1":
-            return self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha'])
-        else:
-            return self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(logM, p)
+    def Nc(self, logM):
+        func = lambda p: self.Nc_Zheng2005(logM, logM_min=p['logM_cut'], sigma_logM=np.sqrt(2)*p['sigma']) * p['f_ic']
+        return lambda p={}: func(self.p0 | p)
 
+    def Ns(self, logM):
+        if self.sample=="QSO 0.8<z<2.1":
+            func = lambda p: self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha'])
+        else:
+            func = lambda p: self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_cut'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(logM)(p)
+        return lambda p={}: func(self.p0 | p)
         
 
 class Kusiak2022(BaseHOD):  # unWISE (arxiv.org/abs/2203.12583)
+    info = {'mdef': '200c', 
+            'mhalomin': 7e8, 'mhalomax': 3.5e15,  # Msun/h
+            'zmin_hmod': 0.005, 'zmax_hmod': 4,
+            'zmin': 0, 'zmax': 2,
+            'zmeans': {'Blue': 0.6, 'Green': 1.1, 'Red': 1.5}}
+    
     samples = ["Blue", "Green", "Red"]
     params = {
         "sigma_logM": [0.73, 0.61, 0.75],
@@ -114,25 +131,24 @@ class Kusiak2022(BaseHOD):  # unWISE (arxiv.org/abs/2203.12583)
         "10^7A_SN": [-0.16, 1.35, 27.95],
     }
     
-    mdef = "200c"
-    mhalomin, mhalomax = 7e8, 3.5e15  # Msun/h
-    zmin_hmod, zmax_hmod = 0.005, 4
-    zmeans = [0.6, 1.1, 1.5]
-    zmin, zmax = 0, 2
-
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
+        self.info['zmean'] = self.info['zmeans'][self.sample]
     
-    def Nc(self, logM, p={}):
-        p = self.p0 | p
-        return self.Nc_Zheng2005(logM, logM_min=p['logM_min^HOD'], sigma_logM=p['sigma_logM'])
-    
-    def Ns(self, logM, p={}):
-        p = self.p0 | p
-        return self.Ns_Zheng2005(logM, logM_0=0, logM_1 = p['logM_1'], alpha=p['alpha_s']) * self.Nc(logM, p)
+    def Nc(self, logM):
+        func = lambda p: self.Nc_Zheng2005(logM, logM_min=p['logM_min^HOD'], sigma_logM=p['sigma_logM'])
+        return lambda p={}: func(self.p0 | p)
+
+    def Ns(self, logM):
+        func = lambda p: self.Ns_Zheng2005(logM, logM_0=0, logM_1 = p['logM_1'], alpha=p['alpha_s']) * self.Nc(logM)(p)
+        return lambda p={}: func(self.p0 | p)
+
     
     
 class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.org/abs/2204.02418)
+    info = {'mdef': '200m', 'zmax': 0.5,
+            'mhalomin':10e11, 'mhalomax': 10e15,  # Msun/h^2, these cuts are just for sims
+}
     # There are actually many further subsamples cut by stellar mass
     samples = ["MS red", "MS blue", "KV450 X GAMA red", "KV450 X GAMA blue"]
     params = {
@@ -145,25 +161,23 @@ class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.o
         "A": [5.31, 5.31, 1.62, 1.62],
         "epsilon": [0.69, 0.69, 0.99, 0.99],
     }
-    
-    mdef = "200m"
-    zmaxs = 0.5
-    mhalomin, mhalomax = 10e11, 10e15  # Msun/h^2, these cuts are just for sims
-    
-
+        
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
         
-    def Nc(self, logM, p={}):
-        p = self.p0 | p
-        return self.Nc_Zheng2005(logM, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a']) * p['alpha^a']
+    def Nc(self, logM):
+        func = lambda p: self.Nc_Zheng2005(logM, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a']) * p['alpha^a']
+        return lambda p={}: func(self.p0 | p)
     
-    def Ns(self, logM, p={}):
-        p = self.p0 | p
-        return self.Ns_Zheng2005(logM, logM_0=0, logM_1 = np.log10(p['M^a']*1e13), alpha=p['beta^a']) * self.Nc_Zheng2005(logM, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a'])
+    def Ns(self, logM):
+        func = lambda p: self.Ns_Zheng2005(logM, logM_0=0, logM_1 = np.log10(p['M^a']*1e13), alpha=p['beta^a']) * self.Nc_Zheng2005(logM, logM_min=np.log10(p['M_th^a']*1e11), sigma_logM=p['sigma^a'])
+        return lambda p={}: func(self.p0 | p)
 
 
 class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
+    info = {'mdef': '200m',  # M200b, 200 times overdense wrt background matter density
+            }
+    
     samples = ["[11.10, 12.00]", "[11.30, 12.0]", "[11.40, 12.0]"]
     params = {
         "logM_min": [13.13, 13.45, 13.68],
@@ -185,15 +199,13 @@ class More2015(BaseHOD):  # CMASS DR11 (arxiv.org/abs/1407.1856)
         "h": [0.703, 0.700, 0.695],
     }
     
-    mdef = "200m"  # M200b, 200 times overdense wrt background matter density
-
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
 
-    def Nc(self, logM, p={}):
-        p = self.p0 | p
-        return self.Nc_Zheng2005(logM, logM_min=p['logM_min'], sigma_logM=p['sigma^2']**0.5) * self.f_inc_More2015(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
-    
-    def Ns(self, logM, p={}):
-        p = self.p0 | p
-        return self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_min'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(logM, p)
+    def Nc(self, logM):
+        func = lambda p: self.Nc_Zheng2005(logM, logM_min=p['logM_min'], sigma_logM=p['sigma^2']**0.5) * self.f_inc_More2015(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
+        return lambda p={}: func(self.p0 | p)
+
+    def Ns(self, logM):
+        func = lambda p:  self.Ns_Zheng2005(logM, logM_0=np.log10(p['kappa'])+p['logM_min'], logM_1 = p['logM_1'], alpha=p['alpha']) * self.Nc(logM)(p)
+        return lambda p={}: func(self.p0 | p)
