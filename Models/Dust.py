@@ -17,7 +17,9 @@ class BaseDust:
         self.p0 = {param: self.params[param][self.models.index(self.model)] for param in self.params.keys()}
 
 class Amodeo2021(BaseDust):
+    info = {'z': 0.45, 'nu0': 856.54988}
     models=['Hershel', 'ACT+Hershel']
+    # These are all rough values
     params = {'A_dust': [0.326, 0.363],  # amplitude of dust emission [kJy/sr]
               'T_dust': [20.7, 16.9],  # Dust temperature [K]
               'beta_dust': [1.13, 1.13],  # Dust sepctral index
@@ -29,16 +31,16 @@ class Amodeo2021(BaseDust):
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['model'])
     
-    def dustpoly(self, thetas, nu, z=0.45, nu0=856):
-        amp = lambda p: p['A_dust']*(nu*(1+z)/nu0)**(p['beta_dust']+3)
-        poly = lambda p: p['c_0']+p['c_1']*thetas+p['c_2']*thetas**2
+    def dustpoly(self, thetas, nu, z=0.55, nu0=856.54988):
         x = lambda nu, p: ((nu*u.GHz)*c.h/c.k_B/(p['T_dust']*u.K)).decompose()
         planck = lambda p: (np.exp(x(nu0, p))-1)/(np.exp(x(nu*(1+z), p))-1)
+        amp = lambda p: p['A_dust']*(nu*(1+z)/nu0)**(p['beta_dust']+3)
+        poly = lambda p: p['c_0']+p['c_1']*thetas+p['c_2']*thetas**2
         dustfunc = lambda p: amp(p)*planck(p)*poly(p)
         return lambda p={}: dustfunc(self.p0 | p)
 
-    def dust_uK(self, thetas, nu, z=0.45, nu0=856):
-        x = lambda p: ((nu*u.GHz)*c.h/c.k_B/(p['T_dust']*u.K)).decompose()
-        dB_dT = lambda p: ((2*c.h*(nu*u.GHz)**3/c.c**2)).to(u.kJy).value * x(p)/p['T_dust'] * np.exp(x(p))/(np.exp(x(p))-1)**2
-        dustprof = lambda p: self.dustpoly(thetas, nu, z, nu0)(p)/dB_dT(p)*1e6*np.pi*thetas**2
+    def dust_uKarcmin(self, thetas, nu, z=0.55, nu0=856.54988, T_CMB=2.7255):
+        x = ((nu*u.GHz)*c.h/c.k_B/(T_CMB*u.K)).decompose()
+        dB_dT = ((2*c.h*(nu*u.GHz)**3/c.c**2)).to(u.kJy).value * x/T_CMB * np.exp(x)/(np.exp(x)-1)**2
+        dustprof = lambda p: self.dustpoly(thetas, nu, z, nu0)(p)/dB_dT*1e6 * np.pi*thetas**2
         return lambda p={}: dustprof(self.p0 | p)

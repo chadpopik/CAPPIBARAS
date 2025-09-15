@@ -36,7 +36,7 @@ class BaseHOD:
 
     # Default central density distribution (FFT of dirac delta)
     def uck(self):
-        return 1
+        return lambda p={}: 1
 
     # Default satellite distribution (FFT of NFW)
     def usk(self, rs, rs200c, FFTf):
@@ -73,7 +73,7 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
         func = lambda p: self.Ns_Zheng2005(logM, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(logM-p['logM_min'],1) * self.Nc(logM)(p)
         return lambda p={}: func(self.p0 | p)
     
-    def uSat(self, rs, rs200c, FFTf):
+    def usk(self, rs, rs200c, FFTf):
         x = rs[:, None, None]/rs200c
         GNFW = lambda p: 1/(x * (1+x)**(p['beta_s']-1))
         func = lambda p: FFTf(GNFW(p))

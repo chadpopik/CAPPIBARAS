@@ -20,20 +20,20 @@ class mcfit_package:
         self.IFFTraw = lambda funck: self.mcfit.P2xi(self.ks)(funck)[1]
         self.rs_rev = self.mcfit.P2xi(self.ks)(self.ks)[0]
 
-    def FFT3D(self):
-        return self.ks, lambda funcx: np.array([[self.FFTraw(funcx[:, i, j]) for i in range(funcx.shape[1])] for j in range(funcx.shape[2])]).T
+    def FFT3D(self, funcx):
+        return np.array([[self.FFTraw(funcx[:, i, j]) for i in range(funcx.shape[1])] for j in range(funcx.shape[2])]).T
     
-    def FFT1D(self):
-        return self.ks, lambda funcx: self.FFTraw(funcx)
+    def FFT1D(self, funcx):
+        return self.FFTraw(funcx)
     
-    def IFFT3D(self):
-        return self.rs_rev, lambda funck: np.array([[self.IFFTraw(funck[:, i, j]) for i in range(funck.shape[1])] for j in range(funck.shape[2])]).T
+    def IFFT3D(self, funck):
+        return np.array([[self.IFFTraw(funck[:, i, j]) for i in range(funck.shape[1])] for j in range(funck.shape[2])]).T
     
-    def IFFT2D(self):
-        return self.rs_rev, lambda funck: np.array([self.IFFTraw(funck[:, i]) for i in range(funck.shape[1])]).T
+    def IFFT2D(self, funck):
+        return np.array([self.IFFTraw(funck[:, i]) for i in range(funck.shape[1])]).T
 
-    def IFFT1D(self):
-        return self.rs_rev, lambda funck: self.IFFTraw(funck)
+    def IFFT1D(self, funck):
+        return self.IFFTraw(funck)
     
 
 # This class is taken from Pixell, written by Sigurd Naess. We don't need all of pixell

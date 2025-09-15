@@ -7,6 +7,7 @@ Classes should contain halo number density 2D arrays over halo mass (in m200c) a
 import numpy as np
 import astropy
 
+
 class BASEHMF:
     def checkspefs(self, spefs, required):
         for mname in required:
@@ -49,7 +50,6 @@ class pyccl(BASEHMF):
         cosmo = self.initcosmo(**kwargs)
         massconv = self.ccl.halos.massdef.mass_translator(mass_in=mdefin, mass_out=mdefout, concentration='Bhattacharya13')
         return np.array([np.log10(massconv(cosmo, 10**logmshalo, 1/(1+z))) for z in zs])
-
 
 
 

@@ -20,19 +20,19 @@ class BASESHMR:
         f = lambda x : -np.log10(10**(alpha*x)+1) + delta*(np.log10(1+np.exp(x)))**gamma/(1+np.exp(10**(-x)))
         Ms = 10**( np.log10(eps*M1) + f(np.log10(Mh/M1)) - f(0) )
         return np.log10(Ms)
-    
+
     # Double Power Law SHMR form (arxiv.org/abs/1205.5807)
     def DoublePowerLaw(self, logMh, logM1, N, beta, gamma):
         Mh, M1 = 10**logMh, 10**logM1
         Ms = 2*N/((Mh/M1)**(-beta) + (Mh/M1)**(gamma))
         return np.log10(Ms)
-    
+
     # Get halo mass from stellar mass using interpolation
     def SHMR(self, logMs):
         logMhs = np.linspace(10, 20, 1000)  # Should cover the range of reasonable halo masses
-        func = lambda p: np.interp(logMs, self.HSMR(logMhs, self.p0 | p), logMhs)
+        func = lambda p: np.interp(logMs, self.HSMR(logMhs)(self.p0 | p), logMhs)
         return lambda p={}: func(self.p0 | p)
-    
+
 
 class Xu2023(BASESHMR):  # SDSS Main DR7, CMASS & LOWZ DR12 (arxiv.org/abs/2211.02665)
     info = {'mdef': 'vir',  # virial mass of the halo at the time when the galaxy was last the central dominant object
@@ -71,7 +71,7 @@ class Gao2023(BASESHMR):
         'beta': [2.72, 2.27, 2.61],
         'logk': [10.11, 10.40, 10.36],
         'sigma': [0.18, 0.21, 0.21]}
-    
+
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['sample'])
 

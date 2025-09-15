@@ -2,7 +2,9 @@
 Collections of radial halo profiles used to forward model SZ signals, specifically thermal pressure and gas density.
 """
 
-from Basics import *
+import numpy as np
+import astropy.units as u
+import astropy.constants as c
 
 class BaseGNFW:
     # Check validitity of model specifications and assign default parameters
@@ -123,7 +125,7 @@ class Battaglia2015(BaseGNFW):  # Calibrated off SPH sims made from GADGET-2 (ar
                                     rho0=self.PLmz(zs, logms200c, p['rho0_A0'], p['rho0_alpham'], p['rho0_alphaz']),
                                     beta=self.PLmz(zs, logms200c, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
         return lambda p={}: factorfront*func(self.p0 | p)
-    
+
     def rho2h(self, rs, zs, logmshalo, rhocrit, r200c, Plin, bias, hmf, FFT_func, IFFT_func, **kwargs):
         lin2h = self.twohalo(logmshalo, Plin, bias, hmf, FFT_func, IFFT_func)
         prof1h = self.rho1h(rs, zs, logmshalo, rhocrit, r200c, **kwargs)

@@ -1,18 +1,9 @@
-"""
-This file contains the meat of the forward model: everything that happens once you have your function for profile making and all the prep work (HODs, HMF, SMFs, etc.). Specifically, averaging the profile over mass and redshift, projecting it onto the sky and convolving it with the beam, and performing the aperture photometry.
-
-The goal in all of these is to do as much precalculation as possible, as the only things that are changing as chains run is the value of certain parameters, and therefore anything that stays the same should NOT be run everytime. This is done by instead returning lambda functions of just the fit parameters.
-"""
-
-from Basics import *
-
-import Models.FFTs as FFTs
+import numpy as np
+import astropy.units as u
+import astropy.constants as c
 from scipy.interpolate import interp1d  # Do we need this? can we just use normal numpy?
+import Models.FFTs as FFTs
 
-# Weight a profile off a galaxy distribution
-def weighting(galaxydist):
-    gdist_norm = galaxydist/np.sum(galaxydist)  # Normalize the distribution
-    return lambda Pths: np.sum(np.sum(gdist_norm * Pths, axis=1), axis=1)
 
 # Frequency dependence of the tSZ temperature anisotropy
 def fnu(freq, T_CMB, **kwargs):

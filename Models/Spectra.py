@@ -4,48 +4,64 @@ import astropy.units as u
 from scipy.interpolate import RegularGridInterpolator
 
 
-# General form
-def Pgy1h(logM, hmf, H_y, H_g):
-    return np.trapz(H_y*H_g*hmf, logM)
+# General form of cross-spectra
+def Pgy1h(Nc, Ns, uck, usk, logM, hmf, FFT_func, Hz, XH, **kwargs):
+    Hy = H_y(FFT_func, Hz, XH, **kwargs)
+    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
+    return lambda Pth, p={}: np.trapz(Hy(Pth)*Hg(p)*hmf, logM)
 
+# Cross-spectra function for Compton y
 def H_y(FFT_func, Hz, XH, **kwargs):
+    # Precalculate conversion of thermal pressure to compton y
     yfac = (c.sigma_T/c.m_e/c.c**2).to(u.s**2/u.M_sun).value * (2+2*XH)/(3+5*XH)
-    prefac = c.c.to(u.km/u.s).value/Hz[:, None]*yfac
+    prefac = c.c.to(u.km/u.s).value/Hz[:, None] * yfac
     return lambda Pth: FFT_func(prefac*Pth)
 
+# Cross-spectra function for galaxies
 def H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs):
-    ngal = np.trapz((Nc+Ns)*hmf, logM)[:, None]
-    return (Nc*uck + Ns*usk)/ngal
+    ngal = lambda p: np.trapz((Nc(p)+Ns(p))*hmf, logM)[:, None]
+    return lambda p={}: (Nc(p)*uck(p) + Ns(p)*usk(p))/ngal(p)
     
-def HODweighting(zs, logmshalo, HMF, zdist, FFT_func, IFFT_func, H_g=None):
-    if H_g is not None:
-        # If the HOD is preset we can precalculate it once
-        dndzdm_norm = H_g*HMF/np.trapz(np.trapz(H_g*HMF, logmshalo), zs)[:, None, None]
-        return lambda Pth: IFFT_func(np.average(np.trapz(FFT_func(Pth)*dndzdm_norm, logmshalo), weights=zdist, axis=1))
-    else:
-        dndzdm_norm = lambda H_g: H_g*HMF/np.trapz(np.trapz(H_g*HMF, logmshalo), zs)[:, None, None]
-        return lambda Pth, H_g: IFFT_func(np.average(np.trapz(FFT_func(Pth)*dndzdm_norm(H_g), logmshalo), weights=zdist, axis=1))
-
+def HODweighting(Nc, Ns, uck, usk, logM, hmf, FFT3D, IFFT1D, zdist, HODp=None, **kwargs):
+    zdist_norm = zdist/np.sum(zdist)
+    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
+    # if HOD parameters are set, precalculate the HOD terms to save time
+    if HODp is not None:
+        Hg = Hg(HODp)
+        crossspec = lambda Pth: np.trapz(FFT3D(Pth)*infac, logM)
+        denominator = np.trapz(Hg*hmf, logM)
+        infac, frontfac = Hg*hmf, zdist_norm*denominator
+        return lambda Pth: IFFT1D(np.sum(frontfac*crossspec(Pth), axis=1))
+    
+    crossspec = lambda Pth, p={}: np.trapz(FFT3D(Pth)*Hg(p)*hmf, logM)
+    denominator = lambda p={}: np.trapz(Hg(p)*hmf, logM)
+    mave = lambda Pth, p={}: crossspec(Pth, p)/denominator(p)
+    return lambda Pth, p={}: IFFT1D(np.sum(mave(Pth, p)*zdist_norm, axis=1))
+    
 
 
 # Calculating C_ells
 def limber(ks, zs, W_A, W_B, Hs, chis, ells):
+    # Precalculate the easy part
+    intfac = Hs/chis**2/c.c.to(u.km/u.s).value * W_A * W_B
+    
     # Check the ell arrays to be within interpolation bounds
-    ells_from_ks = ks[:, None]*chis
-    if ells.min()<ells_from_ks.min(): raise ValueError(f"ell_min must be belaboveow {ells_from_ks.min()}")
+    ells_from_ks = ks[:, None]*chis-1/2
+    if ells.min()<ells_from_ks.min(): raise ValueError(f"ell_min must be be above {ells_from_ks.min()}")
     elif ells.max()>ells_from_ks.max(): raise ValueError(f"ell_max must be below {ells_from_ks.max()}")
-    ks_from_ells = ells[:, None]/chis  # [n_ells]/[n_zs] > [n_ells, n_zs], precalculated
+    ks_from_ells = (ells[:, None]+1/2)/chis  # [n_ells]/[n_zs] > [n_ells, n_zs], precalculated
     
     # Make 2D interpolator and array of (k, z) points to put into it
     intp_points = np.stack((ks_from_ells, zs*np.ones(ks_from_ells.shape)), axis=-1)
     P_AB_int = lambda P_AB: RegularGridInterpolator((ks, zs), P_AB, bounds_error=False, fill_value=np.nan)(intp_points)
 
-    # Precalculate the easy part
-    intfac = Hs/chis**2/c.c.to(u.km/u.s).value * W_A * W_B
     return lambda P_AB: np.trapz(intfac*P_AB_int(P_AB))
+
+def Clgy(ks, zs, dNdz, Hs, chis, ells):
+    return limber(ks, zs, W_g(dNdz), W_y(zs), Hs, chis, ells)
     
 def W_g(dNdz):  # Galaxy Kernel
-    Ntot = np.trapz(dNdz)
+    Ntot = np.sum(dNdz)
     return dNdz/Ntot
 
 def W_y(zs):  # Compton y kernel
