@@ -10,18 +10,34 @@ import astropy.units as u
 from scipy.interpolate import RegularGridInterpolator
 
 
+def Pgg1h(Nc, Ns, uck, usk, logM, hmf, **kwargs):
+    ngal = lambda p: np.trapz((Nc(p)+Ns(p))*hmf, logM)[:, None]
+    Hg2 = lambda p={}: (2*Ns(p)*usk(p) + (Ns(p)*usk(p))**2)/ngal(p)**2
+    return lambda p={}: np.trapz(Hg2(p)*hmf, logM)
+
+def Pgg2h(Nc, Ns, uck, usk, logM, hmf, bh, Plin, **kwargs):
+    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
+    return lambda p={}: Plin*np.trapz((bh*Hg(p)*hmf)**2, logM)
+
 # Galaxy-y cross-spectra
 def Pgy1h(Nc, Ns, uck, usk, logM, hmf, FFT_func, Hz, XH, **kwargs):
     Hy = H_y(FFT_func, Hz, XH, **kwargs)
     Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
     return lambda Pth, p={}: np.trapz(Hy(Pth)*Hg(p)*hmf, logM)
 
+# Galaxy-y cross-spectra
+def Pgy2h(Nc, Ns, uck, usk, logM, hmf, FFT_func, Hz, bh, Plin, XH, **kwargs):
+    Hy = H_y(FFT_func, Hz, XH, **kwargs)
+    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
+    return lambda Pth, p={}: Plin*np.trapz(bh*Hy(Pth)*hmf, logM)*np.trapz(bh*Hg(p)*hmf, logM)
+
 # Cross-spectra function for Compton y
 def H_y(FFT_func, Hz, XH, **kwargs):  # Hz in units of km/s/Mpc
     # Precalculate
     efrac = (2+2*XH)/(3+5*XH)  # electron fraction
     yfac = (c.sigma_T/c.m_e/c.c**2).to(u.s**2/u.M_sun).value  # Conversion from P_e to y
-    prefac = c.c.to(u.km/u.s).value/Hz[:, None] * yfac * efrac
+    cgs_cosmo = (u.g/u.cm/u.s**2).to(u.M_sun/u.Mpc/u.s**2)  # Pressure in CGS to Msun/Mpc units
+    prefac = c.c.to(u.km/u.s).value/Hz[:, None] * yfac * efrac * cgs_cosmo
     
     return lambda Pth: FFT_func(prefac*Pth)
 
@@ -49,14 +65,8 @@ def HODweighting(Nc, Ns, uck, usk, logM, hmf, FFT3D, IFFT1D, zdist, HODp=None, *
 
 
 
-
-
-
 # Calculating C_ells
-def limber(ks, zs, W_A, W_B, Hs, chis, ells):  # Hs in km/s/Npc, chis in Mpc
-    # Precalculate the simple part
-    intfac = Hs/chis**2/c.c.to(u.km/u.s).value * W_A * W_B
-    
+def limber(ks, zs, W_A, W_B, chis, ells):  # Hs in km/s/Npc, chis in Mpc    
     # Check the ell arrays to be within the bounds set by the input ks
     ells_from_ks = ks[:, None]*chis-1/2
     if ells.min()<ells_from_ks.min(): raise ValueError(f"ell_min must be be above {ells_from_ks.min()}")
@@ -67,13 +77,17 @@ def limber(ks, zs, W_A, W_B, Hs, chis, ells):  # Hs in km/s/Npc, chis in Mpc
     intp_points = np.stack((ks_from_ells, zs*np.ones(ks_from_ells.shape)), axis=-1)
     P_AB_int = lambda P_AB: RegularGridInterpolator((ks, zs), P_AB, bounds_error=False, fill_value=np.nan)(intp_points)
 
-    return lambda P_AB: np.trapz(intfac*P_AB_int(P_AB))
+    intfac = W_A * W_B /chis**2  # Precalculate the simple part
+    return lambda P_AB: np.trapz(intfac*P_AB_int(P_AB), zs)
+
+def Clgg(ks, zs, dNdz, Hs, chis, ells):
+    return limber(ks, zs, W_g(dNdz, Hs), 1, chis, ells)
 
 def Clgy(ks, zs, dNdz, Hs, chis, ells):
-    return limber(ks, zs, W_g(dNdz), W_y(zs), Hs, chis, ells)
+    return limber(ks, zs, W_g(dNdz, Hs), W_y(zs), chis, ells)
     
-def W_g(dNdz):  # Galaxy Kernel
-    return dNdz/np.sum(dNdz)
+def W_g(dNdz, Hs):  # Galaxy Kernel
+    return dNdz/np.sum(dNdz) * Hs/c.c.to(u.km/u.s).value
 
 def W_y(zs):  # Compton y kernel
     return 1/(1+zs)
