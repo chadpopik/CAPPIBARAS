@@ -80,8 +80,8 @@ class hmf_package(BASEHMF):  # https://hmf.readthaedocs.io/en/latest/index.html
         dlog10m = logmshalo[1]-logmshalo[0]
 
         # Function only takes one z at a time so use list comprehension and then combine
-        haloMFsraw = [self.hmf.MassFunction(z=z, Mmin=logmshalo.min(), Mmax=logmshalo.max(), dlog10m=dlog10m, hmf_model=self.mfunc, mdef_model=self.mdef, cosmo_model=cosmo) for z in zs]
-        HMF_m_z = np.array([haloMF.dndlog10m*hh**3 for haloMF in haloMFsraw])
+        haloMFsraw = [self.hmf.MassFunction(z=z, Mmin=logmshalo.min(), Mmax=logmshalo.max()+dlog10m, dlog10m=dlog10m, hmf_model=self.mfunc, mdef_model=self.mdef, cosmo_model=cosmo) for z in zs]
+        HMF_m_z = np.array([np.interp(logmshalo, np.log10(haloMFraw.m), haloMFraw.dndlog10m)*hh**3 for haloMFraw in haloMFsraw])
         return HMF_m_z
 
 
