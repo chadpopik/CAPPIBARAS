@@ -1,5 +1,7 @@
 """
 Collection of Stellar Halo Mass Relations models and paramterizations for various studies/samples.
+
+TODO 1: Add satellite dependent SHMR model
 """
 
 import numpy as np

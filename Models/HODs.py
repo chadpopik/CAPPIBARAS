@@ -1,5 +1,5 @@
 """
-Collections of Halo Occupancy Distribution model and parameterizations calibrated off different studies/samples.
+Collections of Halo Occupancy Distribution models and parameterizations calibrated off different studies/samples. 
 
 Classes should contain functions to calculate the average number of central and satellite galaxies (Nc/Ns) as a function of halo mass (in m200c) and the parameters values outlined in the papers, with other components of specific models (like density profile of satellite galaxies) added as needed.
 
@@ -12,7 +12,7 @@ import scipy
 
 
 class BaseHOD:
-    # Check specification validity and assign parameters
+    # Check if specified model exists and assign default paper parameters
     def checkspefs(self, spefs, required):
         for mname in required:
             if spefs[mname] not in getattr(self, f"{mname}s"):
@@ -21,20 +21,21 @@ class BaseHOD:
                 setattr(self, mname, spefs[mname])
         self.p0 = {param: self.params[param][self.samples.index(self.sample)] for param in self.params.keys()}
 
-    # Expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564)
+    # Base form for expected number of centrals per halo (arxiv.org/abs/astro-ph/0408564)
     def Nc_Zheng2005(self, logM, logM_min, sigma_logM):  
         return 0.5*(1+scipy.special.erf((logM-logM_min)/sigma_logM))
 
-    # Expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564)
+    # Base form for expected number of satellites per halo (arxiv.org/abs/astro-ph/0408564)
     def Ns_Zheng2005(self, logM, logM_0, logM_1, alpha):
         M, M_0, M_1 = 10**logM, 10**logM_0, 10**logM_1
-        return ((M-M_0)/M_1)**alpha
+        nsat = ((M-M_0)/M_1)**alpha
+        return np.nan_to_num(nsat, 0)
 
     # CMASS incompleteness function (arxiv.org/abs/1407.1856)
     def f_inc_More2015(self, logM, alpha_inc, logM_inc):
         return np.clip(1+alpha_inc*(logM-logM_inc), 0, 1)
 
-    # Default central density distribution (FFT of dirac delta)
+    # Default central distribution (FFT of dirac delta)
     def uck(self):
         return lambda p={}: 1
 
@@ -46,19 +47,24 @@ class BaseHOD:
 
 
 class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
-    info = {'mdef': '200m', 'zmin': 0.47, 'zmax': 0.59, 'zmed': 0.53}
+    # General info about model and samples
+    info = {'mdef': '200m',  # region in which the average density is∆ = 200 times the cosmic mean density
+            'zlims': [0.47, 0.59],  # redshift range of selected galaxies
+            'zmed': 0.53,  # median redshift
+            }
     
+    # Different sample and best-fit parameters for each sample
     samples = ["M*>10.8", "M*>11.1", "M*>11.25", "M*>11.4"]
     params = {
         "logM_min": [13.47, 13.58, 13.84, 14.20],  # minimum halo mass for a central galaxy/value at which halos contain 0.5 central galaxies on average
-        "sigma_logM": [0.76, 0.78, 0.86, 0.959],
+        "sigma_logM": [0.76, 0.78, 0.86, 0.959],  # changes the number of galaxies in lowmass halos
         "logM_1": [14.119, 14.140, 14.171, 14.100],  # controls the number of galaxies at high halo mass
-        "beta_s": [4.38, 4.71, 5.31, 6.35],
-        "1-b_h": [0.602, 0.623, 0.558, 0.550],
-        "A": [0.981, 0.965, 0.956, 0.961],
-        "alpha_inc": [0.51, 0.42, 0.39, 0.33],
-        "logM_inc": [13.39, 13.42, 13.69, 13.96],
-        "beta_m": [4.97, 5.91, 4.16, 10],
+        "beta_s": [4.38, 4.71, 5.31, 6.35],  # satellite galaxy profile
+        "1-b_h": [0.602, 0.623, 0.558, 0.550],  # hydrostatic bias
+        "A": [0.981, 0.965, 0.956, 0.961],  # crosscorrelation amplitude
+        "alpha_inc": [0.51, 0.42, 0.39, 0.33],  # included to account for galaxy incompleteness at the low stellar mass end
+        "logM_inc": [13.39, 13.42, 13.69, 13.96],  # included to account for galaxy incompleteness at the low stellar mass end
+        "beta_m": [4.97, 5.91, 4.16, 10],  # matter density profile
         }
 
     def __init__(self, spefs):
@@ -69,6 +75,7 @@ class Kou2023(BaseHOD):  # CMASS DR12 (arxiv.org/abs/2211.07502)
         func = lambda p: self.Nc_Zheng2005(logM, logM_min=p['logM_min'], sigma_logM=p['sigma_logM']) * self.f_inc_More2015(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
         return lambda p={}: func(self.p0 | p)
 
+    # M_0 is set to M_min
     def Ns(self, logM):
         func = lambda p: self.Ns_Zheng2005(logM, logM_0=p['logM_min'], logM_1=p['logM_1'], alpha=1) * np.heaviside(logM-p['logM_min'],1) * self.Nc(logM)(p)
         return lambda p={}: func(self.p0 | p)
@@ -154,9 +161,9 @@ class Linke2022(BaseHOD):  # Millennium Simulation and KiDS+VIKING+GAMA (arxiv.o
     params = {
         "alpha^a": [0.47, 0.10, 0.34, 0.13],
         "sigma^a": [0.55, 0.47, 0.52, 0.47],
-        "M_th^a": [23.0, 1.19, 15, 1.4],  # 1e11 Msol
+        "M_th^a": [23.0, 1.19, 15, 1.4],  # units of 1e11 Msol
         "beta^a": [0.84, 0.73, 0.88, 0.55],
-        "M^a": [5.8, 32, 3.6, 20],  # 1e13 Msol
+        "M^a": [5.8, 32, 3.6, 20],  # units of 1e13 Msol
         "f": [1.49, 0.88, 1.27, 0.83],
         "A": [5.31, 5.31, 1.62, 1.62],
         "epsilon": [0.69, 0.69, 0.99, 0.99],

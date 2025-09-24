@@ -1,6 +1,10 @@
 """
 Collection of Halo Mass Function obtained either from halo model codes or loaded from a data files. 
 Classes should contain halo number density 2D arrays over halo mass (in m200c) and redshift and the corresponding mass/redshift arrays, in consistent units. If using functions, require input halo mass/redshift arrays to ensure output consistency between classes.
+
+TODO 1: Check about adding more detail to the cosmology setup in pyccl
+TODO 2: Check mass def conversions
+TODO 3: Check about adding more detail to the cosmology setup in astropy
 """
 
 
@@ -17,7 +21,7 @@ class BASEHMF:
                 setattr(self, mname, spefs[mname])
 
 
-class pyccl(BASEHMF):
+class pyccl(BASEHMF):  # https://ccl.readthedocs.io/en/latest/index.html
     mfuncs = ['Angulo12', 'Bocquet16', 'Bocquet20', 'Despali16', 'Jenkins01', 'Nishimichi19', 'Press74', 'Sheth99', 'Tinker08', 'Tinker10', 'Watson13']
     hbiass = ['Bhattacharya11', 'Sheth01', 'Sheth99', 'Tinker10']
     mdefs = ['200c', '200m', 'vir', '500c', '500m']  # can actaully use any overdensity number for c and m
@@ -32,20 +36,26 @@ class pyccl(BASEHMF):
         self.hbias = getattr(self.ccl.halos.hbias, f"HaloBias{self.hbias}")(mass_def=self.mdef)
 
     def initcosmo(self, hh, Omega_b, Omega_m, **kwargs):
+        # TODO 1: Check about adding more detail to the cosmology setups
         return self.ccl.Cosmology(h=hh, Omega_c=Omega_m-Omega_b, Omega_b=Omega_b, n_s=0.95, sigma8=0.8,transfer_function='bbks')
 
+    # Halo Mass Function
     def HMF(self, zs, logmshalo, **kwargs):
         cosmo = self.initcosmo(**kwargs)
         return np.array([self.hmffunc(cosmo=cosmo, M=10**logmshalo, a=1/(1+z))for z in zs])
     
+    # Galaxy bias
     def bh(self, zs, logmshalo, **kwargs):
         cosmo = self.initcosmo(**kwargs)
         return np.array([self.hbias(cosmo=cosmo, M=10**logmshalo, a=1/(1+z))for z in zs])
     
+    # Linear power spectrum
     def Plin(self, ks, zs, **kwargs):
         cosmo = self.initcosmo(**kwargs)
         return np.array([cosmo.linear_matter_power(ks, a=1/(1+z))for z in zs]).T
     
+    # Mass conversion
+    # TODO 2: Check mass conversions for proper functioning
     def Mconv(self, logmshalo, zs, mdefin, mdefout, **kwargs):
         cosmo = self.initcosmo(**kwargs)
         massconv = self.ccl.halos.massdef.mass_translator(mass_in=mdefin, mass_out=mdefout, concentration='Bhattacharya13')
@@ -62,7 +72,9 @@ class hmf_package(BASEHMF):  # https://hmf.readthaedocs.io/en/latest/index.html
         
         self.checkspefs(spefs, required=['mdef', 'mfunc'])
 
+    # Halo Mass Function
     def HMF(self, zs, logmshalo, hh, Omega_b, Omega_m, Omega_L, T_CMB, **kwargs):
+        # TODO 3: Check about adding more detail to the cosmology setups
         cosmo = astropy.cosmology.LambdaCDM(H0=hh*100, Tcmb0=T_CMB, Om0=Omega_m, Ode0=Omega_L, Ob0=Omega_b)
         logmshalo = logmshalo+np.log10(hh)
         dlog10m = logmshalo[1]-logmshalo[0]

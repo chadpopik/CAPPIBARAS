@@ -36,7 +36,7 @@ class BaseGNFW:
 
 
 
-# BOSS DR10 cross-correlated with ACT DR5 (arxiv.org/abs/2009.05558)
+# BOSS DR10 cross-correlated with ACT DR5 (Amodeo+ 2021, arxiv.org/abs/2009.05558)
 class Amodeo2021(BaseGNFW):
     info = {'Omega_m': 0.25, 'Omega_b': 0.044, 'Omega_L': 0.75, 'H0': 70, 'v_rms': 1.06e-3, 'X_H':0.76,
             'mdef': '200c',

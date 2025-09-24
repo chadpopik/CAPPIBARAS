@@ -4,12 +4,16 @@ Going to and back from Fourier space is necessary for beam convolution, as well 
 This file contains various methods of performing FFTs collected from various packages around, returning functions that take in a profile and spit out its transform.
 
 The ideal being ones that are as fast as possible, while being able to maintain the profile values if just doing a conversion back and forth (which is what the HOD method does, and we want to make sure the FFT-IFFT process doesn't insert any changes).
+
+- TODO 1: test for forward/backward equivalency in FFT
+- TODO 2: Check in detail Emily's Hankel transform
 """
 
 import numpy as np
 import scipy
 
-
+# Very fast FFT in mcfit
+# TODO 1: Test to make sure a FFT/IFFT process doesn't returns an identical function and doesn't introduce other artifacts
 class mcfit_package:
     def __init__(self, rs):
         import mcfit
@@ -36,8 +40,8 @@ class mcfit_package:
         return self.IFFTraw(funck)
     
 
-# This class is taken from Pixell, written by Sigurd Naess. We don't need all of pixell
-# for this, so for now we just take the Hankel transform class.
+# Emily: This class is taken from Pixell, written by Sigurd Naess. We don't need all of pixell for this, so for now we just take the Hankel transform class.
+# TODO 2: Check details to see if improvements can be made or it should be replaced with another FFT
 class RadialFourierTransformHankel:
     def __init__(self, lrange=None, rrange=None, n=512, pad=256):
         """Construct an object for transforming between radially

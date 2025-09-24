@@ -1,3 +1,12 @@
+"""
+
+- TODO 1: clean up the projection and aperture functions
+- TODO 2: Maybe too much of th FFT mess is done in this file, it can be put into the FFT file?
+- TODO 3: check if intergrating over zs is really necessary, maybe just use the medium z?
+- TODO 4: Should i just drop the y conversion? like why is it in there? for rho it's incorrect, and for Pth it might be unneeded.
+- TODO 5: Add miscentering?
+"""
+
 import numpy as np
 import astropy.units as u
 import astropy.constants as c
@@ -16,10 +25,16 @@ def Pth_to_muK(XH, T_CMB, freq, **kwargs):
     factor = (c.sigma_T/c.m_e/c.c**2).cgs.value * (2+2*XH)/(3+5*XH) * fnu(freq, T_CMB) * T_CMB*1e6
     return lambda tSZ_sig: factor * tSZ_sig
 
+# Conversion of Pth to y
+def Pth_to_y(XH, **kwargs):
+    factor = (c.sigma_T/c.m_e/c.c**2).cgs.value * (2+2*XH)/(3+5*XH)
+    return lambda tSZ_sig: factor * tSZ_sig
+
 # Conversion between gas density and muK for kSZ
 def rho_to_muK(v_rms, XH, T_CMB, **kwargs):
     factor = v_rms * (c.sigma_T/c.m_p).cgs.value * (1+XH)/2 * T_CMB*1e6
     return lambda kSZ_sig: factor * kSZ_sig
+
 
 
 
@@ -80,18 +95,6 @@ def aperture_photometry(thts, # angular size of the measurements
 
 
 
-# def miscetner()
-    # phis = np.linspace(0, 2*np.pi, 50)
-    # R_mis = np.geomspace(2e-4, 2e1, 100)
-    # rs_theta, rs_theta2  = thta_smooth[:, 0]*AngDis, thta2_smooth[:, 0]*AngDis
-    # Rints = np.sqrt(R_mis[None, ..., None]**2+rs_theta[..., None, None]**2 \
-    #                 +2*R_mis[None, ..., None]*rs_theta[..., None, None]*np.cos(phis))
-    # Pth2D_R_Rmis = np.trapz(Pth2Dfunc(Rints, Pth_inter), phis, axis=-1)/(2*np.pi)
-
-    # gamma = lambda r_mis: r_mis/tauRg**2 * np.exp(-r_mis/tauRg)
-    # Pth2D_mis_R = np.trapz(gamma(R_mis) * Pth2D_R_Rmis, R_mis)
-
-    # Pth2D_mis = (1-f_mis)*Pth2D+f_mis*Pth2D_mis_R
 
 
 
@@ -150,3 +153,16 @@ def project_tsz_Hankel2(rs, zs, thetas, AngDistFunc, LumDistFunc, galaxydist,
     # TASK: check units
     PthtoTtsz = (c.sigma_T/c.m_e/c.c**2).cgs.value * (2+2*XH)/(3+5*XH) * (u.Mpc*u.sr).to(u.cm*u.arcmin**2)
     return lambda Pths: project_convolve(Pths)*PthtoTtsz
+
+# def miscetner()
+    # phis = np.linspace(0, 2*np.pi, 50)
+    # R_mis = np.geomspace(2e-4, 2e1, 100)
+    # rs_theta, rs_theta2  = thta_smooth[:, 0]*AngDis, thta2_smooth[:, 0]*AngDis
+    # Rints = np.sqrt(R_mis[None, ..., None]**2+rs_theta[..., None, None]**2 \
+    #                 +2*R_mis[None, ..., None]*rs_theta[..., None, None]*np.cos(phis))
+    # Pth2D_R_Rmis = np.trapz(Pth2Dfunc(Rints, Pth_inter), phis, axis=-1)/(2*np.pi)
+
+    # gamma = lambda r_mis: r_mis/tauRg**2 * np.exp(-r_mis/tauRg)
+    # Pth2D_mis_R = np.trapz(gamma(R_mis) * Pth2D_R_Rmis, R_mis)
+
+    # Pth2D_mis = (1-f_mis)*Pth2D+f_mis*Pth2D_mis_R

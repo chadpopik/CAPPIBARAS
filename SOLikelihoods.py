@@ -1,10 +1,16 @@
 """
 Likelihood for SZ model
+
+- TODO 1: Is there a way to not way to write a preinit line for each value that's needed?
+- TODO 2: Is there a way to just know the yaml file and more easily load the original params?
+- TODO 3: Should I explore with actually creating a theory class to calculate some of the HOD/HMF type things?
+- TODO 4: How to decide rs array? 
 """
 
 from Basics import *
+from CAPPIBARAS.Testing import ForwardModel
 from Capybara.Models import Data, HaloModels
-from Models import ForwardModel, Profiles, SHMRs, HODs, SMFs
+from Models import Profiles, SHMRs, HODs, SMFs
 
 from cobaya.yaml import yaml_load_file
 

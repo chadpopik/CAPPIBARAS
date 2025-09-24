@@ -1,57 +1,69 @@
+"""
+
+TODO 1: Add Cells calculation
+"""
+
+
 import numpy as np
 import astropy.constants as c
 import astropy.units as u
 from scipy.interpolate import RegularGridInterpolator
 
 
-# General form of cross-spectra
+# Galaxy-y cross-spectra
 def Pgy1h(Nc, Ns, uck, usk, logM, hmf, FFT_func, Hz, XH, **kwargs):
     Hy = H_y(FFT_func, Hz, XH, **kwargs)
     Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
     return lambda Pth, p={}: np.trapz(Hy(Pth)*Hg(p)*hmf, logM)
 
 # Cross-spectra function for Compton y
-def H_y(FFT_func, Hz, XH, **kwargs):
-    # Precalculate conversion of thermal pressure to compton y
-    yfac = (c.sigma_T/c.m_e/c.c**2).to(u.s**2/u.M_sun).value * (2+2*XH)/(3+5*XH)
-    prefac = c.c.to(u.km/u.s).value/Hz[:, None] * yfac
+def H_y(FFT_func, Hz, XH, **kwargs):  # Hz in units of km/s/Mpc
+    # Precalculate
+    efrac = (2+2*XH)/(3+5*XH)  # electron fraction
+    yfac = (c.sigma_T/c.m_e/c.c**2).to(u.s**2/u.M_sun).value  # Conversion from P_e to y
+    prefac = c.c.to(u.km/u.s).value/Hz[:, None] * yfac * efrac
+    
     return lambda Pth: FFT_func(prefac*Pth)
 
 # Cross-spectra function for galaxies
-def H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs):
+def H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs):  
     ngal = lambda p: np.trapz((Nc(p)+Ns(p))*hmf, logM)[:, None]
     return lambda p={}: (Nc(p)*uck(p) + Ns(p)*usk(p))/ngal(p)
     
+# Get average profile with an HOD
 def HODweighting(Nc, Ns, uck, usk, logM, hmf, FFT3D, IFFT1D, zdist, HODp=None, **kwargs):
-    zdist_norm = zdist/np.sum(zdist)
-    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
-    # if HOD parameters are set, precalculate the HOD terms to save time
-    if HODp is not None:
-        Hg = Hg(HODp)
-        crossspec = lambda Pth: np.trapz(FFT3D(Pth)*infac, logM)
-        denominator = np.trapz(Hg*hmf, logM)
-        infac, frontfac = Hg*hmf, zdist_norm*denominator
-        return lambda Pth: IFFT1D(np.sum(frontfac*crossspec(Pth), axis=1))
+    zdist_norm = zdist/np.sum(zdist)  # Pre-calculate normalized z distribution for average
+    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)  # Define the HOD cross-spectra function
+    if HODp is not None:  # if HOD parameters aren't being fit, precalculate the HOD terms to save time
+        Hg_norm = Hg(HODp)/np.trapz(Hg*hmf, logM)[..., None]  # normalized galaxy distribution
+        infac = Hg_norm*hmf  # Precalculated integrand factor
+        mave = lambda prof: np.trapz(FFT3D(prof)*infac, logM)  # mass average using HMF
+        zave = lambda prof: np.sum(prof*zdist_norm, axis=1)  # z average using zdist
+        return lambda prof: IFFT1D(zave(mave(prof)))
     
-    crossspec = lambda Pth, p={}: np.trapz(FFT3D(Pth)*Hg(p)*hmf, logM)
-    denominator = lambda p={}: np.trapz(Hg(p)*hmf, logM)
-    mave = lambda Pth, p={}: crossspec(Pth, p)/denominator(p)
-    return lambda Pth, p={}: IFFT1D(np.sum(mave(Pth, p)*zdist_norm, axis=1))
+    Hg_norm = lambda p: Hg(p)/np.trapz(Hg(p)*hmf, logM)[..., None]  # normalized galaxy distribution
+    mave = lambda prof, p: np.trapz(FFT3D(prof)*Hg_norm(p)*hmf, logM)  # mass average
+    zave = lambda prof: np.sum(prof*zdist_norm, axis=1)  # z average
+    return lambda prof, p={}: IFFT1D(zave(mave(prof, p)))  # IFFT
     
+
+
+
+
 
 
 # Calculating C_ells
-def limber(ks, zs, W_A, W_B, Hs, chis, ells):
-    # Precalculate the easy part
+def limber(ks, zs, W_A, W_B, Hs, chis, ells):  # Hs in km/s/Npc, chis in Mpc
+    # Precalculate the simple part
     intfac = Hs/chis**2/c.c.to(u.km/u.s).value * W_A * W_B
     
-    # Check the ell arrays to be within interpolation bounds
+    # Check the ell arrays to be within the bounds set by the input ks
     ells_from_ks = ks[:, None]*chis-1/2
     if ells.min()<ells_from_ks.min(): raise ValueError(f"ell_min must be be above {ells_from_ks.min()}")
     elif ells.max()>ells_from_ks.max(): raise ValueError(f"ell_max must be below {ells_from_ks.max()}")
-    ks_from_ells = (ells[:, None]+1/2)/chis  # [n_ells]/[n_zs] > [n_ells, n_zs], precalculated
+    ks_from_ells = (ells[:, None]+1/2)/chis  # 2D array, [n_ells]/[n_zs] > [n_ells, n_zs]
     
-    # Make 2D interpolator and array of (k, z) points to put into it
+    # Make 2D interpolator for k and z, and array of (k, z) points to put into it
     intp_points = np.stack((ks_from_ells, zs*np.ones(ks_from_ells.shape)), axis=-1)
     P_AB_int = lambda P_AB: RegularGridInterpolator((ks, zs), P_AB, bounds_error=False, fill_value=np.nan)(intp_points)
 
@@ -61,8 +73,7 @@ def Clgy(ks, zs, dNdz, Hs, chis, ells):
     return limber(ks, zs, W_g(dNdz), W_y(zs), Hs, chis, ells)
     
 def W_g(dNdz):  # Galaxy Kernel
-    Ntot = np.sum(dNdz)
-    return dNdz/Ntot
+    return dNdz/np.sum(dNdz)
 
 def W_y(zs):  # Compton y kernel
     return 1/(1+zs)

@@ -3,10 +3,13 @@ Collections of galaxy distributions in stellar mass and redshift for various sur
 Classes should have galaxy number density 2D arrays over stellar and redshift and the corresponding stellar mass/redshift arrays, in consistent units.
 Some samples may need to combine a SMF from one study and a redshift distribution from another.
 If available, using halo masses in m200c instead of stellar masses is fine, then just don't use a SHMR later.
+
+TODO 1: Add DESI SMF from catalog
 """
 
-datapath = "/global/homes/c/cpopik/Data/"
+datapath = "/global/homes/c/cpopik/CAPPIBARAS/Data/"
 
+import os
 import numpy as np
 import pandas as pd
 import astropy
@@ -21,46 +24,44 @@ class BaseSMF:
             else:
                 setattr(self, mname, spefs[mname])
                 
-    # Calculate volume of redshift bins to convert from typical SMF units of Mpc^-3 to pure number counts
-    def volumes(self, hh, T_CMB, Omega_m, Omega_L, Omega_b, **kwargs):
-        cosmo = astropy.cosmology.LambdaCDM(H0=hh*100, Tcmb0=T_CMB, Om0=Omega_m, Ode0=Omega_L, Ob0=Omega_b)
-
-        dz = (self.z[1]-self.z[0])
-        vols = np.array([(cosmo.comoving_volume(z+dz/2).value-cosmo.comoving_volume(z-dz/2).value)/(1+z)**3 for z in self.z])
-        return vols * (self.info['area']/(4*np.pi*(180/np.pi)**2))
+    # Calculate volume of redshift bins to convert from typical SMF density units to pure number counts
+    def volumes(self, hh, T_CMB, Omega_m, Omega_L, Omega_b, **kwargs):  # Needs cosmological parameters
+        cosmo = astropy.cosmology.LambdaCDM(H0=hh*100, Tcmb0=T_CMB, Om0=Omega_m, Ode0=Omega_L, Ob0=Omega_b)  # Setup astropy cosmology
+        dz = (self.z[1]-self.z[0])  # Redshift slices
+        vol = lambda z: (cosmo.comoving_volume(z+dz/2).value-cosmo.comoving_volume(z-dz/2).value)  # Comoving volume of a shell
+        vols = np.array([vol(z)/(1+z)**3 for z in self.z])  # Calculate for every z and convert for all z
+        return vols * (self.info['area']/(4*np.pi*(180/np.pi)**2))  # Multiply by sky fraction of survey
     
     # Define SMF from an existing Ndist if the data comes from a galaxy catalog
     def dndlogmstar(self, zbins=None, logmstarbins=None, **cosmopars):
         Ndist = self.N(zbins, logmstarbins)
-        dlogmstar = self.logmstar[1]-self.logmstar[0]
-        return Ndist/self.volumes(**cosmopars)[:, None]/dlogmstar
+        return Ndist /self.volumes(**cosmopars)[:, None]/(self.logmstar[1]-self.logmstar[0])
     
     # Define Ndist from SMF if the data comes from a SMF plot
     def N(self, **cosmopars):
-        dlogmstar = self.logmstar[1]-self.logmstar[0]
-        return self.dndlogmstar(**cosmopars)*dlogmstar*self.volumes(**cosmopars)[:, None]
+        return self.dndlogmstar(**cosmopars) *self.volumes(**cosmopars)[:, None]*(self.logmstar[1]-self.logmstar[0])
     
     # Create a 2D array of galaxy count binned by redshift and stellar mass from a catalog
     def Ndist_from_catalog(self, zsraw, logmsraw, zbins, logmstarbins):
-        self.Ndist, _, _ = np.histogram2d(zsraw, logmsraw, bins=[zbins, logmstarbins])
-        self.z, self.logmstar = (zbins[1:]+zbins[:-1])/2, (logmstarbins[1:]+logmstarbins[:-1])/2
+        self.Ndist, _, _ = np.histogram2d(zsraw, logmsraw, bins=[zbins, logmstarbins])  # Bin catalog into 2D z/m array
+        self.z, self.logmstar = (zbins[1:]+zbins[:-1])/2, (logmstarbins[1:]+logmstarbins[:-1])/2  # Calculate centers of bins
         return self.Ndist
     
     # Using a Stellar Halo Mass Relation, convert a Stellar Mass Function into a Halo Mass Function
     def SMF_to_HMF(self, logmhalobins, SHMR, zbins=None, logmstarbins=None, **cosmopars):
-        smf = self.dndlogmstar(zbins, logmstarbins, **cosmopars)
+        smf = self.dndlogmstar(zbins=zbins, logmstarbins=logmstarbins, **cosmopars)
         self.logmhalo = (logmhalobins[1:]+logmhalobins[:-1])/2
         dlogmstar, dlogmhalo = self.logmstar[1]-self.logmstar[0], logmhalobins[1]-logmhalobins[0]
         dndlogmhalo = np.array([np.interp(self.logmhalo, SHMR(self.logmstar)(), smf[i]*dlogmstar)/dlogmhalo for i in range(self.z.size)])
         return dndlogmhalo
     
     def Ndist_halo(self, logmhalobins, SHMR, zbins=None, logmstarbins=None, **cosmopars):
-        ndist = self.N(zbins, logmstarbins, **cosmopars)
+        ndist = self.N(zbins=zbins, logmstarbins=logmstarbins, **cosmopars)
         self.logmhalo = (logmhalobins[1:]+logmhalobins[:-1])/2
         ndist_halo = np.array([np.interp(self.logmhalo, SHMR(self.logmstar)(), ndist[i]) for i in range(self.z.size)])
         return ndist_halo
 
-        
+
 
 class DESILRGsCrossCorr(BaseSMF):  # DESI LS DR9 LRG sample from cross-correlations (arxiv.org/abs/2309.06443)
     info = {'area': 16700,  # Imaging coverage after applying masks and footprint trimming
@@ -130,10 +131,12 @@ class BOSSDR10(BaseSMF):  # arxiv.org/abs/1307.7735
     dusts = ['dust', 'nodust']
 
     def __init__(self, spefs):
+        # Path of the data in NERSC, or path through a URL if not in NERSC
+        self.path = "/global/cfs/projectdirs/sdss/data/sdss/dr10/boss/spectro/redux/galaxy/v1_0"
+        if os.path.isdir(self.path): pass
+        else: self.path = "https://data.sdss.org/sas/dr10/boss/spectro/redux/galaxy/v1_0/"
+
         self.checkspefs(spefs, required=['group', 'galaxy'])
-        
-        # Path of the data in NERSC
-        path = "/global/cfs/projectdirs/sdss/data/sdss/dr10/boss/spectro/redux/galaxy/v1_0"
         
         # Each group model needs different specifications and has a different naming scheme
         if self.group=='portsmouth': 
@@ -152,7 +155,7 @@ class BOSSDR10(BaseSMF):  # arxiv.org/abs/1307.7735
         
         # Fetch the data with properly naming and renaming the mass column
         mcolname = {'portsmouth':'LOGMASS', 'wisconsin':'MSTELLAR_MEDIAN', 'granada':'MSTELLAR_MEDIAN'}[self.group]
-        self.dfdata = Table.read(f"{path}/{fname}")['Z', mcolname, 'BOSS_TARGET1'].to_pandas().rename(columns={mcolname: "LOGM"})
+        self.dfdata = Table.read(f"{self.path}/{fname}")['Z', mcolname, 'BOSS_TARGET1'].to_pandas().rename(columns={mcolname: "LOGM"})
         
         # Select the correct galaxy sample using the bitmasks
         bitmask = {'CMASS':7, 'LOWZ':0}[self.galaxy]
