@@ -55,7 +55,7 @@ class Amodeo2021(BaseGNFW):
               'beta_t': [2.6],  # outer slope
               'A2h_t': [0.7],  # pressure 2h amplitude
             }
-    
+        
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['model'])
 

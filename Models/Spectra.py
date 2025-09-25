@@ -10,197 +10,218 @@ import astropy.units as u
 from scipy.interpolate import RegularGridInterpolator
 
 
-def Pgg1h(Nc, Ns, uck, usk, logM, hmf, **kwargs):
-    ngal = lambda p: np.trapz((Nc(p)+Ns(p))*hmf, logM)[:, None]
-    Hg2 = lambda p={}: (2*Ns(p)*usk(p) + (Ns(p)*usk(p))**2)/ngal(p)**2
-    return lambda p={}: np.trapz(Hg2(p)*hmf, logM)
 
-def Pgg2h(Nc, Ns, uck, usk, logM, hmf, bh, Plin, **kwargs):
-    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
-    return lambda p={}: Plin*np.trapz((bh*Hg(p)*hmf)**2, logM)
 
-# Galaxy-y cross-spectra
-def Pgy1h(Nc, Ns, uck, usk, logM, hmf, FFT_func, Hz, XH, **kwargs):
-    Hy = H_y(FFT_func, Hz, XH, **kwargs)
-    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
-    return lambda Pth, p={}: np.trapz(Hy(Pth)*Hg(p)*hmf, logM)
-
-# Galaxy-y cross-spectra
-def Pgy2h(Nc, Ns, uck, usk, logM, hmf, FFT_func, Hz, bh, Plin, XH, **kwargs):
-    Hy = H_y(FFT_func, Hz, XH, **kwargs)
-    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)
-    return lambda Pth, p={}: Plin*np.trapz(bh*Hy(Pth)*hmf, logM)*np.trapz(bh*Hg(p)*hmf, logM)
-
-# Cross-spectra function for Compton y
-def H_y(FFT_func, Hz, XH, **kwargs):  # Hz in units of km/s/Mpc
-    # Precalculate
-    efrac = (2+2*XH)/(3+5*XH)  # electron fraction
-    yfac = (c.sigma_T/c.m_e/c.c**2).to(u.s**2/u.M_sun).value  # Conversion from P_e to y
-    cgs_cosmo = (u.g/u.cm/u.s**2).to(u.M_sun/u.Mpc/u.s**2)  # Pressure in CGS to Msun/Mpc units
-    prefac = c.c.to(u.km/u.s).value/Hz[:, None] * yfac * efrac * cgs_cosmo
-    
-    return lambda Pth: FFT_func(prefac*Pth)
-
-# Cross-spectra function for galaxies
-def H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs):  
-    ngal = lambda p: np.trapz((Nc(p)+Ns(p))*hmf, logM)[:, None]
-    return lambda p={}: (Nc(p)*uck(p) + Ns(p)*usk(p))/ngal(p)
-    
 # Get average profile with an HOD
-def HODweighting(Nc, Ns, uck, usk, logM, hmf, FFT3D, IFFT1D, zdist, HODp=None, **kwargs):
-    zdist_norm = zdist/np.sum(zdist)  # Pre-calculate normalized z distribution for average
+def HODweighting(Nc, Ns, uck, usk, logM, zs, hmf, FFT3D, IFFT1D, dNdz, HODp=None, **kwargs):
     Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)  # Define the HOD cross-spectra function
     if HODp is not None:  # if HOD parameters aren't being fit, precalculate the HOD terms to save time
-        Hg_norm = Hg(HODp)/np.trapz(Hg*hmf, logM)[..., None]  # normalized galaxy distribution
-        infac = Hg_norm*hmf  # Precalculated integrand factor
-        mave = lambda prof: np.trapz(FFT3D(prof)*infac, logM)  # mass average using HMF
-        zave = lambda prof: np.sum(prof*zdist_norm, axis=1)  # z average using zdist
-        return lambda prof: IFFT1D(zave(mave(prof)))
+        Hg_norm = Hg(HODp)/np.trapz(np.trapz(Hg*hmf*dNdz, logM), zs)[..., None, None]  # normalized galaxy distribution
+        infac = Hg_norm*hmf*dNdz[:, None]  # Precalculated integrand factor
+        aveprof = lambda prof: np.trapz(np.trapz(FFT3D(prof)*infac, logM), zs)  # mass and redshift average
+        return lambda prof: IFFT1D(aveprof(prof))
     
-    Hg_norm = lambda p: Hg(p)/np.trapz(Hg(p)*hmf, logM)[..., None]  # normalized galaxy distribution
-    mave = lambda prof, p: np.trapz(FFT3D(prof)*Hg_norm(p)*hmf, logM)  # mass average
-    zave = lambda prof: np.sum(prof*zdist_norm, axis=1)  # z average
-    return lambda prof, p={}: IFFT1D(zave(mave(prof, p)))  # IFFT
+    infac = hmf*dNdz[:, None]
+    Hg_norm = lambda p: Hg(p)/np.trapz(np.trapz(Hg(p)*infac, logM), zs)[:, None, None]  # normalized galaxy distribution
+    aveprof = lambda prof, p: np.trapz(np.trapz(FFT3D(prof)*Hg_norm(p)*infac, logM), zs)  # mass average
+    return lambda prof, p={}: IFFT1D(aveprof(prof, p))  # IFFT
+
+
+class Kou2023:  # arxiv.org/abs/2211.07502
+    def __init__(self):
+        pass
     
-
-
-
-# Calculating C_ells
-def limber(ks, zs, W_A, W_B, chis, ells):  # Hs in km/s/Npc, chis in Mpc    
-    # Check the ell arrays to be within the bounds set by the input ks
-    ells_from_ks = ks[:, None]*chis-1/2
-    if ells.min()<ells_from_ks.min(): raise ValueError(f"ell_min must be be above {ells_from_ks.min()}")
-    elif ells.max()>ells_from_ks.max(): raise ValueError(f"ell_max must be below {ells_from_ks.max()}")
-    ks_from_ells = (ells[:, None]+1/2)/chis  # 2D array, [n_ells]/[n_zs] > [n_ells, n_zs]
+    def SN(self, ells, area, dNdz, zs, **kwargs):  # Shot Noise
+        frac = area/ (4*np.pi*(180/np.pi)**2)
+        return 4*np.pi*frac/np.trapz(dNdz, zs) * np.ones(ells.shape)
     
-    # Make 2D interpolator for k and z, and array of (k, z) points to put into it
-    intp_points = np.stack((ks_from_ells, zs*np.ones(ks_from_ells.shape)), axis=-1)
-    P_AB_int = lambda P_AB: RegularGridInterpolator((ks, zs), P_AB, bounds_error=False, fill_value=np.nan)(intp_points)
+    def C_ell(self, ells, ks, zs, W_A, W_B, chis, Hs, **kwargs):  # Spherical Harmonics
+        # Check the ell arrays to be within the bounds set by the input ks
+        ells_from_ks = ks[:, None]*chis
+        if ells.min()<ells_from_ks.min(): raise ValueError(f"ell_min must be be above {ells_from_ks.min()}")
+        elif ells.max()>ells_from_ks.max(): raise ValueError(f"ell_max must be below {ells_from_ks.max()}")
+        ks_from_ells = (ells[:, None])/chis  # 2D array, [n_ells]/[n_zs] > [n_ells, n_zs]
+        
+        # Make 2D interpolator for k and z, and array of (k, z) points to put into it
+        intp_points = np.stack((ks_from_ells, zs*np.ones(ks_from_ells.shape)), axis=-1)
+        P_AB_int = lambda P_AB: RegularGridInterpolator((ks, zs), P_AB, bounds_error=False, fill_value=np.nan)(intp_points)
 
-    intfac = W_A * W_B /chis**2  # Precalculate the simple part
-    return lambda P_AB: np.trapz(intfac*P_AB_int(P_AB), zs)
-
-def Clgg(ks, zs, dNdz, Hs, chis, ells):
-    return limber(ks, zs, W_g(dNdz, Hs), 1, chis, ells)
-
-def Clgy(ks, zs, dNdz, Hs, chis, ells):
-    return limber(ks, zs, W_g(dNdz, Hs), W_y(zs), chis, ells)
+        intfac = W_A * W_B * Hs/c.c.to(u.km/u.s).value/chis**2  # Precalculate the simple part
+        return lambda P_AB: np.trapz(intfac*P_AB_int(P_AB), zs)
     
-def W_g(dNdz, Hs):  # Galaxy Kernel
-    return dNdz/np.sum(dNdz) * Hs/c.c.to(u.km/u.s).value
-
-def W_y(zs):  # Compton y kernel
-    return 1/(1+zs)
-
-
-
-
-
-
-
-
-
-
-
-
-
-# galaxy k-space kernel
-def ug_k(rs, logM, rs200c, hmf, FFTf, Nc, Ns):
-    xs = rs[:, None, None]/rs200c[None, ...]
-    ngal = lambda p: np.trapz((self.Nc(logM, p)+self.Ns(logM, p))*hmf, logM)[:, None]  # mean number density of galaxies
-    ugk = lambda p: (self.Nc(logM, p)*self.uck() + self.Ns(logM, p)*self.usk(xs, FFTf)(p)) / ngal(p)
-    return lambda p={}: ugk(self.p0 | p)
-
-# galaxy kernel squared, for autospectra
-def ug_k2(self, rs, logM, rs200c, hmf, FFTf):
-    xs = rs[:, None, None]/rs200c[None, ...]
-    ngal = lambda p: np.trapz((self.Nc(logM, p)+self.Ns(logM, p))*hmf, logM)[:, None]  # mean number density of galaxies
-    ugk2 = lambda p: (self.Ns(logM, p)**2*self.uck()**2 + 2*self.Ns(logM, p)*self.usk(xs, FFTf)(p)) / ngal(p)**2
-    return lambda p={}: ugk2(self.p0 | p)
-
-def Wg(dNdz, Hz, chi):  # galaxy kernel
-    Ntot = np.trapz(dNdz)  # total number of galaxies
-    phi = (1/Ntot) * dNdz  # normalized galaxy distribution
-    return Hz/c.c * phi/chi**2
+    def W_g(self, dNdz, zs, **kwargs):  # Galaxy Kernel
+        return dNdz/np.trapz(dNdz, zs)
     
-def Pgg(rs, zs, logmshalo, Nc_func, Ns_func, uSat_func,
-                 HMF, r200c_func, H_func, XH, **kwargs):
-    pass
-
-
-
-
-
-# def HODweighting(rs, zs, logmshalo, Nc_func, Ns_func, uSat_func,
-#                  HMF, r200c_func, H_func, XH, **kwargs):
-#     ks, FFT_func = FFTs.mcfit_package(rs).FFT3D()
-#     rs_rev, IFFT_func = FFTs.mcfit_package(rs).IFFT1D()
-
-#     rs200c, Hs = r200c_func(zs, logmshalo), H_func(zs)
-#     xs = rs[:, None, None]/rs200c
-#     # NOTE: These profiles also have some parameters that can be fit, but I'm not doing that here
-#     usk_m_z = FFT_func(uSat_func(xs)) 
-#     uck_m_z = np.ones(usk_m_z.shape)  # Set to one
+    def W_y(self, zs, **kwargs):  # Compton y kernel
+        return 1/(1+zs)
     
-#     # Precalculating as much as possible
-#     yfac = (2+2*XH)/(3+5*XH)*(c.sigma_T/c.m_e/c.c**2).value * 4*np.pi*rs200c**3*((1+zs)**2/Hs)[:, None]  # Converting Pth to y
+    def P1h(self, hmf, logM, **kwargs):  # Galaxy auto-spectra, one-halo
+        return lambda Hx, Hy: np.trapz(Hx*Hy*hmf, logM)
+    
+    def P2h(self, hmf, logM, bh, Plin, **kwargs):
+        # infac = bh*hmf*Plin[..., None]
+        return lambda Hx, Hy: Plin*np.trapz(Hx*bh*hmf, logM)*np.trapz(Hy*bh*hmf, logM)
+    
+    def H_c(self, Nc, Ns, logM, hmf, **kwargs):  # Cross-spectra function for galaxies
+        return lambda p={}: Nc(p)/self.ngal(Nc, Ns, hmf, logM)(p)
+    
+    def H_s(self, Nc, Ns, usk, logM, hmf, **kwargs):  
+        return lambda p={}: Ns(p)*usk(p)/self.ngal(Nc, Ns, hmf, logM)(p)
+    
+    def ngal(self, Nc, Ns, hmf, logM, **kwargs):
+        return lambda p={}: np.trapz((Nc(p)+Ns(p))*hmf, logM)[:, None]
+    
+    def H_y(self, FFT_func, Hz, XH, **kwargs):  # Cross-spectra function for Compton y
+        # Precalculate
+        efrac = (2+2*XH)/(3+5*XH)  # electron fraction
+        yfac = (c.sigma_T/c.m_e/c.c**2).to(u.s**2/u.M_sun).value  # Conversion from P_e to y
+        cgs_cosmo = (u.g/u.cm/u.s**2).to(u.M_sun/u.Mpc/u.s**2)  # Pressure in CGS to Msun/Mpc units
+        infac = yfac * efrac * cgs_cosmo
+        prefac = c.c.to(u.km/u.s).value/Hz[:, None]  # Hz in units of km/s/Mpc
+        return lambda Pth: prefac*FFT_func(infac*Pth)
+    
+    def Pgg_1h(self, Nc, Ns, usk, logM, hmf, **kwargs):
+        Hc = self.H_c(Nc, Ns, logM, hmf)
+        Hs = self.H_s(Nc, Ns, usk, logM, hmf)
+        P1h = self.P1h(hmf, logM)
+        return lambda p={}: 2*P1h(Hc(p), Hs(p)) + P1h(Hs(p), Hs(p))
 
-#     def HODave(Pths, params):
-#         Nc = Nc_func(logmshalo, params)
-#         Ns = Ns_func(logmshalo, params)
-#         ngal = np.trapz(np.trapz((Nc+Ns)*HMF, logmshalo), zs)
-#         HODTerm = (Nc*uck_m_z + Ns*usk_m_z)/ngal
+    def Pgg_2h(self, Nc, Ns, usk, logM, hmf, bh, Plin, **kwargs):
+        Hc = self.H_c(Nc, Ns, logM, hmf)
+        Hs = self.H_s(Nc, Ns, usk, logM, hmf)
+        P2h = self.P2h(hmf, logM, bh, Plin)
+        return lambda p={}: P2h(Hc(p), Hc(p)) + 2*P2h(Hc(p), Hs(p)) + P2h(Hs(p), Hs(p))
 
-#         dndzdm_norm = HODTerm*HMF/np.trapz(np.trapz(HODTerm*HMF, logmshalo), zs)[:, None, None]
-#         yk_m_z = FFT_func(Pths)*yfac
-#         Pgy1h = np.trapz(np.trapz(yk_m_z*dndzdm_norm, logmshalo), zs)
+    def Pgy_1h(self, Nc, Ns, usk, logM, hmf, FFT_func, Hz, XH, **kwargs):
+        Hc = self.H_c(Nc, Ns, logM, hmf)
+        Hs = self.H_s(Nc, Ns, usk, logM, hmf)
+        Hy = self.H_y(FFT_func, Hz, XH)
+        P1h = self.P1h(hmf, logM)
+        return lambda Pth, p={}: P1h(Hc(p), Hy(Pth)) + P1h(Hs(p), Hy(Pth))
 
-#         yfacave = np.trapz(np.trapz(yfac*dndzdm_norm, logmshalo), zs)
-#         return IFFT_func(Pgy1h/yfacave)
+    def Pgy_2h(self, Nc, Ns, usk, logM, hmf, FFT_func, Hz, XH, bh, Plin, **kwargs):
+        Hc = self.H_c(Nc, Ns, logM, hmf)
+        Hs = self.H_s(Nc, Ns, usk, logM, hmf)
+        Hy = self.H_y(FFT_func, Hz, XH)
+        P2h = self.P2h(hmf, logM, bh, Plin)
+        return lambda Pth, p={}: P2h(Hc(p), Hy(Pth)) + P2h(Hs(p), Hy(Pth))
+    
+    def Cgg1h(self, ells, ks, zs, chis, Hs, dNdz, Nc, Ns, usk, logM, hmf, **kwargs):
+        Pgg_1h = self.Pgg_1h(Nc, Ns, usk, logM, hmf)
+        Cl = self.C_ell(ells, ks, zs, self.W_g(dNdz, zs), self.W_g(dNdz, zs), chis, Hs)
+        return lambda p={}: Cl(Pgg_1h(p))
+    
+    def Cgg2h(self, ells, ks, zs, chis, Hs, dNdz, Nc, Ns, usk, logM, hmf, bh, Plin, **kwargs):
+        Pgg_2h = self.Pgg_2h(Nc, Ns, usk, logM, hmf, bh, Plin)
+        Cl = self.C_ell(ells, ks, zs, self.W_g(dNdz, zs), self.W_g(dNdz, zs), chis, Hs)
+        return lambda p={}: Cl(Pgg_2h(p))
+    
+    def Cgy1h(self, ells, ks, zs, chis, Hs, dNdz, Nc, Ns, usk, logM, hmf, FFT_func, XH, **kwargs):
+        Pgy_1h = self.Pgy_1h(Nc, Ns, usk, logM, hmf, FFT_func, Hs, XH)
+        Cl = self.C_ell(ells, ks, zs, self.W_g(dNdz, zs), self.W_y(zs), chis, Hs)
+        return lambda Pth, p={}: Cl(Pgy_1h(Pth, p))
+    
+    def Cgy2h(self, ells, ks, zs, chis, Hs, dNdz, Nc, Ns, usk, logM, hmf, FFT_func, bh, Plin, XH, **kwargs):
+        Pgy_2h = self.Pgy_2h(Nc, Ns, usk, logM, hmf, FFT_func, Hs, XH, bh, Plin)
+        Cl = self.C_ell(ells, ks, zs, self.W_g(dNdz, zs), self.W_y(zs), chis, Hs)
+        return lambda Pth, p={}: Cl(Pgy_2h(Pth, p))
 
-#     return lambda Pths, params: HODave(Pths, params)
+
+class Kusiak2023:
+    def __init__(self):
+        pass
+    
+    def uk_to_ul(self, ells, ks, chis, zs):  # Interpolate to ks that correspond to the same desired ells over all zs
+        # Check the ell arrays to be within the bounds set by the input ks
+        ells_from_ks = ks[:, None]*chis-1/2  # Define ells that correspond to the input ks
+        if ells.min()<ells_from_ks.min(): raise ValueError(f"ell_min must be be above {ells_from_ks.min()}")  # Check input kmin is low enough for desired ellmin
+        elif ells.max()>ells_from_ks.max(): raise ValueError(f"ell_max must be below {ells_from_ks.max()}")  # Check input kmax is low enough for desired ellmax
+        ks_from_ells = (ells[:, None]+1/2)/chis  # Define ks that correpond to the desired ells, 2D array, [n_ells]/[n_zs] > [n_ells, n_zs]
+
+        # Make 2D interpolator for k and z, and array of (k, z) points to put into it
+        intp_points = np.stack((ks_from_ells, zs*np.ones(ks_from_ells.shape)), axis=-1)
+        return lambda uk: RegularGridInterpolator((ks, zs), uk, bounds_error=False, fill_value=np.nan)(intp_points)
+
+    def u_g(self, ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks, **kwargs):
+        ul = lambda p: self.uk_to_ul(ells, ks, chis, zs)(usk(p))
+        W_g = self.W_g(Hz, chis, dNdz, zs)
+        ngal = self.ngal(Nc, Ns, hmf, logM)
+        return lambda p={}: W_g / ngal(p) * (Nc(p)+Ns(p)*ul(p))
+    
+    def ngal(self, Nc, Ns, hmf, logM, **kwargs):
+        return lambda p={}: np.trapz((Nc(p)+Ns(p))*hmf, logM)[:, None]
+        
+    def W_g(self, Hz, chis, dNdz, zs, **kwargs):
+        phi_g = dNdz / np.trapz(dNdz, zs)
+        return (Hz/c.c.to(u.km/u.s).value * phi_g/chis**2)[:, None]
+    
+    def Cgg_1h(self, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ells, ks, **kwargs):
+        d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
+        ug2 = self.ug2(Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, ells, ks, zs)
+        return lambda p={}: np.trapz(d2V_dzdOmega*np.trapz(hmf*ug2(p), logM), zs)
+
+    def ug2(self, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, ells, ks, zs, **kwargs):
+        ul = lambda p: self.uk_to_ul(ells, ks, chis, zs)(usk(p))
+        W_g = self.W_g(Hz, chis, dNdz, zs)
+        ngal = self.ngal(Nc, Ns, hmf, logM)
+        return lambda p={}: W_g**2/ngal(p)**2 * (Ns(p)**2*ul(p)**2 + 2*Ns(p)*ul(p))
+    
+    def Cgg_2h(self, ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks, Plin, bh, **kwargs):
+        Plinl = self.uk_to_ul(ells, ks, chis, zs)(Plin)
+        ug = self.u_g(ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks)
+        d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
+        return lambda p={}: np.trapz(d2V_dzdOmega*Plinl*np.trapz(bh*hmf*ug(p), logM)**2, zs)
+    
+    def SN(self, area, dNdz, ells, zs, **kwargs):
+        return area*(u.deg**2).to(u.sr)/np.trapz(dNdz, zs) *np.ones(ells.shape)
+
+
+
+
+
+
+
+
 
 
 # from hmvec
-def C_yy_new(self,ells,zs,ks,Ppp,gzs,dndz=None,zmin=None,zmax=None):
-    chis = self.comoving_radial_distance(gzs)
-    hzs = self.h_of_z(gzs) # 1/Mpc
-    Wz1s = 1/(1+gzs)
-    Wz2s = 1/(1+gzs)
-    # Convert to y units
-    # 
+# def C_yy_new(self,ells,zs,ks,Ppp,gzs,dndz=None,zmin=None,zmax=None):
+#     chis = self.comoving_radial_distance(gzs)
+#     hzs = self.h_of_z(gzs) # 1/Mpc
+#     Wz1s = 1/(1+gzs)
+#     Wz2s = 1/(1+gzs)
+#     # Convert to y units
+#     # 
 
-def C_gy_new(self,ells,zs,ks,Pgp,gzs,gdndz=None,zmin=None,zmax=None):
-    gzs = np.asarray(gzs)
-    chis = self.comoving_radial_distance(gzs)
-    hzs = self.h_of_z(gzs) # 1/Mpc
-    nznorm = np.trapz(gdndz,gzs)
-    term = (c.sigma_T/(c.m_e*c.c**2)).to(u.s**2/u.M_sun)*u.M_sun/u.s**2
-    Wz1s = gdndz/nznorm
-    Wz2s = 1/(1+gzs)
+# def C_gy_new(self,ells,zs,ks,Pgp,gzs,gdndz=None,zmin=None,zmax=None):
+#     gzs = np.asarray(gzs)
+#     chis = self.comoving_radial_distance(gzs)
+#     hzs = self.h_of_z(gzs) # 1/Mpc
+#     nznorm = np.trapz(gdndz,gzs)
+#     term = (c.sigma_T/(c.m_e*c.c**2)).to(u.s**2/u.M_sun)*u.M_sun/u.s**2
+#     Wz1s = gdndz/nznorm
+#     Wz2s = 1/(1+gzs)
 
-    return limber_integral(ells,zs,ks,Pgp,gzs,Wz1s,Wz2s,hzs,chis)
+#     return limber_integral(ells,zs,ks,Pgp,gzs,Wz1s,Wz2s,hzs,chis)
 
-def C_gg_new(self,ells,zs,ks,Pgg,gzs,gdndz=None,zmin=None,zmax=None):
-    gzs = np.asarray(gzs)
-    chis = self.comoving_radial_distance(gzs)
-    hzs = self.h_of_z(gzs) # 1/Mpc
-    nznorm = np.trapz(gdndz,gzs)
-    Wz1s = gdndz/nznorm
-    Wz2s = gdndz/nznorm
-    return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s,Wz2s,hzs,chis)
+# def C_gg_new(self,ells,zs,ks,Pgg,gzs,gdndz=None,zmin=None,zmax=None):
+#     gzs = np.asarray(gzs)
+#     chis = self.comoving_radial_distance(gzs)
+#     hzs = self.h_of_z(gzs) # 1/Mpc
+#     nznorm = np.trapz(gdndz,gzs)
+#     Wz1s = gdndz/nznorm
+#     Wz2s = gdndz/nznorm
+#     return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s,Wz2s,hzs,chis)
 
 
-def u_y(zs, mshalo, r200_func, dA_func):
-    l200c = dA_func(zs)[:, None]/r200_func(zs, mshalo)
-    prefac = 4*np.pi*r200_func(zs, mshalo)/l200c**2 * (c.sigma_T/c.m_e/c.c**2)
-    return lambda Pek: prefac*Pek
+# def u_y(zs, mshalo, r200_func, dA_func):
+#     l200c = dA_func(zs)[:, None]/r200_func(zs, mshalo)
+#     prefac = 4*np.pi*r200_func(zs, mshalo)/l200c**2 * (c.sigma_T/c.m_e/c.c**2)
+#     return lambda Pek: prefac*Pek
 
-def u_g(zs, mshalo, Nc, Ns, hmf):
-    ng = np.trapz((Nc(mshalo)+Ns(mshalo))*hmf(zs, mshalo), np.log10(mshalo))
+# def u_g(zs, mshalo, Nc, Ns, hmf):
+#     ng = np.trapz((Nc(mshalo)+Ns(mshalo))*hmf(zs, mshalo), np.log10(mshalo))
     
-    
-
 
 # Limber Integral from hmvec
 # def limber_integral2(ells,zs,ks,Pzks,gzs,Wz1s,Wz2s,hzs,chis):
