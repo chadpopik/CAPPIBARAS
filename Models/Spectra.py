@@ -1,8 +1,6 @@
 """
 
-TODO 1: Add Cells calculation
 """
-
 
 import numpy as np
 import astropy.constants as c
@@ -10,17 +8,16 @@ import astropy.units as u
 from scipy.interpolate import RegularGridInterpolator
 
 
-
-
 # Get average profile with an HOD
 def HODweighting(Nc, Ns, uck, usk, logM, zs, hmf, FFT3D, IFFT1D, dNdz, HODp=None, **kwargs):
-    Hg = H_g(Nc, Ns, uck, usk, logM, hmf, **kwargs)  # Define the HOD cross-spectra function
+    ngal = lambda p: np.trapz((Nc(p)+Ns(p))*hmf, logM)[:, None]
+    Hg = lambda p: (Nc(p)*uck(p) + Ns(p)*usk(p))/ngal(p)  # Define the HOD cross-spectra function
     if HODp is not None:  # if HOD parameters aren't being fit, precalculate the HOD terms to save time
         Hg_norm = Hg(HODp)/np.trapz(np.trapz(Hg*hmf*dNdz, logM), zs)[..., None, None]  # normalized galaxy distribution
         infac = Hg_norm*hmf*dNdz[:, None]  # Precalculated integrand factor
         aveprof = lambda prof: np.trapz(np.trapz(FFT3D(prof)*infac, logM), zs)  # mass and redshift average
         return lambda prof: IFFT1D(aveprof(prof))
-    
+
     infac = hmf*dNdz[:, None]
     Hg_norm = lambda p: Hg(p)/np.trapz(np.trapz(Hg(p)*infac, logM), zs)[:, None, None]  # normalized galaxy distribution
     aveprof = lambda prof, p: np.trapz(np.trapz(FFT3D(prof)*Hg_norm(p)*infac, logM), zs)  # mass average
@@ -58,14 +55,14 @@ class Kou2023:  # arxiv.org/abs/2211.07502
     def P1h(self, hmf, logM, **kwargs):  # Galaxy auto-spectra, one-halo
         return lambda Hx, Hy: np.trapz(Hx*Hy*hmf, logM)
     
-    def P2h(self, hmf, logM, bh, Plin, **kwargs):
+    def P2h(self, hmf, logM, bh, Plin, **kwargs):  # Galaxy auto-spectra, two-halo
         # infac = bh*hmf*Plin[..., None]
         return lambda Hx, Hy: Plin*np.trapz(Hx*bh*hmf, logM)*np.trapz(Hy*bh*hmf, logM)
     
-    def H_c(self, Nc, Ns, logM, hmf, **kwargs):  # Cross-spectra function for galaxies
+    def H_c(self, Nc, Ns, logM, hmf, **kwargs):  # Cross-spectra function for centrals
         return lambda p={}: Nc(p)/self.ngal(Nc, Ns, hmf, logM)(p)
     
-    def H_s(self, Nc, Ns, usk, logM, hmf, **kwargs):  
+    def H_s(self, Nc, Ns, usk, logM, hmf, **kwargs):    # Cross-spectra function for satellites
         return lambda p={}: Ns(p)*usk(p)/self.ngal(Nc, Ns, hmf, logM)(p)
     
     def ngal(self, Nc, Ns, hmf, logM, **kwargs):
@@ -116,15 +113,17 @@ class Kou2023:  # arxiv.org/abs/2211.07502
         Cl = self.C_ell(ells, ks, zs, self.W_g(dNdz, zs), self.W_g(dNdz, zs), chis, Hs)
         return lambda p={}: Cl(Pgg_2h(p))
     
-    def Cgy1h(self, ells, ks, zs, chis, Hs, dNdz, Nc, Ns, usk, logM, hmf, FFT_func, XH, **kwargs):
+    def Cgy1h(self, ells, ks, zs, chis, Hs, dNdz, Nc, Ns, usk, logM, hmf, FFT_func, beam_ells, beam_data, XH, **kwargs):
         Pgy_1h = self.Pgy_1h(Nc, Ns, usk, logM, hmf, FFT_func, Hs, XH)
         Cl = self.C_ell(ells, ks, zs, self.W_g(dNdz, zs), self.W_y(zs), chis, Hs)
-        return lambda Pth, p={}: Cl(Pgy_1h(Pth, p))
+        beam = np.interp(ells, beam_ells, beam_data)
+        return lambda Pth, p={}: beam*Cl(Pgy_1h(Pth, p))
     
-    def Cgy2h(self, ells, ks, zs, chis, Hs, dNdz, Nc, Ns, usk, logM, hmf, FFT_func, bh, Plin, XH, **kwargs):
+    def Cgy2h(self, ells, ks, zs, chis, Hs, dNdz, Nc, Ns, usk, logM, hmf, FFT_func, bh, Plin, beam_ells, beam_data, XH, **kwargs):
         Pgy_2h = self.Pgy_2h(Nc, Ns, usk, logM, hmf, FFT_func, Hs, XH, bh, Plin)
         Cl = self.C_ell(ells, ks, zs, self.W_g(dNdz, zs), self.W_y(zs), chis, Hs)
-        return lambda Pth, p={}: Cl(Pgy_2h(Pth, p))
+        beam = np.interp(ells, beam_ells, beam_data)
+        return lambda Pth, p={}: beam*Cl(Pgy_2h(Pth, p))
 
 
 class Kusiak2023:
@@ -165,13 +164,13 @@ class Kusiak2023:
         W_g = self.W_g(Hz, chis, dNdz, zs)
         ngal = self.ngal(Nc, Ns, hmf, logM)
         return lambda p={}: W_g**2/ngal(p)**2 * (Ns(p)**2*ul(p)**2 + 2*Ns(p)*ul(p))
-    
+
     def Cgg_2h(self, ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks, Plin, bh, **kwargs):
         Plinl = self.uk_to_ul(ells, ks, chis, zs)(Plin)
         ug = self.u_g(ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks)
         d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
         return lambda p={}: np.trapz(d2V_dzdOmega*Plinl*np.trapz(bh*hmf*ug(p), logM)**2, zs)
-    
+
     def SN(self, area, dNdz, ells, zs, **kwargs):
         return area*(u.deg**2).to(u.sr)/np.trapz(dNdz, zs) *np.ones(ells.shape)
 

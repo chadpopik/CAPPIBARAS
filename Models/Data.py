@@ -1,8 +1,7 @@
 """
 Collection of measurements/covariances from different stacking/cross-correlation studies and corresponding components needed for forward modelling and inference, such as the beam and response. 
 
-- TODO 1: Find beam and response for ACT DR5
-- TODO 2: Add info about the measurement like window function/aperture photometry info or m/z selection
+- TODO 1: Add info about the measurement like window function/aperture photometry info or m/z selection
 """
 
 import os
@@ -23,22 +22,18 @@ class BaseData:
     def get_beam_ACTDR5(self):
         self.beamfile = f"{datapath}/ACTDR5/beams/act_planck_dr5.01_s08s18_f{self.freq}_daynight_beam.txt"
         self.respfile = f"{datapath}/ACTDR5/responses/act_planck_dr5.01_s08s18_AA_f{self.freq}_daynight_response_tsz.txt"
-    
+
         self.beam_ells, self.beam_data = np.genfromtxt(self.beamfile).T  # [ells, unitless]
-        self.resp_ells, self.resp_data = np.genfromtxt(self.respfile).T[0:2]
-        self.resp_data = -self.resp_data  # Is negative for some reason
-        
-    def get_beam_ACTDR6(self):  # TODO 1: These are old DR5 beams/responses, need ones for DR6
-        self.beamfile = f"{datapath}/ACTDR5/beams/act_planck_dr5.01_s08s18_f150_daynight_beam.txt"
-        self.respfile = f"{datapath}/ACTDR5/responses/act_planck_dr5.01_s08s18_AA_f150_daynight_response_tsz.txt"
-    
-        self.beam_ells, self.beam_data = np.genfromtxt(self.beamfile).T  # [ells, unitless]
-        self.resp_ells, self.resp_data = np.genfromtxt(self.respfile).T[0:2]
-        self.resp_data = -self.resp_data  # Is negative for some reason    
+        self.resp_ells, self.resp_data = np.genfromtxt(self.respfile).T[0:2]  # [ells, uk/y]
+
+    def get_beam_ACTDR6(self): 
+        self.beam_ells = np.arange(1, 3e4+1)
+        sigma = 1.6*u.arcmin.to(u.rad)/np.sqrt(8*np.log(2))
+        self.beam_data =  np.exp(-self.beam_ells*(self.beam_ells+1)*sigma**2/2)
 
 
 
-class RiedGuachalla2025(BaseData):  # ACT DR6 maps stacked on DESI Y1 LRGs (arxiv.org/abs/2503.19870)
+class RiedGuachalla2025(BaseData):  # ACT DR6 maps stacked on DESI Y1 LRGs (Ried-Guachalla+ 2025, arxiv.org/abs/2503.19870)
     zbins = ['all', '1', '2', '3', '4']
     mbins = ['all', '1', '2', '3', '4']
 
@@ -62,23 +57,23 @@ class RiedGuachalla2025(BaseData):  # ACT DR6 maps stacked on DESI Y1 LRGs (arxi
             self.kSZdata, self.kSZerr = kszstacked[f'mass_{self.mbin}'], kszstacked[f'mass_{self.mbin}_error']
 
 
-class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
+class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (Hadzhiyska+ 2025, arxiv.org/abs/2407.07152)
     zbins = ['1', '2', '3', '4']
     samples = ['main', 'extended', 'all']
     zoutcuts = ['nocut', 'cut']
     corrs = ['corrected', 'uncorrected']
-    
+
     def __init__(self, spefs):       
         self.checkspefs(spefs, required=['zbin', 'sample', 'corr', 'zoutcut'])
         self.get_meas()
         self.get_beam_ACTDR6()
-        
+
     def get_meas(self):
         self.thetas = np.load(f"{datapath}/Hadzhiyska2024/Fig2_sim.npz")['theta_arcmins']
         self.Tksz_Illustris1 = np.load(f"{datapath}/Hadzhiyska2024/Fig2_sim.npz")['gas_illustris']
         self.Tksz_TNG300 = np.load(f"{datapath}/Hadzhiyska2024/Fig2_sim.npz")['dm_tng']
         self.Tksz = np.load(f"{datapath}/Hadzhiyska2024/Fig2_sim.npz")['signal']
-        
+    
         samplestr = {'main': '', 'extended': 'extended_', 'all': ''}[self.sample]
         corrstr = {'corrected':'corr', 'uncorrected':''}[self.corr]
         zstr = {'nocut': '', 'cut': 'sigmaz0.05000_'}[self.zoutcut]
@@ -89,7 +84,7 @@ class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/a
         self.kSZerr = np.diag(self.kSZcov)**0.5
 
 
-class Liu2025(BaseData): # ACT DR6 maps stacked on DESI LRGs for cross-correlation (arxiv.org/abs/2502.08850)
+class Liu2025(BaseData): # ACT DR6 maps stacked on DESI LRGs for cross-correlation (Liu+ 2025, arxiv.org/abs/2502.08850)
     zbins = ['1', '2', '3', '4']
     Betas = ['fiducial', '1.2', '1.4', '1.6']
     TCIBs = ['10.7', '24.0']
@@ -103,15 +98,12 @@ class Liu2025(BaseData): # ACT DR6 maps stacked on DESI LRGs for cross-correlati
         if self.DR=='DR6': 
             self.checkspefs(spefs, required=['Beta', 'dp', 'TCIB'])
             self.get_meas()
+            self.get_beam_ACTDR6()
         elif self.DR=='DR5': 
             self.checkspefs(spefs, required=['aper', 'freq'])
             self.get_meas_DR5()
+            self.get_beam_ACTDR5()
             
-        if os.path.isdir(f"{datapath}/Liu2025/shared"):
-            self.get_meas_shared()
-            
-        self.get_beam_ACTDR6()
-        
     def get_meas(self):
         if self.dp=='beta' and self.TCIB=='10.7': fname = "fig3.csv"
         elif self.dp=='dBeta' and self.TCIB=='10.7': fname = "fig4.csv"
