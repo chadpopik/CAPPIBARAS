@@ -2,9 +2,8 @@
 Collection of Halo Mass Function obtained either from halo model codes or loaded from a data files. 
 Classes should contain halo number density 2D arrays over halo mass (in m200c) and redshift and the corresponding mass/redshift arrays, in consistent units. If using functions, require input halo mass/redshift arrays to ensure output consistency between classes.
 
-TODO 1: Check about adding more detail to the cosmology setup in pyccl
+TODO 1: Check about adding more detail to the cosmology setup in pyccl and astropy
 TODO 2: Check mass def conversions
-TODO 3: Check about adding more detail to the cosmology setup in astropy
 """
 
 
@@ -35,9 +34,10 @@ class pyccl(BASEHMF):  # https://ccl.readthedocs.io/en/latest/index.html
         self.hmffunc = getattr(ccl.halos.hmfunc, f"MassFunc{self.mfunc}")(mass_def=self.mdef)
         self.hbias = getattr(self.ccl.halos.hbias, f"HaloBias{self.hbias}")(mass_def=self.mdef)
 
-    def initcosmo(self, hh, Omega_b, Omega_m, **kwargs):
+    def initcosmo(self, hh, Omega_b, Omega_m, T_CMB, **kwargs):
         # TODO 1: Check about adding more detail to the cosmology setups
-        return self.ccl.Cosmology(h=hh, Omega_c=Omega_m-Omega_b, Omega_b=Omega_b, n_s=0.95, sigma8=0.8,transfer_function='bbks')
+        return self.ccl.Cosmology(h=hh, Omega_c=Omega_m-Omega_b, Omega_b=Omega_b, T_CMB=T_CMB,
+                                  n_s=0.95, sigma8=0.8,transfer_function='bbks')
 
     # Halo Mass Function
     def HMF(self, zs, logmshalo, **kwargs):
@@ -61,6 +61,38 @@ class pyccl(BASEHMF):  # https://ccl.readthedocs.io/en/latest/index.html
         massconv = self.ccl.halos.massdef.mass_translator(mass_in=mdefin, mass_out=mdefout, concentration='Bhattacharya13')
         return np.array([np.log10(massconv(cosmo, 10**logmshalo, 1/(1+z))) for z in zs])
 
+class colossus(BASEHMF):  # https://ccl.readthedocs.io/en/latest/index.html
+    cosmodels = ['planck18']
+    biasmodels = ['tinker10']
+    mdefs = ['200c']
+    hmfmods = ['tinker08']
+    plinmods = ['camb']
+    
+    def __init__(self, spefs):
+        from colossus.cosmology import cosmology
+        from colossus.lss import bias
+        from colossus.lss import mass_function
+        self.cosmology = cosmology
+        self.bias = bias
+        self.mass_function = mass_function
+        
+        self.checkspefs(spefs, required=['cosmodel', 'biasmodel', 'mdef', 'hmfmod', 'plinmod'])
+        
+    def initcosmo(self, hh, Omega_b, Omega_m, **kwargs):
+        params = {'H0': hh*100, 'Om0': Omega_m, 'Ob0': Omega_b}
+        return self.cosmology.setCosmology(self.cosmodel)
+    
+    def HMF(self, zs, logmshalo, **kwargs):
+        self.initcosmo(**kwargs)
+        return np.array([[self.mass_function.massFunction(10**logm, z = z, model = self.hmfmod, mdef = self.mdef, q_out = 'dndlnM') for logm in logmshalo] for z in zs])
+    
+    def bh(self, zs, logmshalo, **kwargs):
+        self.initcosmo(**kwargs)
+        return np.array([[self.bias.haloBias(10**logm, z = z, model = self.biasmodel, mdef = self.mdef) for logm in logmshalo] for z in zs])
+    
+    def Plin(self, ks, **kwargs):
+        cosmo = self.initcosmo(**kwargs)
+        return np.array([self.cosmology.power_spectrum.powerSpectrum(k, self.plinmod, cosmo, output='ps') for k in ks])
 
 
 class hmf_package(BASEHMF):  # https://hmf.readthaedocs.io/en/latest/index.html
@@ -74,7 +106,7 @@ class hmf_package(BASEHMF):  # https://hmf.readthaedocs.io/en/latest/index.html
 
     # Halo Mass Function
     def HMF(self, zs, logmshalo, hh, Omega_b, Omega_m, Omega_L, T_CMB, **kwargs):
-        # TODO 3: Check about adding more detail to the cosmology setups
+        # TODO 1: Check about adding more detail to the cosmology setups
         cosmo = astropy.cosmology.LambdaCDM(H0=hh*100, Tcmb0=T_CMB, Om0=Omega_m, Ode0=Omega_L, Ob0=Omega_b)
         logmshalo = logmshalo+np.log10(hh)
         dlog10m = logmshalo[1]-logmshalo[0]

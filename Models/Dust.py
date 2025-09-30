@@ -2,6 +2,7 @@
 Models for the dust emission from galaxies in the tSZ signal. 
 
 TODO 1: Get more accurate values for the parameters in Amodeo 2021
+TODO 2: Figure out how to use dust without frequency dependence (DR6 ILC)
 """
 
 import numpy as np
@@ -36,17 +37,17 @@ class Amodeo2021(BaseDust):  # (Amodeo+ 2021, arxiv.org/abs/2009.05558)
         self.checkspefs(spefs, required=['model'])
     
     # Polynominal dust fit to stacked profiles I(nu) [in jr/sr]
-    def dustpoly(self, thetas, nu, z=0.55, nu0=856.54988):
+    def dustpoly(self, thetas, nu, z=0.55, nu0=856.54988, **kwargs):
         x = lambda nu, p: ((nu*u.GHz)*c.h/c.k_B/(p['T_dust']*u.K)).decompose()
         planck = lambda p: (np.exp(x(nu0, p))-1)/(np.exp(x(nu*(1+z), p))-1)  # Planck function part
         amp = lambda p: p['A_dust']*(nu*(1+z)/nu0)**(p['beta_dust']+3)  # Amplitude part
         poly = lambda p: p['c_0']+p['c_1']*thetas+p['c_2']*thetas**2  # Polynomial part
         dustfunc = lambda p: amp(p)*planck(p)*poly(p)  # Combine
-        return lambda p={}: dustfunc(self.p0 | p)
+        return lambda p={}: dustfunc(self.p0 | p).value
 
     # Conversion of polynomial fit to uK arcmin^2
-    def dust_uKarcmin(self, thetas, nu, z=0.55, nu0=856.54988, T_CMB=2.7255):
+    def dust_uKarcmin(self, thetas, nu, z=0.55, nu0=856.54988, T_CMB=2.7255, **kwargs):
         x = ((nu*u.GHz)*c.h/c.k_B/(T_CMB*u.K)).decompose()
         dB_dT = ((2*c.h*(nu*u.GHz)**3/c.c**2)).to(u.kJy).value * x/T_CMB * np.exp(x)/(np.exp(x)-1)**2  # Planck function for unit conversion to K
         dustprof = lambda p: self.dustpoly(thetas, nu, z, nu0)(p)/dB_dT*1e6 * np.pi*thetas**2  # Also multipy by area of disc
-        return lambda p={}: dustprof(self.p0 | p)
+        return lambda p={}: dustprof(self.p0 | p).value

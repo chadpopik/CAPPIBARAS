@@ -1,9 +1,11 @@
 theory: null
 likelihood:
   tsztest:
-    DataUse:
+    measurement:
       name: Schaan2021
-      spefs: null
+      spefs:
+        freq: '150'
+        sample: cmass
     onehalo:
       name: Amodeo2021
       spefs:
@@ -12,12 +14,17 @@ likelihood:
       name: Amodeo2021
       spefs:
         model: GNFW
-    galaxy_distribution:
-      name: DR10CMASS
+    DustModel:
+      name: Amodeo2021
       spefs:
+        model: ACT+Hershel
+    SMF:
+      name: BOSS_DR10
+      spefs:
+        galaxy: CMASS
         group: portsmouth
         template: passive
-        IMF: krou
+        IMF: Kroupa
     HOD:
       name: Kou2023
       spefs:
@@ -32,7 +39,7 @@ likelihood:
         mfunc: Tinker08
         mdef: 200c
         hbias: Tinker10
-    yaml_file: /global/homes/c/cpopik/Capybara/runchains.yaml
+    yaml_file: /global/homes/c/cpopik/CAPPIBARAS/runchains.yaml
     name: Gaussian
     datapath: null
     covpath: null

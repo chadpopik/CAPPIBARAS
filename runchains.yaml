@@ -12,9 +12,9 @@ debug: False
 likelihood:
     tsztest:
         class: SOLikelihoods.TSZLikelihood
-        DataUse:
+        measurement:
             name: 'Schaan2021'
-            spefs: {}
+            spefs: {'freq':'150', 'sample':'cmass'}
         onehalo:
             name: 'Amodeo2021'
             spefs: {'model': 'GNFW'}
@@ -22,9 +22,9 @@ likelihood:
             name: 'Amodeo2021'
             spefs: {'model': 'GNFW'}
 
-        galaxy_distribution:
-            name: 'DR10CMASS'
-            spefs: {'group':'portsmouth', 'template':'passive', 'IMF':'krou'}
+        SMF:
+            name: 'BOSS_DR10'
+            spefs: {'galaxy':'CMASS','group':'portsmouth', 'template':'passive', 'IMF':'Kroupa'}
         HOD:
             name: 'Kou2023'
             spefs: {'sample':'M*>10.8'}
@@ -34,6 +34,9 @@ likelihood:
         mass_function:
             name: 'pyccl'
             spefs: {'mfunc':'Tinker08', 'mdef':'200c', 'hbias': 'Tinker10'}
+        DustModel:
+            name: 'Amodeo2021'
+            spefs: {'model': 'ACT+Hershel'}
 
 params:
     # Fixed Cosmological
@@ -42,7 +45,7 @@ params:
     Omega_m: {value: 0.25}
     Omega_b: {value: 0.044}
     T_CMB: {value: 2.725}
-    XH: {value: 0.76} # hydrogen fraction
+    XH: {value: 0.76}
     v_rms: {value: 1.06e-3} # v_rms/c
 
     # GNFW Density Profile

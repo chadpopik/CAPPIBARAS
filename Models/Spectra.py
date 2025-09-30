@@ -29,7 +29,7 @@ class Kou2023:  # arxiv.org/abs/2211.07502
         pass
     
     def SN(self, ells, area, dNdz, zs, **kwargs):  # Shot Noise
-        frac = area/ (4*np.pi*(180/np.pi)**2)
+        frac = area/(4*np.pi*(180/np.pi)**2)
         return 4*np.pi*frac/np.trapz(dNdz, zs) * np.ones(ells.shape)
     
     def C_ell(self, ells, ks, zs, W_A, W_B, chis, Hs, **kwargs):  # Spherical Harmonics
@@ -56,7 +56,6 @@ class Kou2023:  # arxiv.org/abs/2211.07502
         return lambda Hx, Hy: np.trapz(Hx*Hy*hmf, logM)
     
     def P2h(self, hmf, logM, bh, Plin, **kwargs):  # Galaxy auto-spectra, two-halo
-        # infac = bh*hmf*Plin[..., None]
         return lambda Hx, Hy: Plin*np.trapz(Hx*bh*hmf, logM)*np.trapz(Hy*bh*hmf, logM)
     
     def H_c(self, Nc, Ns, logM, hmf, **kwargs):  # Cross-spectra function for centrals

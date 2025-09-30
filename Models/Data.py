@@ -20,13 +20,14 @@ class BaseData:
                 setattr(self, mname, spefs[mname])
                 
     def get_beam_ACTDR5(self):
+        # NERSC location /global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary/beams
         self.beamfile = f"{datapath}/ACTDR5/beams/act_planck_dr5.01_s08s18_f{self.freq}_daynight_beam.txt"
         self.respfile = f"{datapath}/ACTDR5/responses/act_planck_dr5.01_s08s18_AA_f{self.freq}_daynight_response_tsz.txt"
 
         self.beam_ells, self.beam_data = np.genfromtxt(self.beamfile).T  # [ells, unitless]
         self.resp_ells, self.resp_data = np.genfromtxt(self.respfile).T[0:2]  # [ells, uk/y]
 
-    def get_beam_ACTDR6(self): 
+    def get_beam_ACTDR6(self):  # ACT DR6 
         self.beam_ells = np.arange(1, 3e4+1)
         sigma = 1.6*u.arcmin.to(u.rad)/np.sqrt(8*np.log(2))
         self.beam_data =  np.exp(-self.beam_ells*(self.beam_ells+1)*sigma**2/2)
@@ -62,6 +63,8 @@ class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (Hadzhiyska+
     samples = ['main', 'extended', 'all']
     zoutcuts = ['nocut', 'cut']
     corrs = ['corrected', 'uncorrected']
+    
+    path = f"{datapath}/Hadzhiyska2024"
 
     def __init__(self, spefs):       
         self.checkspefs(spefs, required=['zbin', 'sample', 'corr', 'zoutcut'])
@@ -69,16 +72,16 @@ class Hadzhiyska2025(BaseData):  # ACT DR6 and DESI LRGs LIS DR9/10 (Hadzhiyska+
         self.get_beam_ACTDR6()
 
     def get_meas(self):
-        self.thetas = np.load(f"{datapath}/Hadzhiyska2024/Fig2_sim.npz")['theta_arcmins']
-        self.Tksz_Illustris1 = np.load(f"{datapath}/Hadzhiyska2024/Fig2_sim.npz")['gas_illustris']
-        self.Tksz_TNG300 = np.load(f"{datapath}/Hadzhiyska2024/Fig2_sim.npz")['dm_tng']
-        self.Tksz = np.load(f"{datapath}/Hadzhiyska2024/Fig2_sim.npz")['signal']
+        self.thetas = np.load(f"{self.path}/Fig2_sim.npz")['theta_arcmins']
+        self.Tksz_Illustris1 = np.load(f"{self.path}/Fig2_sim.npz")['gas_illustris']
+        self.Tksz_TNG300 = np.load(f"{self.path}//Fig2_sim.npz")['dm_tng']
+        self.Tksz = np.load(f"{self.path}/Fig2_sim.npz")['signal']
     
         samplestr = {'main': '', 'extended': 'extended_', 'all': ''}[self.sample]
         corrstr = {'corrected':'corr', 'uncorrected':''}[self.corr]
         zstr = {'nocut': '', 'cut': 'sigmaz0.05000_'}[self.zoutcut]
         
-        filename = f"{datapath}/Hadzhiyska2024/Fig1_Fig8_{samplestr}dr10_allfoot_perbin_{zstr}dr6_{corrstr}pzbin{self.zbin}.npz"
+        filename = f"{self.path}/Fig1_Fig8_{samplestr}dr10_allfoot_perbin_{zstr}dr6_{corrstr}pzbin{self.zbin}.npz"
         self.kSZdata = np.load(filename)['prof']
         self.kSZcov = np.load(filename)['cov']
         self.kSZerr = np.diag(self.kSZcov)**0.5
@@ -92,6 +95,8 @@ class Liu2025(BaseData): # ACT DR6 maps stacked on DESI LRGs for cross-correlati
     DRs = ['DR5', 'DR6']
     apers = ['CAP', 'RingRing']
     freqs = ['90', '150']
+    
+    path = f"{datapath}/Liu2025"
 
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['zbin', 'DR'])
@@ -110,7 +115,7 @@ class Liu2025(BaseData): # ACT DR6 maps stacked on DESI LRGs for cross-correlati
         elif self.dp=='beta' and self.TCIB=='24.0': fname = "fig10.csv"
         elif self.dp=='dBeta' and self.TCIB=='24.0': fname = "fig11.csv"
         
-        dfmeas = pd.read_csv(f"{datapath}/Liu2025/{fname}")
+        dfmeas = pd.read_csv(f"{self.path}/{fname}")
         dBetastr = f"Beta_{self.Beta}" if self.Beta!='fiducial' else 'fiducial'
         
         self.thetas = dfmeas['RApArcmin'].values[:-1]  # [arcmin]
@@ -119,21 +124,23 @@ class Liu2025(BaseData): # ACT DR6 maps stacked on DESI LRGs for cross-correlati
     def get_meas_DR5(self):
         if self.aper=='CAP': fname = "fig12.csv"
         elif self.aper=='RingRing': fname = "fig13.csv"
-        dfmeas = pd.read_csv(f"{datapath}/Liu2025/{fname}")
+        dfmeas = pd.read_csv(f"{self.path}/{fname}")
         
         self.thetas = dfmeas['RApArcmin']  # [arcmin]
         self.tSZdata, self.tSZerr = dfmeas[f"pz{self.zbin}_act_dr5_f{int(self.freq)}"], dfmeas[f"pz{self.zbin}_act_dr5_f{int(self.freq)}_err"]  # [arcmin^2]
 
     def get_meas_shared(self):
+        path = f"/global/homes/c/cpopik/Data/Schaan2021_shared"
         # Find data and covariance files for bin and CIB method
         dBetastr = f"dBeta_{self.dBeta}_10.7" if self.dBeta!='fiducial' else 'fiducial'
-        self.tSZdatafile = f"{datapath}/Liu2025_shared/DESI_pz{self.zbin}_act_dr6_{dBetastr}/diskring_tsz_uniformweight_measured.txt"
-        self.tSZcovfile = f"{datapath}/Liu2025_shared/DESI_pz{self.zbin}_act_dr6_{dBetastr}/cov_diskring_tsz_uniformweight_bootstrap.txt"
+        tSZdatafile = f"{path}/Liu2025_shared/DESI_pz{self.zbin}_act_dr6_{dBetastr}/diskring_tsz_uniformweight_measured.txt"
+        tSZcovfile = f"{path}/Liu2025_shared/DESI_pz{self.zbin}_act_dr6_{dBetastr}/cov_diskring_tsz_uniformweight_bootstrap.txt"
 
         # Load in data and convert to arcmin^2
-        self.thetas = np.genfromtxt(self.tSZdatafile).T[0]  # [arcmin]
-        self.tSZdata_shared, self.tSZerr_shared = np.genfromtxt(self.tSZdatafile).T[1:3]*u.sr.to(u.arcmin**2)  # [ster]->[arcmin^2]
-        self.tSZcov_shared = np.genfromtxt(self.tSZcovfile).T*u.sr.to(u.arcmin**2)**2  # [ster]->[arcmin^2]
+        thetas = np.genfromtxt(tSZdatafile).T[0]  # [arcmin]
+        tSZdata, tSZerr = np.genfromtxt(tSZdatafile).T[1:3]*u.sr.to(u.arcmin**2)  # [ster]->[arcmin^2]
+        tSZcov = np.genfromtxt(tSZcovfile).T*u.sr.to(u.arcmin**2)**2  # [ster]->[arcmin^2]
+        return thetas, tSZdata, tSZcov
 
 
 class Schaan2021(BaseData):  # ACT DR5 maps stacked on SDSS BOSS DR10/DR12 (Schaan+ 2021, arxiv.org/abs/2009.05557)
@@ -142,6 +149,8 @@ class Schaan2021(BaseData):  # ACT DR5 maps stacked on SDSS BOSS DR10/DR12 (Scha
 
     freqs = ['150', '090']
     samples = ['cmass', 'lowz']
+    
+    path = f"{datapath}/Schaan2021"
 
     def __init__(self, spefs):
         self.checkspefs(spefs, required=['freq', 'sample'])
@@ -149,8 +158,8 @@ class Schaan2021(BaseData):  # ACT DR5 maps stacked on SDSS BOSS DR10/DR12 (Scha
         self.get_beam_ACTDR5()
 
     def get_meas(self):
-        self.thetas = np.genfromtxt(f"{datapath}/Schaan2021_shared/cmass_data_sharing_schaan21/f150/diskring_tsz_varweight_measured.txt").T[0]  # [arcmin]
-        path = f"{datapath}/Schaan2021_shared/{self.sample}_data_sharing_schaan21/f{self.freq}"
+        self.thetas = np.genfromtxt(f"{self.path}/cmass_data_sharing_schaan21/f150/diskring_tsz_varweight_measured.txt").T[0]  # [arcmin]
+        path = f"{self.path}/{self.sample}_data_sharing_schaan21/f{self.freq}"
 
         if self.sample=='cmass':
             self.kSZdatafile, self.tSZdatafile = [f"{path}/diskring_{meas}_varweight_measured.txt" for meas in ['ksz', 'tsz']]
