@@ -1,11 +1,15 @@
 likelihood:
-  tsztest:
+  tSZ:
     class: SOLikelihoods.TSZLikelihood
     measurement:
       name: Schaan2021
       spefs:
         freq: '150'
         sample: cmass
+    SMF:
+      name: Schaan2021
+      spefs:
+        sample: CMASS
     onehalo:
       name: Amodeo2021
       spefs:
@@ -14,31 +18,20 @@ likelihood:
       name: Amodeo2021
       spefs:
         model: GNFW
-    SMF:
-      name: BOSS_DR10
+    DustModel:
+      name: Amodeo2021
       spefs:
-        galaxy: CMASS
-        group: portsmouth
-        template: passive
-        IMF: Kroupa
+        model: ACT+Hershel
     HOD:
       name: Kou2023
       spefs:
         sample: M*>10.8
-    SHMR:
-      name: Kravstov2014
-      spefs:
-        sample: M200c
     mass_function:
       name: pyccl
       spefs:
         mfunc: Tinker08
         mdef: 200c
         hbias: Tinker10
-    DustModel:
-      name: Amodeo2021
-      spefs:
-        model: ACT+Hershel
 params:
   hh:
     value: 0.7

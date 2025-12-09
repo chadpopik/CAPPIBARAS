@@ -5,168 +5,134 @@ Collections of radial halo profiles used to forward model SZ signals, specifical
 import numpy as np
 import astropy.units as u
 import astropy.constants as c
+import Models.FFTs as FFTs
+import Models.Studies as Studies
 
-class BaseGNFW:
-    # Check validitity of model specifications and assign default parameters
-    def checkspefs(self, spefs, required):
-        for spef in required:
-            if spefs[spef] in getattr(self, f"{spef}s"):
-                setattr(self, spef, spefs[spef])
-            else:
-                raise NameError(f"{spef} {spefs[spef]} doesn't exist, choose from available {spef}s: {getattr(self, f'{spef}s')}")
-        self.p0 = {param: self.params[param][self.models.index(self.model)] for param in self.params.keys()}
-    
-    # Form of Mh and z dependance of GNFW parameters in Battaglia 2012
-    def PLmz(self, z, logm200c, A0, alpham, alphaz):
-        return A0 * (10**logm200c/1.e14)**alpham * (1.+z)**alphaz
 
-    # GNFW used for density profile
-    def GNFW(self, x, rho0, xc, gamma, alpha, beta):
-        return rho0 * (x/xc)**gamma * (1.+(x/xc)**alpha)**(-(beta-gamma)/alpha)
-    
-    # Modified GNFW used for pressure profile
-    def MGNFW(self, x, P0, xc, gamma, alpha, beta):
+class BaseProfile:
+    def MGNFW(self, x, P0, xc, gamma, alpha, beta):  # Modified GNFW used for pressure profile in B11
         return P0 * (x/xc)**gamma * (1.+(x/xc)**alpha)**(-beta)
 
-    # Two-halo component calculated with linear theory
-    def twohalo(self, logmhalo, Plin, bias, hmf, FFT_func, IFFT_func, windowfunc=1):
-        prefac, intfac = bias*Plin[..., None]*windowfunc, hmf*bias  # Precalculate factors
-        P2h = lambda prof1h: prefac*np.trapz(FFT_func(prof1h)*intfac,logmhalo)[..., None]
-        return lambda prof1h: IFFT_func(P2h(prof1h))  # IFFT to real space
+    def GNFW(self, x, rho0, xc, gamma, alpha, beta):  # GNFW used for density profile in B18
+        return rho0 * (x/xc)**gamma * (1.+(x/xc)**alpha)**(-(beta-gamma)/alpha)
 
+    def PLmz(self, z, logm200c, A0, alpham, alphaz):  # Form of Mh and z dependance of GNFW parameters in B1
+        return A0 * (10**logm200c/1.e14)**alpham * (1.+z)**alphaz
 
-
-# BOSS DR10 cross-correlated with ACT DR5 (Amodeo+ 2021, arxiv.org/abs/2009.05558)
-class Amodeo2021(BaseGNFW):
-    info = {'Omega_m': 0.25, 'Omega_b': 0.044, 'Omega_L': 0.75, 'H0': 70, 'v_rms': 1.06e-3, 'X_H':0.76,
-            'mdef': '200c',
-            'mstar_mean': 3.3e13,  # mean stellar mass
-            'mhalo_mean': 3e11,  # corresponding mean halo mass from SHMR
-            'z_med': 0.55,  # median redshift of sample
-            }
-
-    models = ['GNFW']
-    params = {'logrho0': [2.6],  # density log amplitude
-              'xc_k': [0.6],  # core radius
-              'beta_k': [2.6],  # outer slope
-              'A2h_k': [1.1],  # density 2h amplitude
-              'P0': [2.0],  # pressure amplitude
-              'alpha_t': [0.8],  # intermediate slope
-              'beta_t': [2.6],  # outer slope
-              'A2h_t': [0.7],  # pressure 2h amplitude
-            }
+    def unitfac(self, prof, units='cosmo'):  # handles units of rho and pth for cosmo and cgs
+        if units=='cosmo': return 1  # cosmological units are the default
+        elif units=='cgs':  # if cgs, convert from cosmo units to cgs
+            if prof=='pres': return (1*u.Msun/u.Mpc/u.s**2).to(u.g/u.cm/u.s**2)/(u.Msun/u.Mpc/u.s**2)
+            if prof=='dens': return (1*u.Msun/u.Mpc**3).to(u.g/u.cm**3)/(u.Msun/u.Mpc**3)
         
-    def __init__(self, spefs):
-        self.checkspefs(spefs, required=['model'])
+    def setdim(self, rs, zs, logMs):  # Set proper dimensions of rs, zs, Ms (and define xs)
+        rs, zs, logMs = np.array(rs, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)
+        return rs*u.Mpc/self.r200c(zs, logMs), zs, logMs
 
-    def Pth1h(self, rs, zs, logms200c, rhocs, rs200c, Omega_b, Omega_m, **kwargs):
-        rs, zs, rhocs = rs[:, None, None], zs[:, None], rhocs[:, None]  # Assign 3D dimensions
-        G_cosmo = c.G.to(u.Mpc**3/u.Msun/u.s**2).value  # Put G into Halo units
-        Ps200c = G_cosmo*(10**logms200c)*200*rhocs/(2*rs200c)  # Define scale pressure
-        factorfront = (Omega_b/Omega_m)*Ps200c*(u.Msun/u.Mpc/u.s**2).to(u.g/u.cm/u.s**2)
-        xs = rs/rs200c[None, ...]
+    def twohalo(self, rs, zs, logMs, logMs_2h, windowfunc=lambda k: 1): # Two-halo component calculated with linear theory
+        fft = FFTs.mcfit_package(rs=rs)  # setup FFT
+        ks, FFT3D, IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
 
-        # Assign parameters as done in the paper
-        func = lambda p: self.MGNFW(xs, gamma=-0.3, alpha=p['alpha_t'], P0 = p['P0'], xc=self.PLmz(zs, logms200c, A0=0.497, alpham=-0.00865, alphaz=0.731), beta=p['beta_t'])
-        return lambda p={}: factorfront*func(self.p0 | p)
-    
-    def rho1h(self, rs, zs, logms200c, rhocs, rs200c, Omega_b, Omega_m, **kwargs):
-        rs, zs, rhocs = rs[:, None, None], zs[:, None], rhocs[:, None]  # Assign proper dimensions on r and z
-        factorfront = (Omega_b/Omega_m)*rhocs*(u.Msun/u.Mpc**3).to(u.g/u.cm**3)
-        xs = rs/rs200c[None, ...]
-
-        # Assign parameters as done in the paper
-        func = lambda p: self.GNFW(xs, gamma=-0.2, alpha=1, rho0=10**p['logrho0'], xc=p['xc_k'], beta=p['beta_k'])
-        return lambda p={}: factorfront*func(self.p0 | p)
-    
-    def Pth2h(self, rs, zs, logmshalo, rhocs, rs200c, Plin, bias, hmf, FFT_func, IFFT_func, ks, **kwargs):
-        windfunc = np.array([1 if k>1/50 else 0 for k in ks])[:, None, None]  # twohalo Window function
-        lin2h = self.twohalo(logmshalo, Plin, bias, hmf, FFT_func, IFFT_func, windowfunc=windfunc)
-        prof1h = Battaglia2012({'model':'B12'}).Pth1h(rs, zs, logmshalo, rhocs, rs200c, **kwargs)  # Use B12 parameterization to get 2h term
-        ave2h = np.trapz(lin2h(prof1h())*hmf)  # Uses average over halo mass
-        twohalo = lambda p: p['A2h_t']*ave2h  # Multiplied by an amplitude factor
-        return lambda p={}: twohalo(self.p0 | p)
-    
-    def rho2h(self, rs, zs, logmshalo, rhocs, rs200c, Plin, bias, hmf, FFT_func, IFFT_func, ks, **kwargs):
-        windfunc = np.array([1 if k>1/50 else 0 for k in ks])[:, None, None]  # twohalo Window function
-        lin2h = self.twohalo(logmshalo, Plin, bias, hmf, FFT_func, IFFT_func, windowfunc=windfunc)
-        prof1h = Battaglia2015({'model':'AGN'}).rho1h(rs, zs, logmshalo, rhocs, rs200c, **kwargs)  # Use B15 parameterization to get 2h term
-        ave2h = np.trapz(lin2h(prof1h())*hmf)  # Uses average over halo mass
-        twohalo = lambda p: p['A2h_k']*ave2h  # Multiplied by an amplitude factor
-        return lambda p={}: twohalo(self.p0 | p)
-    
-
-
-class Battaglia2015(BaseGNFW):  # Calibrated off SPH sims made from GADGET-2 (arxiv.org/abs/1607.02442)
-    info = {'mdef': '200c'}
-
-    models = ['AGN', 'SH']
-    params = {'rho0_A0': [4*1e3, 1.9*1e4], 
-                'rho0_alpham': [0.29, 0.09], 
-                'rho0_alphaz': [-0.66, -0.95],
-                'alpha_A0': [0.88, 0.70], 
-                'alpha_alpham': [-0.03, -0.017], 
-                'alpha_alphaz': [0.19, 0.27],
-                'beta_A0': [3.83, 4.43], 
-                'beta_alpham': [0.04, 0.005], 
-                'beta_alphaz': [-0.025, 0.037]}
-    
-    def __init__(self, spefs):
-        self.checkspefs(spefs, required=['model'])
+        ks, zs, logMs = np.array(ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)  # Assign proper dimensions [nr, nz, nm]
         
-    def rho1h(self, rs, zs, logms200c, rhocs, rs200c, Omega_b, Omega_m, **kwargs):
-        rs, zs, rhocs = rs[:, None, None], zs[:, None], rhocs[:, None]  # Assign proper dimensions of (nr, nz, nm)
-        factorfront = Omega_b/Omega_m*rhocs*(u.Msun/u.Mpc**3).to(u.g/u.cm**3)  # Calculate prefactor once
-        xs = rs/rs200c[None, ...]  # scaled radii
+        prefac = self.bh(zs, logMs)*self.Plin(ks, zs)*windowfunc(ks)  # collect factors outside int
+        intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
+        P2h = lambda prof1h: prefac*(np.trapz(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
+        return lambda prof1h: IFFT3D(P2h(prof1h)) *prof1h.unit  # IFFT to real space and return its units destroyed by the FFT
+
+
+    
+class Kou2023(BaseProfile, Studies.Kou2023):  # TODO: in progress
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
         
-        # Assign parameters following the parameterization of the paper
-        func = lambda p: self.GNFW(xs, gamma=-0.2, xc=0.5,
-                                    alpha=self.PLmz(zs, logms200c, p['alpha_A0'], p['beta_alpham'], p['beta_alphaz']),
-                                    rho0=self.PLmz(zs, logms200c, p['rho0_A0'], p['rho0_alpham'], p['rho0_alphaz']),
-                                    beta=self.PLmz(zs, logms200c, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
+    def Pe(self):
+        fac1 = 1.65*(h/0.7)**2 * u.eV*u.cm**3
+        fac2 = E(z)**(8/3) * (p['1-bh']*M500c/(3e14*(0.7/h)*u.Msun))**(2/3+p['alpha_p'])
+        rs = r200m/c
+        fac3 = self.GNFW(r/rs, rho0=6.41, xc=1, gamma=0.31, alpha=1.33, beta=4.13)
+
+
+
+class Amodeo2021(BaseProfile, Studies.Amodeo2021):
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+
+    def rho1h(self, rs, zs, logMs, units='cosmo'):  # one-halo density component, II.C.eq16
+        self.require(['r200c', 'rhoc'])  # required functions
+        xs, zs, logMs = self.setdim(rs, zs, logMs)  # set proper dimensions [nr, nz, nM]        
+        factorfront = self.rhoc(zs)*self.f_bary *self.unitfac('dens', units)  # group all fixed values and convert units 
+        
+        func = lambda p: self.GNFW(xs, gamma=self.gamma_k, alpha=self.alpha_k, rho0=10**p['logrho0'], xc=p['xc_k'], beta=p['beta_k'])  # free parameterization
         return lambda p={}: factorfront*func(self.p0 | p)
 
-    def rho2h(self, rs, zs, logmshalo, rhocrit, r200c, Plin, bias, hmf, FFT_func, IFFT_func, **kwargs):
-        lin2h = self.twohalo(logmshalo, Plin, bias, hmf, FFT_func, IFFT_func)
-        prof1h = self.rho1h(rs, zs, logmshalo, rhocrit, r200c, **kwargs)
-        return lambda p={}: lin2h(prof1h(self.p0 | p))
-
-
-
-class Battaglia2012(BaseGNFW):  # SPH sims made from GADGET-2 (arxiv.org/abs/1109.3711)
-    info = {'mdef': '200c'}
-    
-    models = ['B12']
-    params = {'P0_A0': [18.1], 
-                'P0_alpham': [0.154], 
-                'P0_alphaz': [-0.758],
-                'xc_A0': [0.497], 
-                'xc_alpham': [-0.00865], 
-                'xc_alphaz': [0.731],
-                'beta_A0': [4.35], 
-                'beta_alpham': [0.0393], 
-                'beta_alphaz': [0.415]}
+    def Pth1h(self, rs, zs, logMs, units='cosmo'): # one-halo pressure component, Section II.C Eq 17
+        self.require(['r200c', 'rhoc'])  # required functions
+        xs, zs, logMs = self.setdim(rs, zs, logMs)  # set proper dimensions [nr, nz, nM]        
+        Ms, G_cosmo = 10**logMs *u.Msun, c.G.to(u.Mpc**3/u.Msun/u.s**2)
+        Ps200c = G_cosmo * Ms*200*self.rhoc(zs)/(2*self.r200c(zs, logMs))  # scale pressure
+        factorfront = Ps200c*self.f_bary *self.unitfac('pres', units)  # group all fixed values and convert units
         
-    def __init__(self, spefs):
-        self.checkspefs(spefs, required=['model'])
-
-    def Pth1h(self, rs, zs, logms200c, rhocs, rs200c, Omega_b, Omega_m, **kwargs):
-        rs, zs, rhocs = rs[:, None, None], zs[:, None], rhocs[:, None]  # Assign proper dimensions on r and z
-        G_cosmo = c.G.to(u.Mpc**3/u.Msun/u.s**2).value  # Proper units of G
-        p200c = G_cosmo*(10**logms200c)*200*rhocs/(2*rs200c)  # Scaled pressure of 200c sphere
-        factorfront = (Omega_b/Omega_m)*p200c*(u.Msun/u.Mpc/u.s**2).to(u.g/u.cm/u.s**2)  # calculate prefactor once
-        xs = rs/rs200c[None, ...]
-
-        # Assign parameters as done in the paper
-        func = lambda p: self.MGNFW(xs, gamma=-0.3, alpha=1,
-                                    P0=self.PLmz(zs, logms200c, p['P0_A0'], p['P0_alpham'], p['P0_alphaz']),
-                                    xc=self.PLmz(zs, logms200c, p['xc_A0'], p['xc_alpham'], p['xc_alphaz']),
-                                    beta=self.PLmz(zs, logms200c, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
+        xc = self.PLmz(zs, logMs, A0=self.xc_t_A0, alpham=self.xc_t_alpham, alphaz=self.xc_t_alphaz)
+        func = lambda p: self.MGNFW(xs, gamma=self.gamma_t, alpha=p['alpha_t'], P0 = p['P0'], xc=xc, beta=p['beta_t'])
         return lambda p={}: factorfront*func(self.p0 | p)
-    
-    def Pth2h(self, rs, zs, logmshalo, rhoscrit, rs200c, Plin, bias, hmf, FFT_func, IFFT_func, **kwargs):
-        lin2h = self.twohalo(logmshalo, Plin, bias, hmf, FFT_func, IFFT_func)
-        prof1h = self.Pth1h(rs, zs, logmshalo, rhoscrit, rs200c, **kwargs)
-        return lambda p={}: lin2h(prof1h(self.p0 | p))
 
+    def prof2h(self, rs, zs, logMs): # linear two-halo calculation, Section II.C Eq 17
+        self.require(['r200c', 'rhoc', 'dndlogm', 'bh', 'Plin'])  # required functions
+        windfunc = lambda k: np.where(k > 1/50, 1, 0)  # two-halo window function, [k]=1/Mpc
+        logMs_2h = np.linspace(self.info['logmhalomin_2h'], self.info['logmhalomax_2h'], 50)
+        lin2h = self.twohalo(rs, zs, logMs, logMs_2h, windowfunc=windfunc)  # linear two-halo calculation
+        return lambda prof, p={}: lin2h(prof(rs, zs, logMs_2h)(p))
     
+    def rho2h(self, rs, zs, logMs, units='cosmo'): # two-halo density component
+        rho1h = Battaglia2018({'model':'AGN'}, rhoc=self.rhoc, r200c=self.r200c).rho1h
+        lin2hrho = self.prof2h(rs, zs, logMs)(rho1h) *self.unitfac('dens', units)
+        return lambda p={}: lin2hrho
+    
+    def Pth2h(self, rs, zs, logMs, units='cosmo'): # two-halo pressure component
+        pth1h = Battaglia2011(rhoc=self.rhoc, r200c=self.r200c).Pth1h
+        lin2hPth = self.prof2h(rs, zs, logMs)(pth1h) *self.unitfac('pres', units)
+        return lambda p={}: lin2hPth
+    
+    def Pth(self, rs, zs, logMs, units='cosmo'):
+        Pth_1h, Pth_2h = self.Pth1h(rs, zs, logMs, units), self.Pth2h(rs, zs, logMs, units)
+        Pth = lambda p={}: Pth_1h(p)+p['A2h_t']*Pth_2h(p)
+        return lambda p={}: Pth(self.p0 | p)
+    
+    def rho(self, rs, zs, logMs, units='cosmo'):
+        rho_1h, rho_2h = self.rho1h(rs, zs, logMs, units), self.rho2h(rs, zs, logMs, units)
+        rho = lambda p={}: rho_1h(p)+p['A2h_k']*rho_2h(p)
+        return lambda p={}: rho(self.p0 | p)
+
+
+
+class Battaglia2018(BaseProfile, Studies.Battaglia2018):
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+
+    def rho1h(self, rs, zs, logMs, units='cosmo'):  # B18 eq A1
+        self.require(['rhoc', 'r200c'])
+        xs, zs, logMs = self.setdim(rs, zs, logMs)  # set proper dimensions [nr, nz, nM]
+        factorfront = self.rhoc(zs)*self.f_bary *self.unitfac('dens', units)  # prefactor and units
+        rho_rhodel = lambda p: self.GNFW(xs, gamma=self.gamma, xc=self.xc,
+                                    alpha=self.PLmz(zs, logMs, p['alpha_A0'], p['alpha_alpham'], p['alpha_alphaz']),
+                                    rho0=self.PLmz(zs, logMs, p['rho0_A0'], p['rho0_alpham'], p['rho0_alphaz']),
+                                    beta=self.PLmz(zs, logMs, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
+        return lambda p={}: factorfront*rho_rhodel(self.p0 | p)
+
+
+class Battaglia2011(BaseProfile, Studies.Battaglia2011):
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+
+    def Pth1h(self, rs, zs, logMs, units='cosmo'):  # B18 Eq. A1
+        self.require(['rhoc', 'r200c'])
+        xs, zs, logMs = self.setdim(rs, zs, logMs)  # set proper dimensions [nr, nz, nM]
+        Ms, G_cosmo = 10**logMs *u.Msun, c.G.to(u.Mpc**3/u.Msun/u.s**2)  # halo masses and G constant in cosmo units
+        p200c = G_cosmo*Ms*200*self.rhoc(zs)/(2*self.r200c(zs, logMs))  # Scaled pressure of 200c sphere
+        factorfront = p200c*self.f_bary *self.unitfac('pres', units)  # combined prefactor and units
+        Pth_Pdel = lambda p: self.MGNFW(xs, gamma=self.gamma_pres, alpha=self.alpha_pres,  # set parameterization
+                                    P0=self.PLmz(zs, logMs, p['P0_A0'], p['P0_alpham'], p['P0_alphaz']),
+                                    xc=self.PLmz(zs, logMs, p['xc_A0'], p['xc_alpham'], p['xc_alphaz']),
+                                    beta=self.PLmz(zs, logMs, p['beta_pres_A0'], p['beta_pres_alpham'], p['beta_pres_alphaz']))
+        return lambda p={}: factorfront*Pth_Pdel(self.p0 | p)

@@ -1,6 +1,5 @@
-theory: null
 likelihood:
-  tsztest:
+  tSZ:
     measurement:
       name: Schaan2021
       spefs:
@@ -19,20 +18,13 @@ likelihood:
       spefs:
         model: ACT+Hershel
     SMF:
-      name: BOSS_DR10
+      name: Schaan2021
       spefs:
-        galaxy: CMASS
-        group: portsmouth
-        template: passive
-        IMF: Kroupa
+        sample: CMASS
     HOD:
       name: Kou2023
       spefs:
         sample: M*>10.8
-    SHMR:
-      name: Kravstov2014
-      spefs:
-        sample: M200c
     mass_function:
       name: pyccl
       spefs:
@@ -49,19 +41,6 @@ likelihood:
     stop_at_error: false
     version: null
     class: SOLikelihoods.TSZLikelihood
-    input_params:
-    - hh
-    - Omega_L
-    - Omega_m
-    - Omega_b
-    - T_CMB
-    - XH
-    - v_rms
-    - P0
-    - alpha_t
-    - beta_t
-    - A2h_t
-    output_params: []
 params:
   hh:
     value: 0.7

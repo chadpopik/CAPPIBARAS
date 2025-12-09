@@ -1,0 +1,20 @@
+Derived data for the LRG samples from
+
+Cosmological constraints from the tomographic cross-correlation of DESI
+Luminous Red Galaxies and Planck CMB lensing
+Martin White, et al.
+https://arxiv.org/abs/2111.09898
+
+Samples s01 through s04 correspond to pz_bin 1 through 4.  Files like
+lrg_s01_cls.txt contain galaxy-galaxy and galaxy-kappa spectra:
+
+cls: Contain the galaxy auto-spectra and galaxy-kappa cross-spectra.
+cov: The combined auto- and cross-spectrum covariance matrix (see file header).
+dndz:The (normalized) redshift distribution for the photo-z sample.
+mod: A smooth model, used to compute the covariance matrix.
+wla: The window function matrix for the auto-spectra.
+wlx: The window function matrix for the cross-spectra.
+
+
+while files like lrg_s01_s02_* represent galaxy cross-spectra between
+pz_bins (in this case s01 and s02).

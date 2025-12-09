@@ -1,2 +1,2 @@
-#        weight    minuslogpost              P0         alpha_t          beta_t           A2h_t   minuslogprior minuslogprior__0            chi2   chi2__tsztest
-              1       10.865767       1.9892433      0.99934837       1.5140432       0.5834723       5.0875963        5.0875963       11.556342       11.556342
+#        weight    minuslogpost              P0         alpha_t          beta_t           A2h_t   minuslogprior minuslogprior__0            chi2       chi2__tSZ
+              1       13.135227       1.4171653        0.784233       2.5820139      0.75838295       5.0875963        5.0875963       16.095261       16.095261

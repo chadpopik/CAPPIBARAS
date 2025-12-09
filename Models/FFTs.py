@@ -1,48 +1,48 @@
 """
-Going to and back from Fourier space is necessary for beam convolution, as well as finding average profiles using the HOD method.
 
-This file contains various methods of performing FFTs collected from various packages around, returning functions that take in a profile and spit out its transform.
-
-The ideal being ones that are as fast as possible, while being able to maintain the profile values if just doing a conversion back and forth (which is what the HOD method does, and we want to make sure the FFT-IFFT process doesn't insert any changes).
-
-- TODO 1: test for forward/backward equivalency in FFT
+- TODO 1: test for forward/backward equivalency in FFT, maybe pad?
 - TODO 2: Check in detail Emily's Hankel transform
 """
 
 import numpy as np
-import scipy
+import scipy.fft
 
 # Very fast FFT in mcfit
-# TODO 1: Test to make sure a FFT/IFFT process doesn't returns an identical function and doesn't introduce other artifacts
-class mcfit_package:
-    def __init__(self, rs):
+class mcfit_package:  # TODO 1:
+    def __init__(self, rs=None, ks=None):
         import mcfit
         self.mcfit = mcfit
                 
-        self.FFTraw= lambda funcx: self.mcfit.xi2P(rs)(funcx)[1]
-        self.ks = self.mcfit.xi2P(rs)(rs)[0]
-        self.IFFTraw = lambda funck: self.mcfit.P2xi(self.ks)(funck)[1]
-        self.rs_rev = self.mcfit.P2xi(self.ks)(self.ks)[0]
+        if rs is not None:
+            self.FFTraw= lambda funcx: self.mcfit.xi2P(rs)(funcx)[1]
+            self.ks = self.mcfit.xi2P(rs)(rs)[0]
+            self.IFFTraw = lambda funck: self.mcfit.P2xi(self.ks)(funck)[1]
+            self.rs_rev = self.mcfit.P2xi(self.ks)(self.ks)[0]
+        
+        elif ks is not None:
+            self.IFFTraw = lambda funck: self.mcfit.P2xi(ks)(funck)[1]
+            self.rs = self.mcfit.P2xi(ks)(ks)[0]
+            self.FFTraw = lambda funcx: self.mcfit.xi2P(self.rs)(funcx)[1]
+            self.ks_rev = self.mcfit.xi2P(self.rs)(self.rs)[0]
+        
+    def FFT1D(self, funcx):
+        return self.FFTraw(funcx)
+    
+    def IFFT1D(self, funck):
+        return self.IFFTraw(funck)
 
     def FFT3D(self, funcx):
         return np.array([[self.FFTraw(funcx[:, i, j]) for i in range(funcx.shape[1])] for j in range(funcx.shape[2])]).T
-    
-    def FFT1D(self, funcx):
-        return self.FFTraw(funcx)
     
     def IFFT3D(self, funck):
         return np.array([[self.IFFTraw(funck[:, i, j]) for i in range(funck.shape[1])] for j in range(funck.shape[2])]).T
     
     def IFFT2D(self, funck):
         return np.array([self.IFFTraw(funck[:, i]) for i in range(funck.shape[1])]).T
-
-    def IFFT1D(self, funck):
-        return self.IFFTraw(funck)
     
 
 # Emily: This class is taken from Pixell, written by Sigurd Naess. We don't need all of pixell for this, so for now we just take the Hankel transform class.
-# TODO 2: Check details to see if improvements can be made or it should be replaced with another FFT
-class RadialFourierTransformHankel:
+class RadialFourierTransformHankel:  # TODO 2
     def __init__(self, lrange=None, rrange=None, n=512, pad=256):
         """Construct an object for transforming between radially
         symmetric profiles in real-space and fourier space using a
@@ -97,7 +97,6 @@ class RadialFourierTransformHankel:
         The transform is done along the last axis of the profile.
         Returns lprof[self.ell]. This includes padding, which can be removed
         using self.unpad"""
-        import scipy.fft
 
         try:
             rprof = rprof(self.r)

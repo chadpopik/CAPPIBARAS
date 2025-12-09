@@ -1,0 +1,29 @@
+ -log(Like) = -394.18122579261296
+  chi-sq    = -788.3624515852259
+
+    8  1.022362295e+00   P0_A0              P_0^{A_0}
+   10  -9.924091713e-01  P0_alphaz          P_0^{\alpha_z}
+   11  8.906419469e-01   alpha_A0           \alpha_t^{A_0}
+   14  2.938154557e+00   beta_pres_A0       \beta_t^{A_0}
+   17  6.777774115e-01   xc_A0              x_{c, t}
+   20  7.281081854e-01   A2h_t              A_{2h, t}
+
+    1  0.7               hh                 hh
+    2  0.75              Omega_L            Omega\ L
+    3  0.25              Omega_m            Omega\ m
+    4  0.044             Omega_b            Omega\ b
+    5  2.725             T_CMB              T\ CMB
+    6  0.76              XH                 XH
+    7  0.00106           v_rms              v\ rms
+    9  0.0               P0_alpham          P0\ alpham
+   12  0.0               alpha_alpham       alpha\ alpham
+   13  0.0               alpha_alphaz       alpha\ alphaz
+   15  0.0               beta_pres_alpham   beta\ pres\ alpham
+   16  0.0               beta_pres_alphaz   beta\ pres\ alphaz
+   18  0.0               xc_alpham          xc\ alpham
+   19  0.0               xc_alphaz          xc\ alphaz
+
+   21  -2.214695838e+02  chi2__zbin1        \chi^2_{\rm zbin1}
+   22  -2.150404775e+02  chi2__zbin2        \chi^2_{\rm zbin2}
+   23  -1.986258726e+02  chi2__zbin3        \chi^2_{\rm zbin3}
+   24  -1.705742961e+02  chi2__zbin4        \chi^2_{\rm zbin4}

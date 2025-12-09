@@ -1,0 +1,106 @@
+sampler:
+    mcmc:
+        Rminus1_stop: 0.01
+        max_tries: 200d
+        output_every: 10s
+    #minimize:
+    #  ignore_prior: True
+
+
+output: chains/10-16-25/Liutest
+output_options: 
+  columns:
+    add_chain: True
+
+debug: False
+
+params:
+    # Fixed Cosmological
+    hh: {value: 0.7}
+    Omega_L: {value: 0.75}
+    Omega_m: {value: 0.25}
+    Omega_b: {value: 0.044}
+    T_CMB: {value: 2.725}
+    XH: {value: 0.76}
+    v_rms: {value: 1.06e-3} # v_rms/c
+
+    # GNFW Density Profile
+    P0:  # Amplitude
+        latex: P_0^{A_0}
+        ref: 3
+        prior: {'min': 1, 'max': 5}
+    alpha_t:  # Intermediate Slope
+        latex: \alpha_t^{A_0}
+        ref: 0.9
+        prior: {'min': 0.1, 'max': 1}
+    beta_t:  # Outer slope
+        latex: \beta_t^{A_0}
+        ref: 2.9
+        prior: {'min': 1, 'max': 10}
+    A2h_t:  # Two-halo Amplitude
+        latex: A_{2h, t}
+        ref: 3.5
+        prior: {'min': 0.5, 'max': 10}
+
+
+# shared:
+#     onehalo:
+#         name: 'Amodeo2021'
+#         spefs: {'model': 'GNFW'}
+#     twohalo:
+#         name: 'Amodeo2021'
+#         spefs: {'model': 'GNFW'}
+#     DustModel:
+#         name: 'Amodeo2021'
+#         spefs: {'model': 'ACT+Hershel'}
+#     HaloModel:
+#         name: 'pyccl'
+#         spefs: {'mfunc':'Tinker08', 'mdef':'200c', 'hbias': 'Tinker10'}
+#     HOD:
+#         name: 'Kou2023'
+#         spefs: {'sample':'M*>10.8'}
+#     SMF:
+#         name: 'Schaan2021'
+#         spefs: {'sample':'CMASS'}
+
+# likelihood:
+#     tSZ150:
+#         class: SOLikelihoods.TSZLikelihood
+#         measurement:
+#             name: 'Schaan2021'
+#             spefs: {'freq':'150', 'sample':'cmass'}
+
+#     tSZ090:
+#         class: SOLikelihoods.TSZLikelihood
+#         measurement:
+#             name: 'Schaan2021'
+#             spefs: {'freq':'090', 'sample':'cmass'}
+
+
+
+
+shared:
+    onehalo:
+        name: 'Amodeo2021'
+        spefs: {'model': 'GNFW'}
+    twohalo:
+        name: 'Amodeo2021'
+        spefs: {'model': 'GNFW'}
+    DustModel:
+        name: 'Amodeo2021'
+        spefs: {'model': 'ACT+Hershel'}
+    HaloModel:
+        name: 'pyccl'
+        spefs: {'mfunc':'Tinker08', 'mdef':'200c', 'hbias': 'Tinker10'}
+
+likelihood:
+    zbin1:
+        measurement:
+            name: 'Liu2025'
+            spefs: {'zbin':'1', 'DR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}
+        SMF:
+            name: 'Liu2025'
+            spefs: {'zbin':'1'}
+        HOD:
+            name: 'Yuan2023'
+            spefs: {'sample':'LRG 0.4<z<0.6'}
