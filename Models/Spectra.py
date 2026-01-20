@@ -14,6 +14,9 @@ from scipy.interpolate import RegularGridInterpolator
 
 import Models.FFTs as FFTs
 import Models.Studies as Studies
+import Models.HODs as HODs
+import Models.Data as Data
+
 
 
 
@@ -89,10 +92,10 @@ class BaseSpectra:
         return ells*(ells+1)*C_ells/2/np.pi
 
     def k_to_ell(self, ells, ks, zs, ell_func=lambda k, chi: k*chi-1/2):  # Interpolate a function in ks to corresponding ells (over all zs)
-        ells_from_ks = ell_func(ks[:, None], self.chi(zs))  # corresponding ells from the ks of the function 
+        ells_from_ks = ell_func(ks, self.chi(zs).value)  # corresponding ells from the ks of the function 
         if ells.min()<ells_from_ks.min() or ells.max()>ells_from_ks.max():   # ells can't correspond to ks outside the k range of the functions
             raise ValueError(f"ell must be in between {ells_from_ks.min()} and {ells_from_ks.max()}")
-        ks_from_ells = (ells[:, None]+1/2)/self.chi(zs)  # ks that correspond to input ells, 2D: [n_ells]/[n_zs] > [n_ells, n_zs]
+        ks_from_ells = (ells[:, None]+1/2)/self.chi(zs).value  # ks that correspond to input ells, 2D: [n_ells]/[n_zs] > [n_ells, n_zs]
         intp_points = np.stack((ks_from_ells, zs*np.ones(ks_from_ells.shape)), axis=-1)  # intrpn points of (k,z) that will get (ells_input, z)
         intp_func = lambda P_k: RegularGridInterpolator((ks, zs), P_k, bounds_error=False, fill_value=np.nan)  # interpolator to those points
         return lambda P_k: intp_func(P_k)(intp_points)
@@ -114,29 +117,100 @@ class BaseSpectra:
 
 
 
+class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galaxies and Planck lensing (Kusiak+ 2023, arxiv.org/abs/2203.12583)
 
-
-class Kusiak2022(BaseSpectra, Studies.Kusiak2022):  # unWISE galaxies and Planck lensing (Kusiak+ 2023, arxiv.org/abs/2203.12583)
-    def __init__(self, inputsdict, **inputvars):
-        self.setup(inputsdict | inputvars)
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)        
+        logMs = np.linspace(7e8, 3.5e15, 20)/Studies.Kusiak2022().h
+        zs = np.linspace(0.005, 4, 10)
+        
+    def d2VdzdOmega(self, zs):
+        self.require(['H', 'chi'])
+        return (c.c*self.chi(zs)**2/self.H(zs)).decompose()
     
-    def P1h_gg(self, zs, logM):  # galaxy overdensity one-halo auto-spectra
-        ngal, dndlogm = self.ngal(zs, logM), dndlogm(zs, logM)
-        ug2 = lambda Nc, Ns, ns: (2*Ns*ns + (Ns*ns)**2)/ngal(Nc, Ns)**2
-        return lambda Nc, Ns, ns: np.trapz(ug2(Nc, Ns, ns)*dndlogm, logM*u.dex)    
+    def ugl(self, ks, zs, logMs):
+        self.require(['ells'])
+        nsat, Pkell = self.ngal(zs, logMs), self.k_to_ell(self.ells[:, None, None], ks, zs)
+        return lambda p: Pkell(nsat(p))
     
+    def C_ij(self):  # Eq. 3
+        return lambda C1h_ij, C2h_ij: C1h_ij+C2h_ij
     
+    def C1h_ij(self, zs, logMs, **kwargs):  # Eq. 4
+        self.require(['dndlogM'])
+        intfactor = self.dndlogM(zs, logMs)*self.d2VdzdOmega(zs)
+        return lambda u_i, u_j: np.trapz(np.trapz(intfactor*u_i*u_j, logMs), zs)
+
+    def C2h_ij(self, ks, zs, logMsi, logMsj, **kwargs):  # Eq. 5
+        self.require(['Plin', 'dndlogM', 'bh', 'ells'])
+        Plin_k = self.k_to_ell(self.ells, ks[:, :, 0], zs[:, 0])(self.Plin(ks, zs)[:, :, 0])[:, :, None]
+        intfac_i, intfac_j = Plin_k*self.d2VdzdOmega(zs)*self.dndlogM(zs, logMsi)*self.bh(zs, logMsi), self.dndlogM(zs, logMsj)*self.bh(zs, logMsj)
+        return lambda u_i, u_j: np.trapz(np.trapz(intfac_i*u_i, logMsi)*np.trapz(intfac_j*u_j, logMsj), zs)
+
+    def u_g(self, ks, zs, logMs, **kwargs):  # Eq. 11
+        Wg, Nc, Ns, ugl, ngal = self.W_g(zs), self.Nc(logMs), self.Nc(logMs), self.ugl(ks, zs, logMs), self.ngal(zs, logMs)
+        return lambda p: Wg/ngal(p) * (Nc(p)+Ns(p)*ugl)
     
-class Kou2023(BaseSpectra, Studies.Kou2023):  # CMASS DR12 (Kou 2023, arxiv.org/abs/2211.07502)
-    def __init__(self, inputsdict, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.setup('Kou2023', inputs, reqlist=['rhoc', 'c200m', 'r200m'], **kwargs)
-
-
-
+    def ngal(self, zs, logMs, **kwargs):  # Eq. 12
+        Nc, Ns, dndlogm = self.Nc(logMs), self.Nc(logMs), self.dndlogM(zs, logMs)
+        return lambda p: np.trapz((Nc+Ns)*dndlogm, logMs)
     
+    def W_g(self, zs):  # Eq 13 & 14
+        self.require(['dNdz', 'H', 'chi'])
+        phig = self.dNdz/np.trapz(self.dNdz, zs)
+        return (self.H(zs)/c.c*phig/self.chi(zs)).decompose()
 
+    def C1h_gg(self, ks, zs, logMs):  # Eq. 15
+        C1hij, ug2 = self.C1h_ij(zs, logMs), self.u2_g(ks, zs, logMs)
+        return lambda p: C1hij(ug2(p), 1)
 
+    def u2_g(self, ks, zs, logMs):  # Eq. 16
+        Wg, Ns, ugl, ngal = self.W_g(zs), self.Ns(logMs), self.ugl(ks, zs, logMs), self.ngal(zs, logMs)
+        return lambda p: Wg**2/ngal(p)**2 * (Ns(p)**2*ugl(p)**2 + 2*Ns*ugl(p))
+
+    def C2h_gg(self, ks, zs, logMs):  # Eq. 17
+        C2hij, ug = self.C2h_ij(ks, zs, logMs, logMs), self.u_g(ks, zs, logMs)
+        C2hgg = lambda ug: C2hij(ug)
+        return lambda p: C2hgg(ug(p))
+    
+    def C_gg(self, ks, zs, logMs):
+        C1hgg, C2hgg = self.C1h_gg(ks, zs, logMs), self.C2h_gg(ks, zs, logMs)
+        return lambda p: C1hgg(p) + C2hgg(p)
+
+    # def u_g(self, ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks, **kwargs):
+    #     k_to_ell = self.Pk_to_Pell(ells, ks, chis, zs)
+    #     W_g = self.W_g(Hz, chis, dNdz, zs)
+    #     ngal = self.ngal(Nc, Ns, hmf, logM)
+    #     return lambda p={}: W_g / ngal(p) * (Nc(p)+Ns(p)*k_to_ell(usk(p)))
+    
+    # def ngal(self, Nc, Ns, hmf, logM, zs, **kwargs):
+    #     hmf
+    #     return lambda p={}: np.trapz((Nc(p)+Ns(p))*hmf, logM)
+        
+    # def W_g(self, Hz, chis, dNdz, zs, **kwargs):
+    #     phi_g = dNdz / np.trapz(dNdz, zs)
+    #     return (Hz/c.c.to(u.km/u.s).value * phi_g/chis**2)[:, None]
+    
+    # def C1h_gg(self, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ells, ks, **kwargs):
+    #     d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
+    #     ug2 = self.ug2(Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, ells, ks, zs)
+    #     return lambda p={}: np.trapz(d2V_dzdOmega*np.trapz(hmf*ug2(p), logM), zs)
+
+    # def ug2(self, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, ells, ks, zs, **kwargs):
+    #     k_to_ell = self.Pk_to_Pell(ells, ks, chis, zs)
+    #     ul = lambda p: k_to_ell(usk(p))
+    #     W_g = self.W_g(Hz, chis, dNdz, zs)
+    #     ngal = self.ngal(Nc, Ns, hmf, logM)
+    #     return lambda p={}: W_g**2/ngal(p)**2 * (Ns(p)**2*ul(p)**2 + 2*Ns(p)*ul(p))
+
+    # def C2h_gg(self, ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks, Plin, bh, **kwargs):
+    #     Plinl = self.uk_to_ul(ells, ks, chis, zs)(Plin)
+    #     ug = self.u_g(ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks)
+    #     d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
+    #     return lambda p={}: np.trapz(d2V_dzdOmega*Plinl*np.trapz(bh*hmf*ug(p), logM)**2, zs)
+
+    # def SN(self, area, dNdz, ells, zs, **kwargs):
+    #     return area*(u.deg**2).to(u.sr)/np.trapz(dNdz, zs) *np.ones(ells.shape)
 
 
 
@@ -360,44 +434,7 @@ class Kou2023(BaseSpectra, Studies.Kou2023):  # CMASS DR12 (Kou 2023, arxiv.org/
 #         return lambda u_i, u_j: np.trapz(np.trapz(intfac_i*u_i, logms_i)*np.trapz(intfac_j*u_j, logms_j), zs)
     
     
-    # class Kusiak2022(BaseSpectra):  # unWISE galaxies and Planck lensing (Kusiak+ 2023, arxiv.org/abs/2203.12583)
-    # def __init__(self):
-    #     pass
-    
-    # def u_m(self, logM, rho0_m, r200c, c200c, lambda_trunc):  # Eq. 8
-    #     rho0 = 10**(logM)/rho0_m
-    #     return lambda lambda_trunc: rho0*self.NFW_k(rdel=r200c, cdel=c200c, lambda_trunc=lambda_trunc)
-    
-    # def u_g(self, W_g, **kwargs):  # Eq. 11
-    #     return lambda N_c, N_s, u_m, n_g: W_g / n_g * (N_c+N_s*u_m)
-    
-    # # def ngal(self, Nc, Ns, dndlogm, logM, **kwargs):  # Eq. 12
-    # #     return np.trapz((Nc+Ns)*dndlogm, logM)
-    
-    # def C1h_gg(self, dndlogm, logms, d2VdzdOmega, zs):  # Eq. 15
-    #     intfactor = dndlogm*d2VdzdOmega
-    #     return lambda u2_g: np.trapz(np.trapz(intfactor*u2_g, logms), zs)
-    
-    # def u2_g(self, W_g, Hz, chis, dNdz, zs):  # Eq. 16
-    #     W_g = Hz/c * self.W_g(zs, dNdz)/chis**2  # Eq. 13 & 14
-    #     return lambda N_s, u_m, n_g: W_g**2/n_g**2 * (N_s**2*u_m**2 + 2*N_s*u_m)
-    
-    # def C2h_gg(self, dndlogm, logms, b_h, d2VdzdOmega, zs, Plin, ells, ks, chis):  # Eq. 17
-    #     Plin_k = self.Pk_to_Pell(ells, ks, chis, zs)(Plin)
-    #     intfac = Plin_k*d2VdzdOmega*dndlogm*b_h
-    #     return lambda u_g: np.trapz(np.trapz(intfac*u_g, logms)**2, zs)
-    
-    # def C_ij(self, C1h_ij, C2h_ij):  # Eq. 3
-    #     return C1h_ij+C2h_ij
-    
-    # def C1h_ij(self, dndlogm, logms, d2VdzdOmega, zs, **kwargs):  # Eq. 4
-    #     intfactor = dndlogm*d2VdzdOmega
-    #     return lambda u_i, u_j: np.trapz(np.trapz(intfactor*u_i*u_j, logms), zs)
-    
-    # def C2h_ij(self, dndlogm_i, dndlogm_j, logms_i, logms_j, b_h_i, b_h_j, d2VdzdOmega, zs, Plin, ells, ks, chis, **kwargs):  # Eq. 5
-    #     Plin_k = self.Pk_to_Pell(ells, ks, chis, zs)(Plin)
-    #     intfac_i, intfac_j = Plin_k*d2VdzdOmega*dndlogm_i*b_h_i, dndlogm_j*b_h_j
-    #     return lambda u_i, u_j: np.trapz(np.trapz(intfac_i*u_i, logms_i)*np.trapz(intfac_j*u_j, logms_j), zs)
+
     
     
     

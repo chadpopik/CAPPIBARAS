@@ -41,6 +41,52 @@ class mcfit_package:  # TODO 1:
         return np.array([self.IFFTraw(funck[:, i]) for i in range(funck.shape[1])]).T
     
 
+class mopc:
+    def __init__(self):
+        from scipy.integrate import quad
+        self.quad = quad
+        self.kpc_cgs = 3.086e21
+        self.Msol_cgs = 1.989e33
+        
+        self.cosmo_params = {
+            'Omega_m':0.25,
+            'hh':0.7,
+            'Omega_L':0.75,
+            'Omega_b':0.044,
+            'rhoc_0':2.77525e2,
+            'C_OVER_HUBBLE':2997.9
+        }
+        
+        self.rhocrit =  1.87847e-29 * self.cosmo_params['hh']**2
+        
+    def rho_cz(self,z):
+        '''critical density in cgs
+        '''
+        Ez2 = self.cosmo_params['Omega_m']*(1+z)**3. + (1-self.cosmo_params['Omega_m'])
+        return self.rhocrit * Ez2
+
+    def r200(self, M, z):
+        '''radius of a sphere with density 200 times the critical density of the universe.
+        Input mass in solar masses. Output radius in cm.
+        '''
+        M_cgs = M*self.Msol_cgs
+        om = self.cosmo_params['Omega_m']
+        ol = self.cosmo_params['Omega_L']
+        Ez2 = om * (1 + z)**3 + ol
+        ans = (3 * M_cgs / (4 * np.pi * 200.*self.rhocrit*Ez2))**(1.0/3.0)
+        return ans
+    
+    def FFT(self, k, m, z, proffunc):
+        ans = []
+        for i in range(len(m)):
+            r200c = self.r200(m[i],z)/self.kpc_cgs/1e3
+            integrand = lambda r: 4.*np.pi*r**2*proffunc(r/r200c,m[i],z) * np.sin(k * r)/(k*r)
+            res = self.quad(integrand, 0., 10*r200c, epsabs=0.0, epsrel=1.e-4, limit=10000)[0]
+            ans.append(res)
+        ans = np.array(ans)
+        return ans
+    
+
 # Emily: This class is taken from Pixell, written by Sigurd Naess. We don't need all of pixell for this, so for now we just take the Hankel transform class.
 class RadialFourierTransformHankel:  # TODO 2
     def __init__(self, lrange=None, rrange=None, n=512, pad=256):

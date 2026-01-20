@@ -51,7 +51,7 @@ class Popik2025(BaseProjection):
         if r_ell is not None and rTF is not None:  # If resp is given, load
             self.beamrespTF = self.beamTF*np.interp(self.rht.ell, r_ell, rTF)
 
-        # Setup for line of sigh integral
+        # Setup for line of sight integral
         self.los = np.geomspace(r_min, r_max, N_LOS)  # line of sight to integrate over
         self.rint = np.sqrt(self.los**2 + (self.rht.r[:,None])**2*AngDist**2)  # r values for LOS integration
         self.rs = np.geomspace(np.min(self.rint), np.max(self.rint), N_r)  # r values for profile defined by limits of rints
@@ -61,24 +61,24 @@ class Popik2025(BaseProjection):
         self.infac_CAP = 2*np.pi*np.radians(Rs/60)[:, None]/N_RCAP *self.Rs_CAP  # prefactor for sum
         self.Rs_CAP2 = np.array([np.linspace(0, f_disc*np.radians(R/60), N_RCAP+1)[1:] for R in Rs])  # values of R for outer disc
         self.infac_CAP2 = 2*np.pi*f_disc*np.radians(Rs/60)[:, None]/N_RCAP *self.Rs_CAP2  # prefactor for sum, outer disc
-        
 
-    def HODweighting(self, Nc, Ns, uck, usk, logM, dndlogm_zm, zs, ks, dNdz, onevalue=False,**kwargs):
-        dndlogm = dndlogm_zm(zs[:, None], logM)  # calculate halo mass function
-        infac = dndlogm*dNdz[:, None]  # combined mass/z distributions
-        
+
+    def HODweighting(self, Nc, Ns, uck, usk, logM, zs, ks, onevalue=False, **kwargs):
+        dndlogm = self.dndlogm(zs[:, None], logM)  # calculate halo mass function
+        infac = dndlogm*self.dNdz[:, None]  # combined mass/z distributions
+
         ngal = lambda p: np.trapz((Nc(p)+Ns(p))*dndlogm, logM)  # total galaxy number
         Hg = lambda p: (Nc(p)*uck(p) + Ns(p)*usk(p))/ngal(p)[:, None]  # HOD cross-spectra function
         Hg_norm = lambda p: Hg(p)/np.trapz(np.trapz(Hg(p)*infac, logM), zs)[:, None, None]  # normalized galaxy distribution
         intfac0 = Hg_norm({})*infac  # combine default HOD galaxy dist into integrand factor
         intfac = lambda p: Hg_norm()*infac if p!={} else intfac0  # recalculate integrand factor if HOD galaxy dist is being fit
-        
+
         if onevalue:
             return lambda val, p={}: np.trapz(np.trapz(val*intfac(p), logM), zs)  # take mass/redshift average
 
         fft = FFTs.mcfit_package(ks=ks)
         FFT3D, IFFT1D = fft.FFT3D, fft.IFFT1D
-                
+
         aveprof = lambda prof, p: np.trapz(np.trapz(FFT3D(prof)*intfac(p), logM), zs)  # take mass/redshift average
         return lambda prof, p={}: IFFT1D(aveprof(prof, p))
 
@@ -119,11 +119,14 @@ class Moser2023(BaseProjection):  # https://arxiv.org/abs/2307.10919
         self.rs = np.geomspace(np.min(self.rint), np.max(self.rint), 100)  # r values for profile defined by limits of rints
         # self.rs = np.geomspace(np.radians(np.min(Rs)/60)*AngDist**2, np.radians(np.max(Rs)/60)*AngDist**2*disc_fac, 100)
         self.Rs = Rs
-
-    def beam_convolve(self, prof_r, beam, **kwargs):
+        
+    def proj2D(self, prof_r):  # project along line of sight
         prof_int = interp1d(self.rs, prof_r, bounds_error=False, fill_value=0.0)(self.rint)  # interpret to integration rs
         prof_proj = 2*np.trapz(prof_int, x=self.los)  # Integrate over line of sight
-        prof_ell_beam = self.rht.real2harm(prof_proj)*beam  # Transform to harmonic space and colvolve with beam
+        return prof_proj
+
+    def beam_convolve(self, prof2D, beam, **kwargs):
+        prof_ell_beam = self.rht.real2harm(prof2D)*beam  # Transform to harmonic space and colvolve with beam
         r_unpad, prof2D_beam = self.rht.unpad(self.rht.r, self.rht.harm2real(prof_ell_beam))  # Transform back and unpad
         return r_unpad.flatten(), prof2D_beam.flatten()
     
