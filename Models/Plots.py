@@ -180,7 +180,7 @@ class Moser2021(BasePlots):  # ui.adsabs.harvard.edu/abs/2021ApJ...919....2M
     def Fig2(self, width=14, height=6):
         return self.plot(filename=['Fig2a','Fig2b'], nrow=1, ncol=2, width=width, height=height,
             xlabel=[r'$r/r_{200c}$', r'$r/r_{200c}$'], ylabel=[r'$\rho_\text{gas} [\text{g cm}^{-3}]$', r'$P_\text{th} [\text{g} \text{cm}^{-1} \text{s}^{-2}]$'],
-            xlim=[[8e-2,6.2e0],[8e-2,6.2e0]], ylim=[[5e-31,1.2e-26],[1e-16,1.6e-11]], xscale=['log','log'], yscale=['log','log'])
+            xlim=[[8e-2,6.2e0],[8e-2,6.2e0]], ylim=[[5e-31,1.2e-26],[1e-16,1.6e-11]], xscale='log', yscale='log')
 
     def Fig3(self, width=14, height=6):
         return self.plot(filename=['Fig3a','Fig3b'], nrow=1, ncol=2, width=width, height=height,
@@ -228,14 +228,14 @@ class Amodeo2021(BasePlots):  # ui.adsabs.harvard.edu/abs/2021PhRvD.103f3514A
             xlabel=[r'$R [\text{Mpc}]$', r'$R [\text{Mpc}]$'],
             ylabel=[r'$\rho_\text{gas} \ [\text{g cm}^{-3}]$', r'$P_\text{th} \ [\text{erg cm}^{-3}]$'],
             xlim=[[7.7e-2, 1.25e1],[7.7e-2, 1.25e1]], ylim=[[5e-32,4.1e-26],[1.5e-16,2.5e-12]],
-            xscale=['linear','linear'], yscale=['log','log'])
+            xscale='log', yscale='log')
 
     def Fig6_row2(self, width=16, height=6):
         return self.plot(filename=['Fig6c','Fig6d'], nrow=1, ncol=2, width=width, height=height,
             xlabel=[r'$R [\text{arcmin}]$', r'$R [\text{arcmin}]$'],
             ylabel=[r'$\rho_\text{gas} \ [\text{g cm}^{-3}]$', r'$P_\text{th} \ [\text{erg cm}^{-3}]$'],
             xlim=[[0.8,6.1],[0.8,6.1]], ylim=[[6.9e-5,1.5e-3],[1.5e-16,2.5e-12]],
-            xscale=['linear','linear'], yscale=['linear','linear'])
+            xscale='log', yscale='log')
 
     def Fig6_row3(self, width=15, height=5):
         return self.plot(filename=['Fig6e','Fig6f'], nrow=1, ncol=2, width=width, height=height,
@@ -249,21 +249,21 @@ class Amodeo2021(BasePlots):  # ui.adsabs.harvard.edu/abs/2021PhRvD.103f3514A
             xlabel=[r'$r/R_\text{200c}$', r'$r/R_\text{200c}$'],
             ylabel=[r'$\rho_\text{gas}(r) / \rho_c$', r'$P_\text{th} (r) / / P_{200}$'],
             xlim=[[7.3e-3,3.2e1],[7.3e-3,3.2e1]], ylim=[[2.7e-4,8.2e3],[5.5e-8,8.2e1]],
-            xscale=['log','linear'], yscale=['log','log'])
+            xscale='log', yscale='log')
 
     def Fig11_row2(self, width=20, height=5):
         return self.plot(filename=['Fig11b','Fig11c','Fig11d'], nrow=1, ncol=3, width=width, height=height,
             xlabel=[r'$R [\text{arcmin}]$',r'$R [\text{arcmin}]$',r'$R [\text{arcmin}]$'],
             ylabel=[r'$I \ [\text{kJy/sr}]$',r'$I \ [\text{kJy/sr}]$',r'$I \ [\text{kJy/sr}]$'],
             xlim=[[1.5,6.2],[1.5,6.2],[1.5,6.2]], ylim=[[-0.2,1.6],[-0.3,2.8],[-0.3,2.7]],
-            xscale=['linear','linear','linear'], yscale=['linear','linear','linear'])
+            xscale='linear', yscale='linear')
 
     def Fig11_row3(self, width=15, height=5):
         return self.plot(filename=['Fig11e','Fig11f'], nrow=1, ncol=2, width=width, height=height,
             xlabel=[r'$R [\text{arcmin}]$', r'$R [\text{arcmin}]$'],
             ylabel=[r'$T_\text{tSZ} \ [\mu\text{K} \cdot \text{arcmin}^2]$', r'$T_\text{tSZ} \ [\mu\text{K} \cdot \text{arcmin}^2]$'],
             xlim=[[1.5,6.2],[1.5,6.2]], ylim=[[-22.5,3.5],[-27.5,2.5]],
-            xscale=['linear','linear'], yscale=['linear','linear'])
+            xscale='linear', yscale='linear')
 
 
 

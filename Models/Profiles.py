@@ -68,7 +68,7 @@ class Nagai2007(BaseProfile, Studies.Nagai2007):  # Pressure Profile from GADGET
 
     def P500(self, z, logM500c, units='cosmo'):  # Eq 3
         val = 1.45e-11*u.erg/u.cm**3 * (10**logM500c/1e15)**(2/3) * (self.H(z)/self.H0)**(8/3)
-        return lambda p={}: val.to(self.units('pres', units))
+        return val.to(self.units('pres', units))
 
     def PGNFW(self, x, gamma, alpha, beta, P0):  # Eq A1
         return P0 / (x**gamma * (1+x**alpha)**((beta-gamma)/alpha))
@@ -76,7 +76,7 @@ class Nagai2007(BaseProfile, Studies.Nagai2007):  # Pressure Profile from GADGET
     def Pressure(self, r, z, logM500c, units='cosmo'):
         self.require(list(self.models.keys()))
         r, z, logM500c = self.setdim(r, z, logM500c)  # set proper dimensions
-        P500 = self.P500(z, logM500c, units)()
+        P500 = self.P500(z, logM500c, units)
         x = r*u.Mpc/(self.r500c(z, logM500c))
         PGNFW = lambda p: self.PGNFW(x=x*p['c500'], gamma=p['gamma'], alpha=p['alpha'], beta=p['beta'], P0=p['P0'])
         return lambda p={}: P500*PGNFW(self.p0 | p)
@@ -101,7 +101,7 @@ class Arnaud2010(BaseProfile, Studies.Arnaud2010):  # Pressure Profile fit to RE
 
     def P500(self, z, logM500c, units='cosmo'):  # Eq 5
         val = 1.65e-3 * (self.H(z)/self.H0)**(8/3) * (10**logM500c/(3e14/self.h70))**(2/3) *self.h70**2 *u.keV/u.cm**3
-        return lambda p={}: val.to(self.units('pres', units))
+        return val.to(self.units('pres', units))
     
     def PGNFW(self, x, gamma, alpha, beta, P0, c500):  # Eq 11
         return P0 / ((x*c500)**gamma * (1+(x*c500)**alpha)**((beta-gamma)/alpha))
@@ -111,7 +111,7 @@ class Arnaud2010(BaseProfile, Studies.Arnaud2010):  # Pressure Profile fit to RE
     
     def Pressure(self, r, z, logM500c, units='cosmo', alphaPprime=False):  # Eq 4/8/10/13
         r, z, logM500c = self.setdim(r, z, logM500c)  # set proper dimensions
-        P500 = self.P500(z, logM500c, units)()
+        P500 = self.P500(z, logM500c, units)
         x = r*u.Mpc/(self.r500c(z, logM500c))
         PGNFW = lambda p: self.PGNFW(x, gamma=p['gamma'], alpha=p['alpha'], beta=p['beta'], P0=p['P0']*self.h70**(-3/2), c500=p['c500'])
         alphaPp = lambda p: self.alphaPp(x, p) if alphaPprime else 0
@@ -143,11 +143,11 @@ class Battaglia2011(BaseProfile, Studies.Battaglia2011):  # Pressure Profile fro
     
     def P200c(self, z, logM200c, units='cosmo'):  # Scaled pressure of 200c sphere, Section 4.1 paragraph 1
         P200c = c.G*(10**logM200c*u.Msun)*200*self.rhoc(z)/(2*self.r200c(z, logM200c))
-        return lambda p={}: self.Fb*P200c.to(self.units('pres', units))
+        return self.Fb*P200c.to(self.units('pres', units))
 
     def Pressure(self, r, z, logM200c, units='cosmo'):  # B18 Eq. A1
         r, z, logM200c = self.setdim(r, z, logM200c)  # set proper dimensions [nr, nz, nM]
-        P200c = self.P200c(z, logM200c, units)()
+        P200c = self.P200c(z, logM200c, units)
         x = r*u.Mpc/self.r200c(z, logM200c)
         PGNFW = lambda p: self.MGNFW(x, gamma=p['gamma_pres'], alpha=p['alpha_pres'], 
                             P0=self.PL(z, logM200c, p['P0_A0'], p['P0_alpham'], p['P0_alphaz']), 
@@ -182,7 +182,7 @@ class Battaglia2016(BaseProfile, Studies.Battaglia2016):  # Density Profile from
         return rho0 * (x/xc)**gamma * (1+(x/xc)**alpha)**(-(beta+gamma)/alpha)
 
     def pc(self, z, units='cosmo'):  # right before eq A1
-        return lambda p={}: self.Fb*self.rhoc(z).to(self.units('dens', units))  # prefactor and units
+        return self.Fb*self.rhoc(z).to(self.units('dens', units))  # prefactor and units
     
     def PL(self, z, logM200c, A0, alpham, alphaz):  # Eq A2
         return A0 * (10**logM200c/1e14)**alpham * (1+z)**alphaz
@@ -190,12 +190,12 @@ class Battaglia2016(BaseProfile, Studies.Battaglia2016):  # Density Profile from
     def Density(self, r, z, logM200c, units='cosmo'):
         self.require(['model'])
         r, z, logM200c = self.setdim(r, z, logM200c)  # set proper dimensions [nr, nz, nM]
+        pc = self.pc(z, units)
         x = r*u.Mpc/self.r200c(z, logM200c)
         pGNFW = lambda p: self.GNFW(x, gamma=p['gamma'], xc=p['xc'],
                                 alpha=self.PL(z, logM200c, p['alpha_A0'], p['alpha_alpham'], p['alpha_alphaz']),
                                 rho0=self.PL(z, logM200c, p['rho0_A0'], p['rho0_alpham'], p['rho0_alphaz']),
                                 beta=self.PL(z, logM200c, p['beta_A0'], p['beta_alpham'], p['beta_alphaz']))
-        pc = self.pc(z, units)()
         return lambda p={}: pc*pGNFW(self.p0 | p)
 
 
@@ -214,54 +214,7 @@ class Battaglia2016(BaseProfile, Studies.Battaglia2016):  # Density Profile from
 # In progress below here
 
 
-class Planck2013(BaseProfile, Studies.Planck2013): # In progress
-    models = {'cluster':['All', 'cool', 'noncool'],
-              'fixedp': ['3','2','1','0']}
-    params = {
-        'P0': {'All':{'3':6.32,'2':6.82,'1':6.41,'0':5.78}, 'cool':11.82, 'noncool':4.72},
-        'c500': {'All':{'3':1.01,'2':1.13,'1':1.81,'0':1.84}, 'cool':0.60, 'noncool':2.19},
-        'gamma': {'All':{'3':0.31,'2':0.31,'1':0.31,'0':0.35}, 'cool':0.31, 'noncool':0.31},
-        'alpha': {'All':{'3':1.05,'2':1.05,'1':1.33,'0':1.39}, 'cool':0.76, 'noncool':1.82},
-        'beta': {'All':{'3':5.49,'2':5.17,'1':4.13,'0':4.05}, 'cool':6.58, 'noncool':3.62},
-    }
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars, model=True)
-        
-    def P500(self, z, logM500c, units='cosmo'):
-        return Arnaud2010(H=self.H).P500(z, logM500c, units)
-    
-    def PGNFW(self, r, z, logM500c):
-        return lambda p={}: Arnaud2010(r500c=self.r500c).PGNFW(r, z, logM500c)(self.p0 | p)
-    
-    def Pressure(self, r, z, logM500c, units='cosmo'):
-        P500, PGNFW = self.P500(z, logM500c, units)(), self.PGNFW(r, z, logM500c)
-        return lambda p={}: P500*PGNFW(self.p0 | p)
-    
-    
 
-class Vikram2017(BaseProfile, Studies.Vikram2017):  # TODO in progress
-    models = {}  # only one model
-    params = { 
-    }
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars, model=True)
-        
-        B11 = Battaglia2011(inputsdict | inputvars, **self.info)
-        self.P1h_del = B11.P_del
-        self.P1h = B11.P
-        self.P200c = B11.P200c
-            
-    def twohalo(self, rs, zs, logMs, logMs_2h):  # Eq 8
-        self.require(['dndlogm', 'bh', 'Plin'])  # required functions
-        fft = FFTs.mcfit_package(rs=rs)  # setup FFT
-        ks, FFT3D, IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
-        ks, zs, logMs = np.array(ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)  # Assign proper dimensions [nr, nz, nm]
-
-        prefac = self.bh(zs, logMs)*self.Plin(ks, zs)  # collect factors outside int
-        intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
-        P2h = lambda prof1h: prefac*(np.trapz(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
-        return lambda prof1h: IFFT3D(P2h(prof1h)) *prof1h.unit  # IFFT to real space and return its units destroyed by the FFT
 
 
 
@@ -431,6 +384,30 @@ class Moser2021(BaseProfile, Studies.Moser2021):
 
 
 
+class Vikram2017(BaseProfile, Studies.Vikram2017):  # TODO in progress
+    models = {}  # only one model
+    params = { 
+    }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+        
+        # B11 = Battaglia2011(inputsdict | inputvars, **self.info)
+        # self.P1h_del = B11.P_del
+        # self.P1h = B11.P
+        # self.P200c = B11.P200c
+
+    def twohalo(self, rs, zs, logMs, logMs_2h):  # Eq 8
+        self.require(['dndlogm', 'bh', 'Plin'])  # required functions
+        fft = FFTs.mcfit_package(rs=rs)  # setup FFT
+        ks, FFT3D, IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
+        ks, zs, logMs = np.array(ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)  # Assign proper dimensions [nr, nz, nm]
+
+        prefac = self.bh(zs, logMs)*self.Plin(ks, zs)  # collect factors outside int
+        intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
+        P2h = lambda prof1h: prefac*(np.trapz(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
+        return lambda prof1h: IFFT3D(P2h(prof1h)) *prof1h.unit  # IFFT to real space and return its units destroyed by the FFT
+
 
 
 class Amodeo2021(BaseProfile, Studies.Amodeo2021):  # ACT DR5 y map and SDSS BOSS CMASS DR10, arxiv.org/abs/2009.05558
@@ -447,87 +424,111 @@ class Amodeo2021(BaseProfile, Studies.Amodeo2021):  # ACT DR5 y map and SDSS BOS
         'A2h_t': {'GNFW': 0.7},    # pressure 2h amplitude
         # Fixed GNFW params
         'gamma_t': -0.3,  # fixed GNFW pres params, Section II.Cp3
-        'xc_t_A0': 0.497, 
-        'xc_t_alpham': -0.00865, 
-        'xc_t_alphaz':0.731,
+        'xc_t_A0': 0.497, 'xc_t_alpham': -0.00865, 'xc_t_alphaz':0.731,
         'gamma_k': -0.2,  # fixed GNFW dens params, Section II.Cp2
-        'alpha_k_A0': 0.88, 
-        'alpha_k_alpham': -0.03, 
-        'alpha_k_alphaz':0.19,
+        # 'alpha_k_A0': 0.88, 'alpha_k_alpham': -0.03, 'alpha_k_alphaz':0.19,
         'alpha_k':1,
     }
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
-
-    def p1h_del(self, rs, zs, logMs):  # one-halo density component, II.C.eq16
-        self.require(['model'])
-        rs, zs, logMs = self.setdim(rs, zs, logMs)  # set proper dimensions [nr, nz, nM]
-        xs = rs*u.Mpc/self.r200c(zs, logMs)
-        # func = lambda p: Battaglia2016().GNFW(xs, gamma=p['gamma_k'], alpha=p['alpha_k'], rho0=10**p['logrho0'], xc=p['xc_k'], beta=p['beta_k'])  # free parameterization
         
-        alpha = self.PLmz(zs, logMs, A0=self.p0['alpha_k_A0'], alpham=self.p0['alpha_k_alpham'], alphaz=self.p0['alpha_k_alphaz'])
-        func = lambda p: Battaglia2016().GNFW(xs, gamma=p['gamma_k'], alpha=alpha, rho0=10**p['logrho0'], xc=p['xc_k'], beta=p['beta_k'])  # free parameterization
-        return lambda p={}: func(self.p0 | p)
+    def pGNFW(self, x, rho0, xc, gamma, alpha, beta):  # Eq 16
+        return rho0 * (x/xc)**gamma * (1+(x/xc)**alpha)**(-(beta-gamma)/alpha)
     
-    def pc(self, zs, units='cosmo'):  # scale density
-        self.require(['rhoc'])  # require rhoc
-        _, zs, _ = self.setdim(1, zs, 1)  # set proper dimensions [nr, nz, nM]
-        return self.Fb*self.rhoc(zs).to(self.units('dens', units))  # prefactor and units
+    def pc(self, z, units='cosmo'):
+        return self.Fb*self.rhoc(z).to(self.units('dens', units))  # prefactor and units
     
-    def dens1h(self, rs, zs, logMs, units='cosmo'):  # one-halo density component, II.C.eq16
-        pdel, rho_del = self.pc(zs, units), self.p1h_del(rs, zs, logMs)
-        return lambda p={}: pdel*rho_del(self.p0 | p)
-    
-    def P1h_del(self, rs, zs, logMs):  # one-halo pressure component, Section II.C Eq 17
+    def Density1h(self, r, z, logM200c, units='cosmo'):  # one-halo density component, II.C.eq16
         self.require(['model'])
-        rs, zs, logMs = self.setdim(rs, zs, logMs)  # set proper dimensions [nr, nz, nM]
-        xs = rs*u.Mpc/self.r200c(zs, logMs)
-        xc = self.PLmz(zs, logMs, A0=self.p0['xc_t_A0'], alpham=self.p0['xc_t_alpham'], alphaz=self.p0['xc_t_alphaz'])
-        func = lambda p: Battaglia2011().MGNFW(xs, gamma=p['gamma_t'], alpha=p['alpha_t'], P0 = p['P0'], xc=xc, beta=p['beta_t'])
-        return lambda p={}: func(self.p0 | p)
+        r, z, logM200c = self.setdim(r, z, logM200c)  # set proper dimensions [nr, nz, nM]
+        pc = self.pc(z, units)
+        x = r*u.Mpc/self.r200c(z, logM200c)
+        pGNFW = lambda p: self.pGNFW(x, gamma=p['gamma_k'], alpha=p['alpha_k'], rho0=10**p['logrho0'], xc=p['xc_k'], beta=p['beta_k'])
+        return lambda p={}: pc*pGNFW(self.p0 | p)
+
+    def PGNFW(self, x, P0, xc, gamma, alpha, beta):  # Eq 17
+        return P0 * (x/xc)**gamma * (1+(x/xc)**alpha)**(-beta)
     
-    def P200c(self, zs, logMs, units='cosmo'):  # scale pressure
-        self.require(['rhoc', 'r200c'])  # require rhoc
-        _, zs, logMs = self.setdim(1, zs, logMs)  # set proper dimensions
-        p200c = c.G*(10**logMs*u.Msun)*200*self.rhoc(zs)/(2*self.r200c(zs, logMs))
-        return self.Fb*p200c.to(self.units('pres', units))
+    def P200c(self, z, logM200c, units='cosmo'): 
+        P200c = c.G*(10**logM200c*u.Msun)*200*self.rhoc(z)/(2*self.r200c(z, logM200c))
+        return self.Fb*P200c.to(self.units('pres', units))
+    
+    def Pressure1h(self, r, z, logM200c, units='cosmo'):  # one-halo density component, II.C.eq16
+        self.require(['model'])
+        r, z, logM200c = self.setdim(r, z, logM200c)  # set proper dimensions [nr, nz, nM]
+        P200c = self.P200c(z, logM200c, units)
+        x = r*u.Mpc/self.r200c(z, logM200c)
+        xc = Battaglia2011().PL(z, logM200c, A0=self.p0['xc_t_A0'], alpham=self.p0['xc_t_alpham'], alphaz=self.p0['xc_t_alphaz'])
+        PGNFW = lambda p: self.PGNFW(x, gamma=p['gamma_t'], alpha=p['alpha_t'], P0=p['P0'], xc=xc, beta=p['beta_t'])
+        return lambda p={}: P200c*PGNFW(self.p0 | p)
 
-    def pres1h(self, rs, zs, logMs, units='cosmo'):  # Section II.C Eq 17
-        Pdel, Pth_del = self.P200c(zs, logMs, units), self.P1h_del(rs, zs, logMs)
-        return lambda p={}: Pdel*Pth_del(self.p0 | p)
+    def prof2h(self, r, z, logM200c):  # linear two-halo calculation, Section II.C Eq 17
+        dndlogm = lambda z, logM200c: self.dndlogm(z, logM200c+np.log10(self.h)) * self.h**4
+        bh = lambda z, logM200c: self.bh(z, logM200c+np.log10(self.h))
+        Plin = lambda k, z: np.where(k*self.h > 1/50, 1, 0) * self.Plin(k*self.h, z) / self.h**3
+        
+        # dndlogm = lambda z, logM200c: self.dndlogm(z, logM200c)
+        # bh = lambda z, logM200c: self.bh(z, logM200c)
+        # Plin = lambda k, z: np.where(k > 1/50, 1, 0) * self.Plin(k, z)
+        
+        V17 = Vikram2017(dndlogm=dndlogm, bh=bh, Plin=Plin)
+        logM200c_2h = np.linspace(10-np.log10(self.h), 15-np.log10(self.h), 50)
+        lin2h = V17.twohalo(r, z, logM200c, logM200c_2h)  # linear two-halo calculation
+        return lambda prof, p={}: lin2h(prof(r, z, logM200c_2h)(p))
 
-    def prof2h(self, rs, zs, logMs):  # linear two-halo calculation, Section II.C Eq 17
-        windfunc = lambda k: np.where(k > 1/50, 1, 0)  # two-halo window function, [k]=1/Mpc
-        logMs_2h = np.linspace(10, 15, 50)
-        lin2h = self.twohalo(rs, zs, logMs, logMs_2h, windowfunc=windfunc)  # linear two-halo calculation
-        return lambda prof, p={}: lin2h(prof(rs, zs, logMs_2h)(p))
+    def Density2h(self, r, z, logM200c, units='cosmo'):  # two-halo density component
+        B16 = Battaglia2016({'model':'AGN'}, rhoc=self.rhoc, r200c=self.r200c, **self.info)
+        ptypo = {'beta_A0': B16.p0['beta_A0']-2*B16.p0['gamma']}
+        Density1h = lambda r, z, logM200c: lambda p: B16.Density(r, z, logM200c, units)(ptypo)
+        return self.prof2h(r, z, logM200c)(Density1h).to(self.units('dens', units))
 
-    def rho2h(self, rs, zs, logMs, units='cosmo'):  # two-halo density component
-        rho1h = Battaglia2016({'model':'AGN'}, rhoc=self.rhoc, r200c=self.r200c, **self.info).rho1h
-        lin2hrho = self.prof2h(rs, zs, logMs)(rho1h).to(self.units('dens', units))
-        rho2h = lambda p={}: lin2hrho *p['A2h_k']
-        return lambda p={}: rho2h(self.p0 | p)
+    def Pressure2h(self, r, z, logM200c, units='cosmo'):  # two-halo pressure component
+        B11 = Battaglia2011(rhoc=self.rhoc, r200c=self.r200c, **self.info)
+        return self.prof2h(r, z, logM200c)(B11.Pressure).to(self.units('pres', units))
 
-    def Pth2h(self, rs, zs, logMs, units='cosmo'):  # two-halo pressure component
-        pth1h = Battaglia2011(rhoc=self.rhoc, r200c=self.r200c, **self.info).Pth1h
-        lin2hPth = self.prof2h(rs, zs, logMs)(pth1h).to(self.units('pres', units))
-        Pth2h = lambda p={}: lin2hPth *p['A2h_t']
-        return lambda p={}: Pth2h(self.p0 | p)
+    def Pressure(self, r, z, logM200c, units='cosmo'):
+        P1h, P2h_lin = self.Pressure1h(r, z, logM200c, units), self.Pressure2h(r, z, logM200c, units)
+        P2h = lambda p: p['A2h_t']*P2h_lin
+        return lambda p={}: P1h(self.p0 | p) + P2h(self.p0 | p)
+    
+    def Density(self, r, z, logM200c, units='cosmo'):
+        p1h, p2h_lin = self.Density1h(r, z, logM200c, units), self.Density2h(r, z, logM200c, units)
+        p2h = lambda p: p['A2h_k']*p2h_lin
+        return lambda p={}: p1h(self.p0 | p) + p2h(self.p0 | p)
+
+
+
+
+
+    
+    
+
+    
     
 
 
-
-
-
-
+class Planck2013(BaseProfile, Studies.Planck2013): # In progress
+    models = {'cluster':['All', 'cool', 'noncool'],
+              'fixedp': ['3','2','1','0']}
+    params = {
+        'P0': {'All':{'3':6.32,'2':6.82,'1':6.41,'0':5.78}, 'cool':11.82, 'noncool':4.72},
+        'c500': {'All':{'3':1.01,'2':1.13,'1':1.81,'0':1.84}, 'cool':0.60, 'noncool':2.19},
+        'gamma': {'All':{'3':0.31,'2':0.31,'1':0.31,'0':0.35}, 'cool':0.31, 'noncool':0.31},
+        'alpha': {'All':{'3':1.05,'2':1.05,'1':1.33,'0':1.39}, 'cool':0.76, 'noncool':1.82},
+        'beta': {'All':{'3':5.49,'2':5.17,'1':4.13,'0':4.05}, 'cool':6.58, 'noncool':3.62},
+    }
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+        
+    def P500(self, z, logM500c, units='cosmo'):
+        return Arnaud2010(H=self.H).P500(z, logM500c, units)
     
+    def PGNFW(self, r, z, logM500c):
+        return lambda p={}: Arnaud2010(r500c=self.r500c).PGNFW(r, z, logM500c)(self.p0 | p)
     
-
-    
-    
-
-
-
+    def Pressure(self, r, z, logM500c, units='cosmo'):
+        P500, PGNFW = self.P500(z, logM500c, units)(), self.PGNFW(r, z, logM500c)
+        return lambda p={}: P500*PGNFW(self.p0 | p)
 
 
 
