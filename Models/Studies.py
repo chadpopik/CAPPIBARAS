@@ -35,6 +35,9 @@ class BaseStudy(HaloModels.BaseModel):
                 spefinfodict[infokey]=spefinfo(spefinfodict[infokey], inp)  # try to use it to narrow it down
         return {k:v for k, v in spefinfodict.items() if not isinstance(v, dict)}
     
+    
+    
+    
     def defineothers(self):  # define info that can be derived by other params
         for mtype in [f'M{m}{v}' for m in ['h', 's'] for v in ['Mean', 'Max', 'Min']]:
             if hasattr(self, mtype) and not hasattr(self, f'log{mtype}'): setattr(self, f'log{mtype}', np.log10(getattr(self, mtype)/u.Msun))
@@ -104,7 +107,17 @@ def cycle(d, f):
             
             
 
-            
+class Hadzhiyska2025B(BaseStudy):  # In progress
+    subs = {'mbin': ['M1', 'M2', 'M3', 'M4', 'M5', 'M6'],
+    }
+
+    info = {
+        "logMsMin": {"M1": 11.861, "M2": 11.918, "M3": 11.831, "M4": 11.750, "M5": 11.947, "M6": 12.183},
+        "fsat": {"M1": 0.123, "M2": 0.147, "M3": 0.206, "M4": 0.295, "M5": 0.333, "M6": 0.343},
+        "logMhMean": {"M1": 13.135, "M2": 13.184, "M3": 13.266, "M4": 13.310, "M5": 13.370, "M6": 13.456},
+        "blin": {"M1": 1.155, "M2": 1.190,  "M3": 1.258, "M4": 1.314, "M5": 1.384, "M6": 1.475},
+    }
+   
         
         
 class Jenna_Catalog(BaseStudy):
@@ -128,18 +141,19 @@ class Popik2025(BaseStudy):  # In progress
 class RiedGuachalla2025(BaseStudy):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112j3512R
     subs = {'bin': ['all', 'z_1', 'z_2', 'z_3', 'z_4', 'mass_1', 'mass_2', 'mass_3', 'mass_4'],}  # subset of galaxy selection
     info = {
-        'area': 4300,  # overlapping region, F1 [deg^2]
-        'logMhMean':13.4,  # estimated halo mass of LRG from Yuan, II.B.p5
-        # spectroscopic redshift and stellar mass bounds of bins, III.B.p6/p7
+        'area': 4300,  # overlapping region of ACT and DESI [deg^2], F1 and III.B.p4
+        'logMhMean':13.4,  # estimated mean halo mass of LRG [Msun/h], III.B.p5
+        # spectroscopic redshift bins, III.B.p6
         'zMin': {'all':0.4, 'z_1':0.4, 'z_2':0.6, 'z_3':0.8, 'z_4':0.9},
         'zMax': {'all':1.1, 'z_1':0.6, 'z_2':0.8, 'z_3':0.95, 'z_4':1.1},
+        # stellar mass bins [Msun], III.B.p7
         'logMsMin': {'all':10.5, 'mass_1':10.5, 'mass_2':11.2, 'mass_3':11.4, 'mass_4':11.6},
         'logMsMax': {'all':12.5, 'mass_1':11.2, 'mass_2':11.4, 'mass_3':11.6, 'mass_4':12.5},
-        # mean/median redshift, mean stellar mass, number of galaxies, T2
-        'zMean': {'all':0.74, 'z_1':0.51, 'z_2':0.71, 'z_3':0.87, 'z_4':1.01, 'mass_1':0.76, 'mass_2':0.75, 'mass_3':0.71, 'mass_4':0.69},
-        'zMed': {'all':0.75, 'z_1':0.51, 'z_2':0.71, 'z_3':0.87, 'z_4':1.01, 'mass_1':0.79, 'mass_2':0.76, 'mass_3':0.70, 'mass_4':0.67},
-        'MsMean': {'all':2.2, 'z_1':2.4, 'z_2':2.3, 'z_3':2.0, 'z_4':2.1, 'mass_1':1.2, 'mass_2':2.0, 'mass_3':3.0, 'mass_4':5.1},  # [10e11 Mstar/Msun]
-        'NGal': {'all':825283, 'z_1':195877, 'z_2':235620, 'z_3':235620, 'z_4':96346, 'mass_1':244932, 'mass_2':320914, 'mass_3':194037, 'mass_4':53997},
+        # subsample info, T2
+        'zMean': {'all':0.74, 'z_1':0.51, 'z_2':0.71, 'z_3':0.87, 'z_4':1.01, 'mass_1':0.76, 'mass_2':0.75, 'mass_3':0.71, 'mass_4':0.69},  # mean redshift
+        'zMed': {'all':0.75, 'z_1':0.51, 'z_2':0.71, 'z_3':0.87, 'z_4':1.01, 'mass_1':0.79, 'mass_2':0.76, 'mass_3':0.70, 'mass_4':0.67},  # median redshift
+        'MsMean': {'all':2.2, 'z_1':2.4, 'z_2':2.3, 'z_3':2.0, 'z_4':2.1, 'mass_1':1.2, 'mass_2':2.0, 'mass_3':3.0, 'mass_4':5.1},  # mean stellar mass [10e11 Mstar/Msun]
+        'NGal': {'all':825283, 'z_1':195877, 'z_2':235620, 'z_3':235620, 'z_4':96346, 'mass_1':244932, 'mass_2':320914, 'mass_3':194037, 'mass_4':53997},  # number of galaxies
         }
     # Assume z/m bins have same m/z limits as all
     for b in [1, 2, 3, 4]:
@@ -182,7 +196,7 @@ class Liu2025(BaseStudy):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112h3561L
 
 
 
-class Coulton2024(BaseStudy):  # arxiv.org/abs/2307.01258
+class Coulton2024(BaseStudy):  # ui.adsabs.harvard.edu/abs/2024PhRvD.109f3530C
     subs={}
     info={}
 
@@ -423,7 +437,7 @@ class Koukoufilippas2020(BaseStudy):  # arxiv.org/abs/1909.09102
     info={}
 
 
-class Naess2020(BaseStudy):  # arxiv.org/abs/2007.07290
+class Naess2020(BaseStudy):  # ui.adsabs.harvard.edu/abs/2020JCAP...12..046N
     subs={}
     info={}
 
@@ -496,7 +510,7 @@ class Ahn2013Alam2015(BaseStudy):  # arxiv.org/abs/1501.00963, arxiv.org/abs/130
 class Planck2013(BaseStudy):  # ui.adsabs.harvard.edu/abs/2013A%26A...550A.131P
     subs = {}
 
-    info = {'Om0':0.3, 'Ol0':0.7,'h':0.7,
+    info = {'Om0':0.3, 'Ol0':0.7,'h':0.7,'MassDef':'500c',
         }
 
 
@@ -512,7 +526,7 @@ class Arnaud2010(BaseStudy):  # ui.adsabs.harvard.edu/abs/2010A%26A...517A..92A
     subs = {}
     info = {
         # Cosmological Parameters, 1p-1
-        'H0':70, 'Om0':0.3, 'Ol0':0.7, 'Concentration': 'Constant',
+        'h':0.7, 'Om0':0.3, 'Ol0':0.7, 'Concentration': 'Constant', 'MassDef':'500c',
     }
 
 
@@ -528,3 +542,13 @@ class Nagai2007(BaseStudy):  # ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
         'mu':0.59, 'mu_e':'1.14'
     }
     
+    
+class Zheng2005(BaseStudy):  # ui.adsabs.harvard.edu/abs/2005ApJ...633..791Z
+    subs = {}
+    info = {
+        }
+
+class Zehavi2005(BaseStudy):  # ui.adsabs.harvard.edu/abs/2005ApJ...630....1Z
+    subs = {}
+    info = {
+        }

@@ -26,29 +26,6 @@ class BaseProfile:
         logMs = logMs if np.array(logMs, ndmin=1).ndim==1 else np.array(logMs, ndmin=1)
         return rs, zs, logMs
 
-    # def twohalo(self, rs, zs, logMs, logMs_2h, windowfunc=lambda k: 1): # Two-halo component calculated with linear theory, Vikram
-    #     self.require(['dndlogm', 'bh', 'Plin'])  # required functions
-    #     fft = FFTs.mcfit_package(rs=rs)  # setup FFT
-    #     ks, FFT3D, IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
-
-    #     ks, zs, logMs = np.array(ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)  # Assign proper dimensions [nr, nz, nm]
-
-    #     prefac = self.bh(zs, logMs)*self.Plin(ks, zs)*windowfunc(ks)  # collect factors outside int
-    #     intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
-    #     P2h = lambda prof1h: prefac*(np.trapz(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
-    #     return lambda prof1h: IFFT3D(P2h(prof1h)) *prof1h.unit  # IFFT to real space and return its units destroyed by the FFT
-    
-    # def Pth(self, rs, zs, logMs, units='cosmo'):
-    #     Pth_1h, Pth_2h = self.Pth1h(rs, zs, logMs, units), self.Pth2h(rs, zs, logMs, units)
-    #     Pth = lambda p={}: Pth_1h(p) + Pth_2h(p)
-    #     return lambda p={}: Pth(self.p0 | p)
-    
-    # def rho(self, rs, zs, logMs, units='cosmo'):
-    #     rho_1h, rho_2h = self.rho1h(rs, zs, logMs, units), self.rho2h(rs, zs, logMs, units)
-    #     rho = lambda p={}: rho_1h(p) + rho_2h(p)
-    #     return lambda p={}: rho(self.p0 | p)
-
-
 
 class Nagai2007(BaseProfile, Studies.Nagai2007):  # Pressure Profile from GADGET-2 made hydro sims
     models = {
@@ -84,13 +61,13 @@ class Nagai2007(BaseProfile, Studies.Nagai2007):  # Pressure Profile from GADGET
 
 
 class Arnaud2010(BaseProfile, Studies.Arnaud2010):  # Pressure Profile fit to REXCESS cluseters with XMM-Newton data
-    models = {}
+    models = {'model': ['norm', 'ST', 'coolcore', 'disturbed'],}  # different best-fit parameter sets
     params = {  # Eq 12
-        'alpha': 1.0510,  # intermediate slope
-        'beta': 5.4905,  # outer slope
-        'gamma': 0.3081,  # central slope
-        'P0': 8.403,  # units of h^(-3/2)
-        'c500': 1.177,  # R500/rs
+        'alpha': {'norm': 1.0510, 'ST': 1.0620, 'coolcore': 1.2223, 'disturbed': 0.7736},  # intermediate slope
+        'beta': {'norm': 5.4905, 'ST': 5.4807, 'coolcore': 5.49, 'disturbed': 5.49},  # outer slope
+        'gamma': {'norm': 0.3081, 'ST': 0.3292, 'coolcore': 0.7736, 'disturbed': 0.3798},  # central slope
+        'P0': {'norm': 8.403, 'ST': 8.130, 'coolcore': 3.249, 'disturbed': 3.202},  # units of h^(-3/2)
+        'c500': {'norm': 1.177, 'ST': 1.156, 'coolcore': 1.128, 'disturbed': 1.083},  # R500/rs
         # fixed params
         'alpha_P': 0.12,  # mass dependence
         }
@@ -109,14 +86,17 @@ class Arnaud2010(BaseProfile, Studies.Arnaud2010):  # Pressure Profile fit to RE
     def alphaPp(self, x, alpha_P):  # Eq 13
         return 0.10-(alpha_P+0.10)*(x/0.5)**3/(1+x/0.5)**3
     
+    def mdep(self, x, logM500c, alphaPprime=False):  # mass dependence factor, Eq 13?
+        alphaPp = lambda p: self.alphaPp(x, p) if alphaPprime else 0
+        return lambda p: (10**logM500c/(3e14/self.h70))**(p['alpha_P']+alphaPp(p))
+    
     def Pressure(self, r, z, logM500c, units='cosmo', alphaPprime=False):  # Eq 4/8/10/13
         r, z, logM500c = self.setdim(r, z, logM500c)  # set proper dimensions
         P500 = self.P500(z, logM500c, units)
         x = r*u.Mpc/(self.r500c(z, logM500c))
         PGNFW = lambda p: self.PGNFW(x, gamma=p['gamma'], alpha=p['alpha'], beta=p['beta'], P0=p['P0']*self.h70**(-3/2), c500=p['c500'])
-        alphaPp = lambda p: self.alphaPp(x, p) if alphaPprime else 0
-        mfac = lambda p: (10**logM500c/(3e14/self.h70))**(p['alpha_P']+alphaPp(p))
-        return lambda p={}: P500*mfac(self.p0 | p)*PGNFW(self.p0 | p)
+        mdep = self.mdep(x, logM500c, alphaPprime)
+        return lambda p={}: P500*mdep(self.p0 | p)*PGNFW(self.p0 | p)
 
 
 
@@ -202,24 +182,42 @@ class Battaglia2016(BaseProfile, Studies.Battaglia2016):  # Density Profile from
 
 
 
-
-
-
-
-
-
-
+    
 
 
 # In progress below here
 
 
+class Planck2013(BaseProfile, Studies.Planck2013): # In progress
+    models = {'cluster':['All', 'cool', 'noncool'],
+              'fixedp': ['3','2','1','0']}
+    params = {
+        'P0': {'All':{'3':6.32,'2':6.82,'1':6.41,'0':5.78}, 'cool':11.82, 'noncool':4.72},
+        'c500': {'All':{'3':1.01,'2':1.13,'1':1.81,'0':1.84}, 'cool':0.60, 'noncool':2.19},
+        'gamma': {'All':{'3':0.31,'2':0.31,'1':0.31,'0':0.35}, 'cool':0.31, 'noncool':0.31},
+        'alpha': {'All':{'3':1.05,'2':1.05,'1':1.33,'0':1.39}, 'cool':0.76, 'noncool':1.82},
+        'beta': {'All':{'3':5.49,'2':5.17,'1':4.13,'0':4.05}, 'cool':6.58, 'noncool':3.62},
+    }
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+        
+    def P500(self, z, logM500c, units='cosmo'):
+        return Arnaud2010(H=self.H).P500(z, logM500c, units)
+    
+    def PGNFW(self, x, gamma, alpha, beta, P0, c500):
+        return Arnaud2010().PGNFW(x, gamma, alpha, beta, P0, c500)
+
+    def mdep(self, x, logM500c):
+        return Arnaud2010().mdep(x, logM500c)({'alpha_P': 0.12})
+    
+    def Pressure(self, r, z, logM500c, units='cosmo'):
+        A10P = Arnaud2010(H=self.H, r500c=self.r500c).Pressure(r, z, logM500c, units)
+        return lambda p={}: A10P(self.p0 | p)
 
 
 
 
-
-class Moser2021(BaseProfile, Studies.Moser2021):
+class Moser2021(BaseProfile, Studies.Moser2021):  # TODO in progress
     models={'model': ['GNFW', 'GNFW1h'],  # with or without two halo term
             'match': ['matched', 'unmatched'],  # match cmass mass distribution or not
             'select': ['star', 'halo'],  # stellar or halo mass selected
@@ -410,7 +408,7 @@ class Vikram2017(BaseProfile, Studies.Vikram2017):  # TODO in progress
 
 
 
-class Amodeo2021(BaseProfile, Studies.Amodeo2021):  # ACT DR5 y map and SDSS BOSS CMASS DR10, arxiv.org/abs/2009.05558
+class Amodeo2021(BaseProfile, Studies.Amodeo2021):  # ACT DR5 y map and SDSS BOSS CMASS DR10, arxiv.org/abs/2009.05558 TODO: in progress
     models = {'model': ['GNFW', 'OBB'],}  # pres/dens profile model
     params = {
         # best-fit GNFW params, T2
@@ -507,28 +505,6 @@ class Amodeo2021(BaseProfile, Studies.Amodeo2021):  # ACT DR5 y map and SDSS BOS
     
 
 
-class Planck2013(BaseProfile, Studies.Planck2013): # In progress
-    models = {'cluster':['All', 'cool', 'noncool'],
-              'fixedp': ['3','2','1','0']}
-    params = {
-        'P0': {'All':{'3':6.32,'2':6.82,'1':6.41,'0':5.78}, 'cool':11.82, 'noncool':4.72},
-        'c500': {'All':{'3':1.01,'2':1.13,'1':1.81,'0':1.84}, 'cool':0.60, 'noncool':2.19},
-        'gamma': {'All':{'3':0.31,'2':0.31,'1':0.31,'0':0.35}, 'cool':0.31, 'noncool':0.31},
-        'alpha': {'All':{'3':1.05,'2':1.05,'1':1.33,'0':1.39}, 'cool':0.76, 'noncool':1.82},
-        'beta': {'All':{'3':5.49,'2':5.17,'1':4.13,'0':4.05}, 'cool':6.58, 'noncool':3.62},
-    }
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars, model=True)
-        
-    def P500(self, z, logM500c, units='cosmo'):
-        return Arnaud2010(H=self.H).P500(z, logM500c, units)
-    
-    def PGNFW(self, r, z, logM500c):
-        return lambda p={}: Arnaud2010(r500c=self.r500c).PGNFW(r, z, logM500c)(self.p0 | p)
-    
-    def Pressure(self, r, z, logM500c, units='cosmo'):
-        P500, PGNFW = self.P500(z, logM500c, units)(), self.PGNFW(r, z, logM500c)
-        return lambda p={}: P500*PGNFW(self.p0 | p)
 
 
 

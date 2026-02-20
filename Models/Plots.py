@@ -30,8 +30,37 @@ class BasePlots:
                 xscale=xscale[i] if isinstance(xscale, list) else xscale,
                 yscale=yscale[i] if isinstance(yscale, list) else yscale)
         return fig, axs
+    
+    
+class Zhou2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2023JCAP...11..097Z
+    def Fig2(self, width=16, height=6):
+        return self.plot(filename=['Fig2a','Fig2b'], nrow=1, ncol=2, width=width, height=height,
+            xlabel=r'Redshift', ylabel=r'$N (\text{deg}^{-2})$',
+            xlim=(0.15, 1.25), ylim=[(0, 28), (0, 75)], xscale='linear', yscale='linear')
+        
+    def Fig3(self, width=16, height=6):
+        return self.plot(filename=['Fig3a','Fig3b'], nrow=1, ncol=2, width=width, height=height,
+            xlabel=r'Redshift', ylabel=r'$10^{3} n(z) (h^{3} \ \text{Mpc}^{-3})$',
+            xlim=(0.15, 1.1), ylim=[(0, 0.65), (0, 1.65)], xscale='linear', yscale='linear')
+    
+    
+class White2022(BasePlots):  # ui.adsabs.harvard.edu/abs/2022JCAP...02..007W
+    def Fig2(self, width=8, height=4):
+        return self.plot(filename='Fig2', width=width, height=height,
+            xlabel=r'$z$', ylabel=r'$d \text{ln} N/dz$',
+            xlim=(0.2, 1.2), ylim=(-0.3, 7.05), xscale='linear', yscale='linear')
 
 
+class Zheng2005(BasePlots):  # ui.adsabs.harvard.edu/abs/2005ApJ...633..791Z
+    def Fig1(self, width=10, height=4):
+        return self.plot(filename=['Fig1c','Fig1d'], nrow=1, ncol=2, width=width, height=height,
+            xlabel=r'$M (M_\odot)$', ylabel=r'$\langle N \rangle$',
+            xlim=(3.15e10, 1e15), ylim=(3.1e-2, 50), xscale='log', yscale='log')
+        
+    def Fig3(self, width=8, height=6):
+        return self.plot(filename=['Fig3a','Fig3b','Fig3c','Fig3d'], nrow=2, ncol=2, width=width, height=height,
+            xlabel=r'$M (M_\odot)$', ylabel=r'$\langle N \rangle$',
+            xlim=(1e11, 1e15), ylim=(3.1e-2, 4.9e1), xscale='log', yscale='log')
 
 class Nagai2007(BasePlots):  # ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
     def Fig1d(self, width=5.5, height=5):
@@ -184,8 +213,8 @@ class Moser2021(BasePlots):  # ui.adsabs.harvard.edu/abs/2021ApJ...919....2M
 
     def Fig3(self, width=14, height=6):
         return self.plot(filename=['Fig3a','Fig3b'], nrow=1, ncol=2, width=width, height=height,
-            xlabel=[r'$r/r_{200c}$', r'$r/r_{200c}$'], ylabel=[r'$\rho_\text{gas} [\text{g cm}^{-3}]$', r'$P_\text{th} [\text{g} \text{cm}^{-1} \text{s}^{-2}]$'],
-            xlim=[[8e-2,6.2e0],[8e-2,6.2e0]], ylim=[[5e-31,1.2e-26],[1e-16,1.6e-11]], xscale=['log','log'], yscale=['log','log'])
+            xlabel=[r'$M_h \ [M_\odot]$', r'$\log_10(M^*)\ (M_\odot)$'], ylabel=[r'$M_s \ [M_\odot]$', ''],
+            xlim=[[10.8, 16],[10.6,11.8]], ylim=[[7,12.5],[2,5.5e4]], xscale=['linear','linear'], yscale=['linear','log'])
 
     def Fig4row1(self, width=14, height=6):
         return self.plot(filename=['Fig4a','Fig4b'], nrow=1, ncol=2, width=width, height=height,
@@ -284,7 +313,7 @@ class Kusiak2022(BasePlots):  # ui.adsabs.harvard.edu/abs/2022PhRvD.106l3517K
     def Fig2(self, width=6, height=4):
         return self.plot(filename='Fig2', width=width, height=height,
             xlabel=r'$z$', ylabel=r'$\frac{1}{N_g^\text{tot}} \frac{dN_g}{dz}$',
-            xlim=(0, 4), ylim=(-0.06, 1.3))
+            xlim=(0, 4), ylim=(-0.06, 1.3), xscale='linear', yscale='linear')
 
     def Fig8_col1(self, width=6, height=10):
         return self.plot(filename=['Fig8a','Fig8c','Fig8e'], nrow=3, ncol=1, width=width, height=height,
@@ -298,7 +327,7 @@ class Kusiak2022(BasePlots):  # ui.adsabs.harvard.edu/abs/2022PhRvD.106l3517K
     def Fig15(self, width=12, height=4):
         return self.plot(filename=['Fig15a','Fig15b'], nrow=1, ncol=2, width=width, height=height,
             xlabel=r'$\ell$', ylabel=r'$u_\ell^\text{m}$', xlim=(7e1, 1.5e5), ylim=(-0.05, 1.05), xscale='log')
-        
+
 
 
 class Xu2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2023ApJ...944..200X
@@ -318,12 +347,12 @@ class Gao2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2023ApJ...954..207G
     def Fig7a(self, width=8, height=6):
         return self.plot(filename='Fig7a', width=width, height=height,
             xlabel=r'$\log(M_h) \ [M_\odot /h]$', ylabel=r'$\log(M_*) \ [M_\odot]$',
-            xlim=(10, 15), ylim=(7.5, 12))
+            xlim=(10, 15), ylim=(7.5, 12), xscale='log', yscale='log')
 
     def Fig2(self, width=10, height=3.5):
         return self.plot(filename=['Fig2a','Fig2b'], nrow=1, ncol=2, width=width, height=height,
             xlabel=r'$\log M_* \ [M_\odot]$', ylabel=r'$n \ [h^3 \text{Mpc}^{-3} \text{dex}^{-1}]$',
-            xlim=[(9, 12.5), (7, 12.5)], ylim=(5e-7, 2e-3), yscale='log')
+            xlim=[(9, 12.5), (7, 12.5)], ylim=(5e-7, 2e-3), xscale='log', yscale='log')
 
 
 
@@ -341,12 +370,12 @@ class Yuan2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2024MNRAS.530..947Y
     def Fig10(self, width=6, height=5):
         return self.plot(filename='Fig10', width=width, height=height,
             xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N^{(c+s)}_\text{gal}$',
-            xlim=(1e12, 1e15), ylim=(1e-2, 1e1), xscale='log', yscale='log')
+            xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')
 
     def Fig14(self, width=6, height=5):
         return self.plot(filename='Fig14', width=width, height=height,
             xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N_\text{gal}$',
-            xlim=(1e12, 1e15), ylim=(1e-2, 1e1), xscale='log', yscale='log')
+            xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')
         
         
     
@@ -372,7 +401,7 @@ class RiedGuachalla2025(BasePlots):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112j3
     def Fig2(self, width=6, height=5):
         return self.plot(filename='Fig2', width=width, height=height,
             xlabel=r'$z$', ylabel=r'Number',
-            xlim=(0.365, 1.135), ylim=(0, 35e3))
+            xlim=(0.365, 1.135), ylim=(0, 35e3), xscale='linear', yscale='linear')
 
     def Fig3(self, width=6, height=5):
         return self.plot(filename='Fig3', width=width, height=height,
@@ -382,12 +411,12 @@ class RiedGuachalla2025(BasePlots):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112j3
     def Fig20(self, width=6, height=4.5):
         return self.plot(filename='Fig20', width=width, height=height,
             xlabel=r'$z$', ylabel=r'Number',
-            xlim=(0.1, 1.15), ylim=(0, 60e3))
+            xlim=(0.1, 1.15), ylim=(0, 60e3), xscale='linear', yscale='linear')
 
     
     
 class Liu2025(BasePlots):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112h3561L
     def Fig2(self, width=6, height=5):
         return self.plot(filename='Fig2', width=width, height=height,
-            xlabel=r'$z$', ylabel=r'$dN/dz$',
-            xlim=(0.1, 1.3), ylim=(0, 10.25))
+            xlabel=r'$z$', ylabel=r'$dN/dz$ (actually $n(z)$)',
+            xlim=(0.1, 1.3), ylim=(0, 10.25), xscale='linear', yscale='linear')

@@ -27,7 +27,7 @@ datapath = "/global/homes/c/cpopik/Data"  # path to data
         # norm_fac = self.dNdz[:,None]/np.trapz(self.dNdlogmhalo, self.logmhalos)*(self.zs[1]-self.zs[0])  # ensures same zcount as dNdz
         # self.dndlogmhalo = self.dNdlogmhalo*norm_fac/self.volumes()[:, None]  # create number dist [dex^-1]
 
-class BaseData:
+class BaseTargetData:
     def make_N_q(self, qs, dq, qmin=None, qmax=None):  # make dist from samples with one value
         if qmin is None: qmin = np.floor(qs.min()/dq)*dq  # default min
         if qmax is None: qmax = np.ceil(qs.max()/dq)*dq  # default max
@@ -44,24 +44,24 @@ class BaseData:
         # dNdq1dq2 = N /dq1/u.dex /dq2/u.dex  # apply units [dex^-2]
         return N_q1_q2, N_q1, N_q2, q1cents, q2cents
 
-    def get_dist(self, dist, dz=None, zMin=None, zMax=None,
-                 dlogMs=None, logMsMin=None, logMsMax=None):  # get redshift distribution with given cuts
-        if 'z' in dist:
-            self.make_zdists(dz=dz, zMin=zMin, zMax=zMax)
-            if dist=='dNdz': dist=self.dNdz
-            elif dist=='dndz': dist=self.dndz
-            elif dist=='n_z': dist=self.n_z
-            elif dist=='N_z': dist=self.N_z
-            else: raise ValueError("Give valid zdist: dNdz, dndz, n_z, N_z")
-            return self.z, dist
-        elif 'Ms' in dist: 
-            self.make_Msdists(dlogMs=dlogMs, logMsMin=logMsMin, logMsMax=logMsMax)
-            if dist=='dNdlogMs': dist=self.dNdlogMs
-            elif dist=='dndlogMs': dist=self.dndlogMs
-            elif dist=='n_logMs': dist=self.n_logMs
-            elif dist=='N_logMs': dist=self.N_logMs
-            else: raise ValueError("Give valid zdist: dNdlogMs, dndlogMs, n_logMs, N_logMs")
-            return self.logMs, dist
+    # def get_dist(self, dist, dz=None, zMin=None, zMax=None,
+    #              dlogMs=None, logMsMin=None, logMsMax=None):  # get redshift distribution with given cuts
+    #     if 'z' in dist:
+    #         self.make_zdists(dz=dz, zMin=zMin, zMax=zMax)
+    #         if dist=='dNdz': dist=self.dNdz
+    #         elif dist=='dndz': dist=self.dndz
+    #         elif dist=='n_z': dist=self.n_z
+    #         elif dist=='N_z': dist=self.N_z
+    #         else: raise ValueError("Give valid zdist: dNdz, dndz, n_z, N_z")
+    #         return self.z, dist
+    #     elif 'Ms' in dist: 
+    #         self.make_Msdists(dlogMs=dlogMs, logMsMin=logMsMin, logMsMax=logMsMax)
+    #         if dist=='dNdlogMs': dist=self.dNdlogMs
+    #         elif dist=='dndlogMs': dist=self.dndlogMs
+    #         elif dist=='n_logMs': dist=self.n_logMs
+    #         elif dist=='N_logMs': dist=self.N_logMs
+    #         else: raise ValueError("Give valid zdist: dNdlogMs, dndlogMs, n_logMs, N_logMs")
+    #         return self.logMs, dist
         # elif
         #     self.make_zMsdists(dz=None, zMin=None, zMax=None, dlogMs=dlogMs, logMsMin=logMsMin, logMsMax=logMsMax)
         #     if dist=='dNdlogMs': dist=self.dNdlogMs
@@ -90,9 +90,224 @@ class BaseData:
     #     mcut = (self.logMhs>=logMhMin) & (self.logMhs<=logMhMax)
     #     zcut = (self.zs>=zMin) & (self.zs<=zMax)
     #     return self.zs[zcut], self.logMhs[mcut], self.dNdlogMh2D[zcut, mcut]
+    
+    
+
+class Kusiak2022(BaseTargetData, Studies.Kusiak2022):  # unWISE galaxies and Planck lensing
+    path = "/global/homes/c/cpopik/Data/Kusiak2022"  # path to data, provided by author
+    subs = {'sample':['Blue', 'Green', 'Red']}
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+
+    def make_zdists(self, dz=None, zMin=None, zMax=None):
+        self.require(['sample'])
+        # load from digitized data
+        sampstr = {'Blue':0,'Green':1,'Red':2}[self.sample]
+        self.zs_df, dNdz_norm = np.loadtxt(f"{self.path}/normalised_dndz_cosmos_{sampstr}.txt").T  # normalized differential number count
+        
+        zmin = zMin if zMin is not None else self.zs_df.min()
+        zmax = zMax if zMax is not None else self.zs_df.max()
+        self.dz = dz if dz is not None else self.zs_df[1]-self.zs_df[0]
+        self.z = np.arange(zmin, 
+                           zmax+self.dz, self.dz)
+        self.dNdz_norm = np.interp(self.z, self.zs_df, dNdz_norm)  # interpolate to desired z
+        
+        # TODO: Need number of galaxies or galaxy density to get unnormed values
+        
+        
+class White2022(BaseTargetData, Studies.White2022):  # DESI LS DR9 LRGs correlated with Planck CMB Lensing (White+ 2022, arxiv.org/abs/2111.09898)
+    path = f"{datapath}/White2022"  # Path to data from zenodo.org/records/5834378
+    subs = {'zbin' : ['z1', 'z2', 'z3', 'z4'], # photometric redshift subsmaple
+            }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+            
+    def make_zdists(self, zbin=None, dz=None, zMin=None, zMax=None):
+        self.require(['zbin'])
+        self.z_df, self.nz_df = np.loadtxt(f"{self.path}/lrg_s0{self.zbin[-1]}_dndz.txt").T  # density distribution [deg^{-2}]
+        
+        zmin = zMin if zMin is not None else self.z_df.min()
+        zmax = zMax if zMax is not None else self.z_df.max()
+        self.dz = dz if dz is not None else self.z_df[1]-self.z_df[0]
+        self.z = np.arange(zmin, zmax+self.dz, self.dz)
+        self.n_z = np.interp(self.z, self.z_df, self.nz_df) /u.deg**2
+        self.N_z = self.n_z*self.area
+        self.dNdz = self.N_z/self.dz /u.dex
+        self.dndz = self.n_z/self.dz /u.dex
+        self.dlnNdz = np.log(self.N_z.value)/self.dz/u.dex
+        
+        # TODO: think these units of density are weird, check
 
 
-class Jenna_Catalog(BaseData, Studies.Jenna_Catalog):
+
+class RiedGuachalla2025(BaseTargetData, Studies.RiedGuachalla2025):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs
+    path = f"{datapath}/RiedGuachalla2025"  # Path to data downloaded from zenodo.org/records/15081008
+    subs = {
+        'bin': ['all', 'z_1', 'z_2', 'z_3', 'z_4', 'mass_1', 'mass_2', 'mass_3', 'mass_4'],  # redshift/mass subsample
+    }
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+
+    def make_zdists(self, dz=None, zMin=None, zMax=None, **kwargs):
+        # Load redshifts from file
+        self.require(['bin'])
+        self.allcat_zs = dict(np.load(f"{self.path}/fig2_hist_z.npz"))  # redshifts of all galaxies in catalog
+        if self.bin[0]=='z': self.cat_zs = self.allcat_zs[f'{self.bin}']  # if zbin is specified, select for that subsample
+        else: self.cat_zs = np.concatenate([self.allcat_zs[f'z_{i}'] for i in range(1, 5)])  # otherwise, get all of them
+
+        # Bin redshifts into histogram of number distribution [unitless]
+        self.N_z, self.z, self.zbins = self.make_N_q(self.cat_zs, 
+                                                dq=dz if dz is not None else 0.01,  # arbitrary default dz
+                                                qmin=zMin if zMin is not None else self.zMin,  # default min z of (sub)sample from Studies
+                                                qmax=zMax if zMax is not None else self.zMax)  # default max z of (sub)sample from Studies
+        self.dz = self.z[1]-self.z[0]  # width of z bins
+        self.dNdz = self.N_z/self.dz  # differential number distribution [dex^-1]
+        self.n_z = self.N_z/(self.area*u.deg**2)  # number density distribution [deg^-2 dex^-1]
+        self.dndz = self.n_z/self.dz  # differential number density distribution [deg^-2 dex^-1]
+
+    def make_Msdists(self, dlogMs=None, logMsMin=None, logMsMax=None, HSMR=None):
+        # Load stellar masses from file
+        self.require(['bin'])
+        self.allcat_mstar = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # stellar masses of all galaxies
+        if self.bin[0]=='m': self.cat_ms = self.allcat_mstar[f'{self.bin}']  # if zbin is specified, select for that subsample
+        else: self.cat_ms = np.concatenate([self.allcat_mstar[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
+    
+        # Bin stellar masses into histogram of number distribution [unitless]
+        self.N_logMs, self.logMs, self.logMsbins = self.make_N_q(np.log10(self.cat_ms),
+                                                            dq=dlogMs if dlogMs is not None else 0.01,  # arbitrary default Ms
+                                                            qmin=logMsMin if logMsMin is not None else self.logMsMin,  # default min Ms of (sub)sample from Studies
+                                                            qmax=logMsMax if logMsMax is not None else self.logMsMax)  # default max Ms of (sub)sample from Studies
+        self.dlogMs = self.logMs[1]-self.logMs[0]  # width of logMs bins
+        self.dNdlogMs = self.N_logMs/self.dlogMs  # differential number distribution [Msol^-1]
+
+        # TODO: add number density distribution [Msol^-1 Mpc^-3] (need volume info from Studies)
+
+    def make_Mhdists(self, dlogMh=None, logMhMin=None, logMhMax=None):
+        self.make_Msdists()  # first get stellar masses
+        Ms_to_Mh = lambda logMs: SHMRs.DESI_1P({'model':'Psat'}).HSMR(logMs)()  # Use SHMR of Gao 2023 TODO: is the Psat model the best to use?
+
+        # Bin halo masses into histogram of number distribution [unitless]
+        self.N_logMh, self.logMh, self.logMhbins = self.make_N_q(Ms_to_Mh(np.log10(self.cat_ms)),
+                                                            dq=dlogMh if dlogMh is not None else 0.01,  # arbitrary default Mh
+                                                            qmin=logMhMin if logMhMin is not None else Ms_to_Mh(self.logMsMin), # default min Mh of (sub)sample from Studies
+                                                            qmax=logMhMax if logMhMax is not None else Ms_to_Mh(self.logMsMax))  # default max Mh of (sub)sample from Studies
+        self.dlogMh = self.logMh[1]-self.logMh[0]  # width of logMh bins
+        self.dNdlogMh = self.N_logMh/self.dlogMh  # differential number distribution [Msol^-1]
+        
+        # TODO: add number density distribution [Msol^-1 Mpc^-3] (need volume info from Studies)
+
+    # TODO: add 2D z/M distribution?
+
+
+
+class Liu2025(BaseTargetData, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked on DESI LS DR9 LRGs
+    path = f"{datapath}/Liu2025"  # path to data from zenodo.org/records/14706729
+    subs = {
+        'zbin' : ['all', 'z1', 'z2', 'z3', 'z4'],  # photometric redshift bin
+        # 'ACTDR' : ['DR5', 'DR6'],  # ACT y map DR
+        # 'freq' : ['090', '150'],  # y map frequency (DR5)
+    }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+
+        # Loading redshift distribution from file
+        zcols = pd.read_csv(f"{datapath}/Zhou2023B/main_lrg_pz_dndz_iron_v0.4_dz_0.02.txt", sep=" ", nrows=1).columns[1:]  # get col names from Zhou2023
+        self.zdf = pd.DataFrame(np.genfromtxt(f"{self.path}/fig2_main_lrg_pz_dndz_iron_v0.4_dz_0.01.txt"), columns=zcols)  # Spectroscopic distributions of four sub-sample photometric redshift bins
+        self.zs_df = (self.zdf.zmin+self.zdf.zmax).values/2  # define zs at center of bins
+
+    # def get_beam(self):
+    #     self.require(['ACTDR'])
+    #     if self.ACTDR=='DR6': 
+    #         ACTDR6 = Coulton2024()
+    #         self.beam_ells, self.beam_data = ACTDR6.beam_ells, ACTDR6.beam_data
+    #     elif self.ACTDR=='DR5': 
+    #         self.require(['freq'])
+    #         ACTDR5 = Naess2020({'freq':self.freq})
+    #         self.beam_ells, self.beam_data = ACTDR5.beam_ells, ACTDR5.beam_data
+    #         self.resp_ells, self.resp_data = ACTDR5.resp_ells, ACTDR5.resp_data
+
+    def make_zdists(self, dz=None, zMin=None, zMax=None, **kwargs):
+        self.require(['zbin'])
+        zstr = f'bin_{self.zbin[-1]}' if self.zbin!='all' else 'all'
+        self.n_df = self.zdf[f'{zstr}_combined'].values /u.deg**2
+        self.dndz_df = self.n_df /(self.zs_df[1]-self.zs_df[0])/u.dex 
+        zmin = zMin if zMin is not None else self.zs_df.min()
+        zmax = zMax if zMax is not None else self.zs_df.max()
+        self.dz = dz if dz is not None else self.zs_df[1]-self.zs_df[0]
+        self.z = np.arange(zmin, zmax+self.dz, self.dz)
+        self.dndz = np.interp(self.z, self.zs_df, self.dndz_df)
+        
+        self.dNdz = self.dndz*(self.area)
+        self.n_z = self.dndz*self.dz*u.dex
+        self.N_z = self.dNdz*self.dz*u.dex
+
+    def get_dndlogm(self):
+        pass
+    
+    
+    
+    
+    
+    
+    
+    
+    
+class Schaan2021(BaseTargetData, Studies.Schaan2021):  # ACT DR5 maps stacked on SDSS BOSS DR10
+    path = f"{datapath}/Schaan2021"  # path to data, shared by author
+    subs = {
+        'sample': ['cmass', 'lowz'],}
+    
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+        
+        self.bigdata = np.loadtxt('/global/homes/c/cpopik/Data/Schaan2021/catalog.txt')
+        
+    def get_zdist(self, dz, zMin, zMax):
+        self.cat_zs = self.bigdata[:, 2]
+        self.N_z, self.z, self.zbins = self.make_N_q(self.cat_zs, 
+                                                    dq=dz if dz is not None else 0.01,  # arbitrary default dz
+                                                    qmin=zMin if zMin is not None else self.zMin,  # default min z of (sub)sample from Studies
+                                                    qmax=zMax if zMax is not None else self.zMax)  # default max z of (sub)sample from Studies
+        self.dz = self.z[1]-self.z[0]  # width of z bins
+        self.dNdz = self.N_z/self.dz  # differential number distribution [dex^-1]
+        self.n_z = self.N_z/(self.area*u.deg**2)  # number density distribution [deg^-2 dex^-1]
+        self.dndz = self.n_z/self.dz  # differential number density distribution [deg^-2 dex^-1]
+
+    def get_Msdist(self, dlogMs, logMsMin, logMsMax):
+        self.cat_Ms = self.bigdata[:, 18]
+        self.N_logMs, self.logMs, self.logMsbins = self.make_N_q(np.log10(self.cat_Ms), 
+                                                    dq=dlogMs if dlogMs is not None else 0.01,  # arbitrary default dlogMs
+                                                    qmin=logMsMin if logMsMin is not None else self.logMsMin,  # default min logMs of (sub)sample from Studies
+                                                    qmax=logMsMax if logMsMax is not None else self.logMsMax)  # default max logMs of (sub)sample from Studies
+        
+    def get_Mhdist(self, dlogMh, logMhMin, logMhMax):
+        self.cat_Mh = self.bigdata[:, 20]
+        self.N_logMh, self.logMh, self.logMhbins = self.make_N_q(np.log10(self.cat_Mh), 
+                                                    dq=dlogMh if dlogMh is not None else 0.01,  # arbitrary default dlogMh
+                                                    qmin=logMhMin if logMhMin is not None else self.logMhMin,  # default min logMh of (sub)sample from Studies
+                                                    qmax=logMhMax if logMhMax is not None else self.logMhMax)  # default max logMh of (sub)sample from Studies
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+
+class Jenna_Catalog(BaseTargetData, Studies.Jenna_Catalog):
     path = "/global/homes/c/cpopik/Data/"  # location of data, provided by Jenna
     subs = {'masstype': ['Mstar', 'M200c', 'Mvir'], # Mass type (column names)
             }
@@ -110,9 +325,14 @@ class Jenna_Catalog(BaseData, Studies.Jenna_Catalog):
         if self.masstype=='Mstar': self.logMs, self.dNdlogMs, self.dNdlogMs2D = logM, dNdlogM, dNdlogMdz*dz*u.dex  # if stellar mass, define the arrays as star
         else: self.logMh, self.dNdlogMh, self.dNdlogMh2D = logM, dNdlogM, dNdlogMdz*dz*u.dex  # if halo mass, define the arrays as halo
         self.dndz = self.dNdz/self.area
+        
+        
+        
+        
+        
 
 
-class Popik2025(BaseData, Studies.Popik2025):  # TODO: In progress
+class Popik2025(BaseTargetData, Studies.Popik2025):  # TODO: In progress
     path = f"/global/homes/c/cpopik/Stacking_Correlating/Results"
     subs = {
     'zbin': ['z1', 'z2', 'z3', 'z4'],
@@ -143,53 +363,9 @@ class Popik2025(BaseData, Studies.Popik2025):  # TODO: In progress
             setattr(self, val, getattr(Zhou, val))
 
 
-class RiedGuachalla2025(BaseData, Studies.RiedGuachalla2025):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs (arxiv.org/abs/2503.19870)
-    path = f"{datapath}/RiedGuachalla2025"  # Path to data downloaded from zenodo.org/records/15081008
-    subs = {
-        'bin': ['all', 'z_1', 'z_2', 'z_3', 'z_4', 'mass_1', 'mass_2', 'mass_3', 'mass_4'],  # redshift/mass bin
-    }
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.require(['bin'])
-
-        ACTDR6 = Coulton2024()
-        self.beam_ells, self.beam_data = ACTDR6.beam_ells, ACTDR6.beam_data
 
 
-    def make_zdists(self, dz=None, zMin=None, zMax=None, **kwargs):
-        self.allcat_zs = dict(np.load(f"{self.path}/fig2_hist_z.npz"))  # Redshifts of all galaxies
-        if self.bin[0]=='z': self.cat_zs = self.allcat_zs[f'{self.bin}']  # if it's for a z bin, only get a subset of zs
-        else: self.cat_zs = np.concatenate([self.allcat_zs[f'z_{i}'] for i in range(1, 5)])  # otherwise get all of them
-
-        self.zmin = zMin if zMin is not None else self.zMin
-        self.zmax = zMax if zMax is not None else self.zMax
-        self.dz = dz if dz is not None else 0.01
-
-        self.N_z, self.z, zbins = self.make_N_q(self.cat_zs, dq=self.dz, qmin=self.zmin, qmax=self.zmax)  # Get 1D hist for z
-        self.n_z = self.N_z/(self.area*u.deg**2)  # create number dens dist [deg^-2 dex^-1]
-        self.dNdz = self.N_z/[self.z[1]-self.z[0]]
-        self.dndz = self.n_z/[self.z[1]-self.z[0]]
-
-    def make_Msdists(self, dlogMs=None, logMsMin=None, logMsMax=None):  # makes the redshift distribution with arbritrary binsize dz
-        self.allcat_mstar = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # Stellar masses of all galaxies
-        if self.bin[0]=='m': self.cat_ms = self.allcat_mstar[f'{self.bin}']  # if it's for a m bin, only get a subset of ms
-        else: self.cat_ms = np.concatenate([self.allcat_mstar[f'mass_{i}'] for i in range(1, 5)])  # otherwise get all of them
-        
-        self.logMsMin = logMsMin if logMsMin is not None else self.logMsMin
-        self.logMsMax = logMsMax if logMsMax is not None else self.logMsMax
-        self.dlogMs = dlogMs if dlogMs is not None else 0.01
-    
-        self.N_logMs, self.logMs, logMsbins = self.make_N_q(np.log10(self.cat_ms),dq=self.dlogMs, qmin=self.logMsMin, qmax=self.logMsMax)  # Get 1D hist for z
-        self.dNdlogMs = self.N_logMs/[self.logMs[1]-self.logMs[0]]
-
-        
-        # self.cat_mhalos = SHMRs.DESI_1P({'model':'Psat'}).SHMR(np.log10(self.cat_ms))()  # steal default SHMR from Gao 2023
-        # self.dNdlogMh, self.logMh, Mhbins = self.dNdq_cat(self.cat_mhalos, dlogmhalo)  # Get 1D hist for z
-
-
-
-class Hadzhiyska2025(BaseData, Studies.Hadzhiyska2025):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
+class Hadzhiyska2025(BaseTargetData, Studies.Hadzhiyska2025):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
     path = f"{datapath}/Hadzhiyska2024"  # Path to data from zenodo.org/records/12633573
     subs = {
         'zbin': ['z1', 'z2', 'z3', 'z4'],  # photometric redshift bin
@@ -208,63 +384,10 @@ class Hadzhiyska2025(BaseData, Studies.Hadzhiyska2025):  # Stacked kSZ measureme
 
 
 
-class Liu2025(BaseData, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked on DESI LS DR9 LRGs
-    path = f"{datapath}/Liu2025"  # path to data from zenodo.org/records/14706729
-    subs = {
-        'zbin' : ['all', 'z1', 'z2', 'z3', 'z4'],  # photometric redshift bin
-        'ACTDR' : ['DR5', 'DR6'],  # ACT y map DR
-        'freq' : ['090', '150'],  # y map frequency (DR5)
-    }
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-
-        # Loading redshift distribution from file
-        zcols = pd.read_csv(f"{datapath}/Zhou2023B/main_lrg_pz_dndz_iron_v0.4_dz_0.02.txt", sep=" ", nrows=1).columns[1:]  # get col names from Zhou2023
-        self.zdf = pd.DataFrame(np.genfromtxt(f"{self.path}/fig2_main_lrg_pz_dndz_iron_v0.4_dz_0.01.txt"), columns=zcols)  # Spectroscopic distributions of four sub-sample photometric redshift bins
-        self.zs_df = (self.zdf.zmin+self.zdf.zmax).values/2  # define zs at center of bins
-
-    def get_beam(self):
-        self.require(['ACTDR'])
-        if self.ACTDR=='DR6': 
-            ACTDR6 = Coulton2024()
-            self.beam_ells, self.beam_data = ACTDR6.beam_ells, ACTDR6.beam_data
-        elif self.ACTDR=='DR5': 
-            self.require(['freq'])
-            ACTDR5 = Naess2020({'freq':self.freq})
-            self.beam_ells, self.beam_data = ACTDR5.beam_ells, ACTDR5.beam_data
-            self.resp_ells, self.resp_data = ACTDR5.resp_ells, ACTDR5.resp_data
-
-    def make_zdists(self, dz=None, zMin=None, zMax=None, **kwargs):
-        self.require(['zbin'])
-        zstr = f'bin_{self.zbin[-1]}' if self.zbin!='all' else 'all'
-        self.n_df = self.zdf[f'{zstr}_combined'].values /u.deg**2
-        self.dndz_df = self.n_df /(self.zs_df[1]-self.zs_df[0])/u.dex 
-        zmin = zMin if zMin is not None else self.zs_df.min()
-        zmax = zMax if zMax is not None else self.zs_df.max()
-        self.dz = dz if dz is not None else self.zs_df[1]-self.zs_df[0]
-        self.z = np.arange(zmin, zmax+self.dz, self.dz)
-        self.dndz = np.interp(self.z, self.zs_df, self.dndz_df)
-        
-        self.dNdz = self.dndz*(self.area)
-        self.n_z = self.dndz*self.dz*u.dex
-        self.N_z = self.dNdz*self.dz*u.dex
-
-    def get_dndlogm(self):
-        pass
-
-
-class Coulton2024(BaseData, Studies.Coulton2024):  # ACT DR6 ILC maps (Coulton 2024, arxiv.org/abs/2307.01258)
-    path = f"{datapath}/ACTDR6"  # Path to data downloaded from portal.nersc.gov/project/act/dr6_nilc/ymaps_20230220/
-    # NERSC_path = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220"  # path to data in NERSC
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        ybeamdf = pd.read_csv(f"{self.path}/ilc_beam.txt", sep=" ")
-        self.beam_ells, self.beam_data = ybeamdf['#'].values, ybeamdf['ell'].values
 
 
 
-class Gao2023(BaseData, Studies.Gao2023):  # DESI 1% LRGs and ELGs (Gao+ 2023, arxiv.org/abs/2306.06317)
+class Gao2023(BaseTargetData, Studies.Gao2023):  # DESI 1% LRGs and ELGs (Gao+ 2023, arxiv.org/abs/2306.06317)
     path = f"{datapath}/Gao2023"
     subs = {'sample':['LRG', 'ELG']}  # Galaxy Sample
 
@@ -319,7 +442,7 @@ class Gao2023(BaseData, Studies.Gao2023):  # DESI 1% LRGs and ELGs (Gao+ 2023, a
     #     return np.trapz(self.dndlogmstar(**cosmopars), self.logmstar)*self.volumes(**cosmopars)/(self.z[1]-self.z[0])
 
 
-class Kou2023(BaseData, Studies.Kou2023):
+class Kou2023(BaseTargetData, Studies.Kou2023):
     path = "/global/homes/c/cpopik/Data/Kou2023"  # path to data, taken from plots using webplotdigitizer
     subs = {'mbin':['M1', "M2", "M3", "M4"]}
 
@@ -330,7 +453,7 @@ class Kou2023(BaseData, Studies.Kou2023):
 
 
 
-class Zhou2023(BaseData, Studies.Zhou2023):  # DESI LS DR9 LRGs for Cross-correlation (Zhou+ 2023, arxiv.org/abs/2309.06443)
+class Zhou2023(BaseTargetData, Studies.Zhou2023):  # DESI LS DR9 LRGs for Cross-correlation (Zhou+ 2023, arxiv.org/abs/2309.06443)
     path = f"{datapath}/Zhou2023B"  # path to data from zenodo.org/records/8319955
     subs = {
         'zbin' : ['z1', 'z2', 'z3', 'z4'],  # photometric redshift bin
@@ -355,47 +478,9 @@ class Zhou2023(BaseData, Studies.Zhou2023):  # DESI LS DR9 LRGs for Cross-correl
         self.dNdz = self.dndz * (self.area*u.deg**2)
 
 
-class Kusiak2022(BaseData, Studies.Kusiak2022):  # HOD for unWISE galaxies and Planck lensing arxiv.org/abs/2203.12583
-    path = "/global/homes/c/cpopik/Data/Kusiak2022"  # path to data, taken from plots using webplotdigitizer
-    subs = {'sample':['Blue', 'Green', 'Red']}
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.require(['sample'])
-
-    def make_zdists(self, dz=None, zMin=None, zMax=None):
-        sampstr = {'Blue':0,'Green':1,'Red':2}[self.sample]
-        zs_df, dNdz_norm = np.loadtxt(f"{self.path}/normalised_dndz_cosmos_{sampstr}.txt").T  # load from digitized data
-        zmin = zMin if zMin is not None else self.zs_df.min()
-        zmax = zMax if zMax is not None else self.zs_df.max()
-        self.dz = dz if dz is not None else self.zs_df[1]-self.zs_df[0]
-        self.z = np.arange(zmin, zmax+self.dz, self.dz)
-        self.dNdz_norm = np.interp(self.zs, self.z, dNdz_norm)
-
-        # return self.zs, self.dNdz_norm
 
 
-
-class White2022(BaseData, Studies.White2022):  # DESI LS DR9 LRGs correlated with Planck CMB Lensing (White+ 2022, arxiv.org/abs/2111.09898)
-    path = f"{datapath}/White2022"  # Path to data from zenodo.org/records/5834378
-    subs = {'zbin' : ['z1', 'z2', 'z3', 'z4'], # photometric redshift subsmaple
-            }
-
-    def __init__(self, inputsdict, **inputvars):
-        self.setup(inputsdict | inputvars)
-
-        self.require(['zbin'])
-            
-        self.get_dNdz()
-
-    def make_dNdz(self):
-        self.z, self.nz = np.loadtxt(f"{self.path}/lrg_s0{self.zbin[-1]}_dndz.txt").T  # normalized redshift distribution [deg^{-2} dex^-1]
-        self.dz = self.z[1]-self.z[0]
-        self.dndz = self.nz/self.dz /u.deg**2/u.dex
-        self.dNdz = self.dndz*self.area
-
-
-class Amodeo2021(BaseData, Studies.Amodeo2021):  # Inference on BOSS DR10 stacked ACT DR5 (arxiv.org/abs/2009.05558)
+class Amodeo2021(BaseTargetData, Studies.Amodeo2021):  # Inference on BOSS DR10 stacked ACT DR5 (arxiv.org/abs/2009.05558)
     path = '/global/homes/c/cpopik/Data/Amodeo2021/'  # path to data, taken from plots using webplotdigitizer and various repos
     subs = {'prof': ['Amodeo', 'Battaglia', 'TNG'],
                 'units': ['cosmo', 'cgs']}
@@ -413,49 +498,9 @@ class Amodeo2021(BaseData, Studies.Amodeo2021):  # Inference on BOSS DR10 stacke
 
 
 
-class Schaan2021(BaseData, Studies.Schaan2021):  # ACT DR5 maps stacked on SDSS BOSS DR10 (Schaan+ 2021, arxiv.org/abs/2009.05557)
-    path = f"{datapath}/Schaan2021"  # path to data, shared by author
-    subs = {
-        'sample': ['cmass', 'lowz'],
-        'freq' : ['150', '090'],  # frequency band of obsevation [GHz]
-    }
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-            
-    def get_beam(self):
-        return Naess2020({'freq':self.freq}).get_beam()
-    
-    def get_resp(self):
-        return Naess2020({'freq':self.freq}).get_resp()
-    
-    def make_dNdz(self, **kwargs):
-        SDSSBOSS({'galaxy':self.sample.upper(), 'DR':'DR10', 'group':'portsmouth', 'template':'passive', 'IMF':'krou'})
 
 
-class Naess2020(BaseData, Studies.Naess2020):  # ACT DR5 (Naess 2020, arxiv.org/abs/2007.07290)
-    path = f"{datapath}/ACTDR5"  # Path to data downloaded from lambda.gsfc.nasa.gov/product/act/actpol_dr5_aux_prod_get.html
-    # NERSC_path = "/global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary"  # location of data in NERSC
-    
-    subs = {'freq': ['090', '150', '220']}
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        
-    def get_beam(self):
-        self.require(['freq'])
-        self.beamfile = f"{self.path}/beams/act_planck_dr5.01_s08s18_f{self.freq}_daynight_beam.txt"  # Map beams transfer function: ells, B
-        self.beam_ells, self.beam_data = np.genfromtxt(self.beamfile).T  # [ells, unitless]
-        return self.beam_ells, self.beam_data
-    
-    def get_resp(self):
-        self.require(['freq'])
-        self.respfile = f"{self.path}/responses/act_planck_dr5.01_s08s18_AA_f{self.freq}_daynight_response_tsz.txt"  # Map-averaged response to tSZ: ell, I, dI, Q, dQ, U, dU
-        self.resp_ells, self.resp_data = np.genfromtxt(self.respfile).T[0:2]  # [ells, uk/y]
-        return self.resp_ells, self.resp_data
-
-
-
-class SDSSBOSS(BaseData, Studies.Ahn2013Alam2015):  # (Ahn+ 2013, arxiv.org/abs/1307.7735, Alam+ 2015, https://arxiv.org/abs/1501.00963)
+class SDSSBOSS(BaseTargetData, Studies.Ahn2013Alam2015):  # (Ahn+ 2013, arxiv.org/abs/1307.7735, Alam+ 2015, https://arxiv.org/abs/1501.00963)
     path = '/global/cfs/projectdirs/sdss/data/sdss'   # Path of the data in NERSC
     if not os.path.isdir(path): # Path through a URL if not in NERSC
         path = 'https://data.sdss.org/sas/'
