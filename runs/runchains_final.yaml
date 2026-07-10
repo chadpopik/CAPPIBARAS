@@ -1,0 +1,85 @@
+shared:  # Aspects that are shared between all likelihoods
+    MapData: {name: 'Coulton2024', spefs: {}}
+    # MapData: {name: 'ACTDR6', spefs: {}}
+    HaloModel: {name: 'pyccl_model', spefs: {'MassDef':'200c', 'MassFunc':'Tinker08', 'HaloBias': 'Tinker10', 'PowSpec': 'Linear', 'Concentration':'Bhattacharya13'}}
+    Projection: {name: 'Popik2025', spefs: {}}
+    Profile: {name: 'Popik2026', spefs:{}, nr: 100}  # Profile model
+
+likelihood:
+    kSZ_RG25_z1:
+        class: SOLikelihoods.KSZLikelihood
+        Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_1'}}
+        TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_1'}, dz: 0.02, dlogM: 0.05}
+        HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z1'}}
+
+    # kSZ_RG25_z2:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_2'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_2'}, dz: 0.02, dlogM: 0.05}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z2'}}
+
+    # kSZ_RG25_z3:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_3'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_3'}, dz: 0.02, dlogM: 0.05}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z3'}}
+
+    # kSZ_RG25_z4:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_4'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_4'}, dz: 0.02, dlogM: 0.05}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z4'}}
+
+    # tSZ_L25_z1:
+    #     class: SOLikelihoods.TSZLikelihood
+    #     Measurement: {name: 'Liu2025', spefs: {'zbin':'z1', 'ACTDR': 'DR6', 'dp':'dBeta', 'Beta':'fiducial', 'TCIB':'10.7'}}
+    #     TargetData: {name: 'Liu2025', spefs: {'zbin':'z1'}, dz: 0.05, dlogM: 0.05, zMin: 0.2, zMax: 0.7}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z1'}}
+
+
+params:
+    # Cosmological, fixed
+    hh: {value: 0.7}
+    Omega_L: {value: 0.75}
+    Omega_m: {value: 0.25}
+    Omega_b: {value: 0.044}
+    T_CMB: {value: 2.725}
+    XH: {value: 0.76}
+    v_rms: {value: 1.06e-3}  # v_rms/c
+
+    # GNFW Amplitude
+    logrho0: {ref: 3, prior: {min: 0.5, max: 20}, latex: '\log \rho_0'}
+    # Outer slope
+    beta_k: {ref: 3.5, prior: {min: 1.5, max: 6}, latex: '\beta_k'}
+    # Intermediate slope
+    # alpha_k: {ref: 1, prior: {min: 0.2, max: 3}, latex: '\alpha_k'}
+    alpha_k: {value: 1}
+    # Core Radius
+    xc_k: {ref: 0.6, prior: {min: 0.1, max: 2}, latex: 'x_{c, k}'}
+    # Inner Slope
+    # gamma_k: {ref: -0.2, prior: {min: -1, max: 0}, latex: '\gamma_k'}
+    gamma_k: {value: -0.2}
+    # Two-halo Amplitude
+    A2h_k: {ref: 5, prior: {min: 0.01, max: 20}, latex: 'A_{2h, k}'}
+
+    # # GNFW Amplitude
+    # P0: {ref: 2, prior: {min: 0.5, max: 20}, latex: 'P_0'}
+    # # Outer slope
+    # beta_t: {ref: 3.5, prior: {min: 1.5, max: 6}, latex: '\beta_t'}
+    # # Two-halo Amplitude
+    # A2h_t: {ref: 5, prior: {min: 0.01, max: 20}, latex: 'A_{2h, t}'}
+
+
+sampler:
+    mcmc:
+        Rminus1_stop: 0.01
+        max_tries: 200d
+        output_every: 10s
+        learn_every: 40
+
+output: runs/Semifinal/testing_theory_3
+output_options: 
+  columns:
+    add_chain: True
+
+debug: False

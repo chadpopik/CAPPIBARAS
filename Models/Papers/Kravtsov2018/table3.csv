@@ -1,0 +1,9 @@
+﻿massdef,scatter,log10M1/Msol,log10eps,alpha,delta,gamma
+M200c,no scatter,11.39,-1.618,1.795,4.345,0.619
+M200c,with scatter,11.35,-1.642,1.779,4.394,0.547
+M500c,no scatter,11.32,-1.527,1.856,4.376,0.644
+M500c,with scatter,11.28,-1.556,1.835,4.437,0.567
+M200m,no scatter,11.45,-1.702,1.736,4.273,0.613
+M200m,with scatter,11.41,-1.72,1.727,4.305,0.544
+Mvir,no scatter,11.43,-1.663,1.75,4.29,0.595
+Mvir,with scatter,11.39,-1.685,1.74,4.335,0.531

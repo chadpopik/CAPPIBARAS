@@ -1,0 +1,7 @@
+Status: failed: Only one sampler currently supported at a time.
+Runtime: 143.70 seconds
+Runtime hours: 0.040
+---- SLURM timing ----
+Started: Thu Jul  9 12:07:19 PM PDT 2026
+Ended: Thu Jul  9 12:10:05 PM PDT 2026
+Wall time: 166 seconds

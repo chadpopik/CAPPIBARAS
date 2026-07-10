@@ -1,0 +1,2 @@
+#        weight    minuslogpost         logrho0          beta_k            xc_k           A2h_k   minuslogprior minuslogprior__0            chi2 chi2__kSZ_RG25_z1
+              1        11.99421       2.9557381       2.9200467      0.59570778       4.9918171       8.1115779        8.1115779       7.7652635         7.7652635

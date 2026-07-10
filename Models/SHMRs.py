@@ -4,9 +4,10 @@ Collection of Stellar Halo Mass Relations models and paramterizations for variou
 """
 
 import numpy as np
+import astropy.units as u
 import Models.Studies as Studies
 
-class BASESHMR:
+class BaseSHMR:
     # SHMR form from Behroozi 2013 (Behroozi+ 2013, arxiv.org/abs/1207.6105)
     def Behroozi(self, logMh, logM1, logeps, alpha, delta, gamma):
         Mh, M1, eps = 10**logMh, 10**logM1, 10**logeps
@@ -27,7 +28,8 @@ class BASESHMR:
         return lambda p={}: func(self.p0 | p)
 
 
-class Kravtsov2018(BASESHMR, Studies.Kravtsov2018):  # SDSS DR8 & G13 
+
+class Kravtsov2018(BaseSHMR, Studies.Kravtsov2018):  # SDSS DR8 & G13 
     models = {
             'model': ['B13', 'PL'],
             'type': ['BGC', 'sat', 'tot'],
@@ -82,7 +84,7 @@ class Kravtsov2018(BASESHMR, Studies.Kravtsov2018):  # SDSS DR8 & G13
     
 
 
-class Xu2023(BASESHMR, Studies.Xu2023):  # SDSS DR7 Main and SDSSIII BOSS DR12 LOWZ & CMASS (arxiv.org/abs/2211.02665)
+class Xu2023(BaseSHMR, Studies.Xu2023):  # SDSS DR7 Main and SDSSIII BOSS DR12 LOWZ & CMASS
     models = {'sample': ['Main', 'LOWZ', 'CMASS'],  # galaxy sample
             'form': ['BP13', 'DP'],  # form of SHMR
             }
@@ -123,7 +125,7 @@ class Xu2023(BASESHMR, Studies.Xu2023):  # SDSS DR7 Main and SDSSIII BOSS DR12 L
         return lambda p={}: func(self.p0 | p)
 
 
-class Gao2023(BASESHMR, Studies.Gao2023):  # DESI 1% (arxiv.org/abs/2306.06317)
+class Gao2023(BaseSHMR, Studies.Gao2023):  # DESI 1% (arxiv.org/abs/2306.06317)
     models = {'model':["Auto", "Cross", "Psat"],}
     params = {
         # best-fit SHMR parameters, Table 3
@@ -141,3 +143,17 @@ class Gao2023(BASESHMR, Studies.Gao2023):  # DESI 1% (arxiv.org/abs/2306.06317)
         func = lambda p: self.DoublePowerLaw(logMh-np.log10(self.h), logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
         return lambda p={}: func(self.p0 | p)
 
+
+
+class To2020(BaseSHMR, Studies.To2020):  # DES Y1 Clusters
+    models = {}
+    params = {
+        'alpha1': 14.351,
+        'alpha2': 1.058,
+    }
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+    
+    def RHMR(self, richness):
+        func = lambda p: 10**p['alpha1'] * (richness/40)**p['alpha2'] / self.h*u.Msun
+        return lambda p={}: func(self.p0 | p)

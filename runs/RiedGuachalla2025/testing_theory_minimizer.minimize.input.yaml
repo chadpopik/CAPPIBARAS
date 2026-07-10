@@ -1,0 +1,81 @@
+likelihood:
+  tSZ_ILC:
+    class: SOLikelihoods.TSZLikelihood
+    MapData:
+      name: Coulton2024
+      spefs: {}
+params:
+  hh:
+    value: 0.7
+  Omega_L:
+    value: 0.75
+  Omega_m:
+    value: 0.25
+  Omega_b:
+    value: 0.044
+  T_CMB:
+    value: 2.725
+  XH:
+    value: 0.76
+  v_rms:
+    value: 0.00106
+  P0:
+    ref: 2
+    prior:
+      min: 0.5
+      max: 20
+    latex: P_0
+  beta_t:
+    ref: 3.5
+    prior:
+      min: 1.5
+      max: 6
+    latex: \beta_t
+  A2h_t:
+    ref: 5
+    prior:
+      min: 0.01
+      max: 20
+    latex: A_{2h, t}
+sampler:
+  minimize: null
+shared:
+  HaloModel:
+    name: pyccl_model
+    spefs:
+      MassDef: 200c
+      MassFunc: Tinker08
+      HaloBias: Tinker10
+      PowSpec: Linear
+      Concentration: Bhattacharya13
+  Projection:
+    name: Popik2025
+    spefs: {}
+  Profile:
+    name: Popik2026
+    spefs: {}
+    nr: 100
+  Measurement:
+    name: Moore2026
+    spefs:
+      sample: opt
+      prof: ilc_cib_deproj
+      bin: '20'
+      radio: 2p4
+  TargetData:
+    name: Moore2026
+    spefs:
+      sample: optical
+      bin: L20
+      radio: '2.4'
+    dz: 0.05
+    dlogM: 0.1
+  HOD:
+    name: Hadzhiyska2025B
+    spefs:
+      mbin: M6
+output: testing_theory_minimizer
+output_options:
+  columns:
+    add_chain: true
+minimize: true

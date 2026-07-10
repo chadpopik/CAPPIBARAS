@@ -7,18 +7,21 @@
 import numpy as np
 import scipy.fft
 
+
 # Very fast FFT in mcfit
+# TODO 1: test for forward/backward equivalency in FFT, maybe pad?
+
 class mcfit_package:  # TODO 1:
     def __init__(self, rs=None, ks=None):
         import mcfit
         self.mcfit = mcfit
-                
+
         if rs is not None:
-            self.FFTraw= lambda funcx: self.mcfit.xi2P(rs)(funcx)[1]
+            self.FFTraw = lambda funcx: self.mcfit.xi2P(rs)(funcx)[1]
             self.ks = self.mcfit.xi2P(rs)(rs)[0]
             self.IFFTraw = lambda funck: self.mcfit.P2xi(self.ks)(funck)[1]
             self.rs_rev = self.mcfit.P2xi(self.ks)(self.ks)[0]
-        
+
         elif ks is not None:
             self.IFFTraw = lambda funck: self.mcfit.P2xi(ks)(funck)[1]
             self.rs = self.mcfit.P2xi(ks)(ks)[0]

@@ -29,70 +29,80 @@ class BaseProjection:
         factor = (c.sigma_T/c.m_e/c.c**2).cgs.value * (2+2*XH)/(3+5*XH) *(u.Mpc*u.sr).to(u.cm*u.arcmin**2)
         return lambda prof_r: self.aperture_photometry(*self.beam_convolve(prof_r, self.beamTF)) *factor
 
+    # def rho_to_uK(self, XH=0.76, v_rms=1.06e-3, T_CMB=2.725, **kwargs):
+    #     factor = v_rms * (c.sigma_T/c.m_p).cgs.value * (1+XH)/2 * T_CMB*1e6 *(u.Mpc).to(u.cm)
+    #     return lambda prof_r: self.aperture_photometry(*self.beam_convolve(prof_r, self.beamTF)) *factor
+    
     def rho_to_uK(self, XH=0.76, v_rms=1.06e-3, T_CMB=2.725, **kwargs):
-        factor = v_rms * (c.sigma_T/c.m_p).cgs.value * (1+XH)/2 * T_CMB*1e6 *(u.Mpc*u.sr).to(u.cm*u.arcmin**2)
-        return lambda prof_r: self.aperture_photometry(*self.beam_convolve(prof_r, self.beamTF)) *factor
+        factor = v_rms * (c.sigma_T/c.m_p).cgs * (1+XH)/2 * T_CMB*u.uK*1e6 * u.cm.to(u.Mpc)**2 * u.Mpc**2/u.cm**2 * u.g/u.Msun * u.Msun.to(u.g)
+        return lambda prof_r: prof_r * factor
 
-        
+
 
 class Popik2025(BaseProjection):
     info = {}
 
-    def __init__(self, Rs, AngDist, b_ell, bTF, r_ell=None, rTF=None, 
-                 r_min=1e-3, r_max=10,  # line of sight range, Mpc
-                 f_disc = np.sqrt(2),  # radius of outer ring in CAP
-                 N_r=100, N_LOS=200, N_RRHT=350, N_RCAP=500,  # Various resolution values
+    def __init__(self, 
+                 Rs,  # values of R of measurement [arcmin]
+                 AngDist,  # Mean Angular distance to halos [Mpc]
+                 N_LOS=200,  # Resolution number of line of sight integral
+                 N_RRHT=350,  # Resolution number of angular size
                  pad=100,  # number of points padded on sides of FHT ell/R range to help accuracy
                  **kwargs):
-        lmin, lmax = np.floor(AngDist/r_max), np.ceil(AngDist/r_min)  # ell range of the FHT, based on r range
-        self.rht = FFTs.RadialFourierTransformHankel(lrange=[lmin, lmax], n=N_RRHT, pad=pad)  # Setup FHT
 
-        self.beamTF = np.interp(self.rht.ell, b_ell, bTF)  # Load beam profile
-        if r_ell is not None and rTF is not None:  # If resp is given, load
-            self.beamrespTF = self.beamTF*np.interp(self.rht.ell, r_ell, rTF)
+        self.Rs = Rs
 
-        # Setup for line of sight integral
-        self.los = np.geomspace(r_min, r_max, N_LOS)  # line of sight to integrate over
-        self.rint = np.sqrt(self.los**2 + (self.rht.r[:,None])**2*AngDist**2)  # r values for LOS integration
-        self.rs = np.geomspace(np.min(self.rint), np.max(self.rint), N_r)  # r values for profile defined by limits of rints
+        # Radial profile limits defined by measurement extent and beam smooth
+        # TODO: these shouldn't be fixed, determine from measurement
+        # Something like max measurements R * beam smoothing * disc_fac * dA(z)
+        r_min = 1e-3*u.Mpc 
+        r_max = 10*u.Mpc
 
+        # Line of sight distance logspaced array of length N_LOS
+        self.dLOS = np.geomspace(r_min, r_max, N_LOS)
+
+        # FHT setup, defines angular scale (ell/R) logspaced array of length N_RRHT 
+        self.rht = FFTs.RadialFourierTransformHankel(lrange=[np.floor(AngDist/r_max), np.ceil(AngDist/r_min)], n=N_RRHT, pad=pad)
+
+        # Radial distance from the profile center as a function of line of sight and angular offset
+        self.r3D = np.sqrt(self.dLOS**2 + (self.rht.r[:,None])**2*AngDist**2)  # r values for LOS integration
+
+    def proj2D(self, rs):  # takes in function of R
+        return lambda prof3D: 2*np.trapz(np.interp(self.r3D, rs, prof3D, left=0, right=0), x=self.dLOS)  # Integrate over line of sight
+
+    # Function for convolving a beam/response with a 2D projected profile
+    def beam_convolve(self, b_ell=None, bTF=None, r_ell=None, rTF=None, **kwargs):
+        # Load beam profile and response (if given), and interpolate to RHT ells
+        self.beamTF = np.interp(self.rht.ell, b_ell, bTF)
+        if r_ell is not None and rTF is not None:
+            self.beamTF = self.beamTF*np.interp(self.rht.ell, r_ell, rTF)
+
+        def convolve(prof2d):
+            prof_ell_beam = self.rht.real2harm(prof2d)*self.beamTF  # Transform to harmonic space and convolve with beam
+            r_unpad, prof2D_beam = self.rht.unpad(self.rht.r, self.rht.harm2real(prof_ell_beam))  # Transform back and unpad
+            return (r_unpad.flatten()*u.rad).to(u.arcmin), prof2D_beam.flatten()*prof2d.unit
+
+        return lambda prof2D: convolve(prof2D)
+
+    def aperture_photometry(self, f_disc=np.sqrt(2), N_RCAP=500, **kwargs):
         # Setup for CAP
-        self.Rs_CAP = np.array([np.linspace(0, np.radians(R/60), N_RCAP+1)[1:] for R in Rs])  # values of R for circles
-        self.infac_CAP = 2*np.pi*np.radians(Rs/60)[:, None]/N_RCAP *self.Rs_CAP  # prefactor for sum
-        self.Rs_CAP2 = np.array([np.linspace(0, f_disc*np.radians(R/60), N_RCAP+1)[1:] for R in Rs])  # values of R for outer disc
-        self.infac_CAP2 = 2*np.pi*f_disc*np.radians(Rs/60)[:, None]/N_RCAP *self.Rs_CAP2  # prefactor for sum, outer disc
+        self.Rs_CAP = np.array([np.linspace(0, R, N_RCAP+1)[1:] for R in self.Rs])*u.arcmin  # values of R for circles
+        self.Rs_CAP2 = np.array([np.linspace(0, f_disc*R, N_RCAP+1)[1:] for R in self.Rs])*u.arcmin  # values of R for outer disc
+        self.infac_CAP = 2*np.pi*self.Rs[:, None]/N_RCAP *self.Rs_CAP  # prefactor for sum
+        self.infac_CAP2 = 2*np.pi*f_disc*self.Rs[:, None]/N_RCAP *self.Rs_CAP2  # prefactor for sum, outer disc
+        
+        def CAP(Rsprof, prof2D_beam):
+            sig = np.sum(self.infac_CAP * np.interp(self.Rs_CAP, Rsprof, prof2D_beam, right=0), axis=1)  # normal circle
+            sig2 = np.sum(self.infac_CAP2 * np.interp(self.Rs_CAP2, Rsprof, prof2D_beam, right=0), axis=1)  # outer disc
+            return (2*sig - sig2)
 
-
-    def HODweighting(self, Nc, Ns, uck, usk, logM, zs, ks, onevalue=False, **kwargs):
-        dndlogm = self.dndlogm(zs[:, None], logM)  # calculate halo mass function
-        infac = dndlogm*self.dNdz[:, None]  # combined mass/z distributions
-
-        ngal = lambda p: np.trapz((Nc(p)+Ns(p))*dndlogm, logM)  # total galaxy number
-        Hg = lambda p: (Nc(p)*uck(p) + Ns(p)*usk(p))/ngal(p)[:, None]  # HOD cross-spectra function
-        Hg_norm = lambda p: Hg(p)/np.trapz(np.trapz(Hg(p)*infac, logM), zs)[:, None, None]  # normalized galaxy distribution
-        intfac0 = Hg_norm({})*infac  # combine default HOD galaxy dist into integrand factor
-        intfac = lambda p: Hg_norm()*infac if p!={} else intfac0  # recalculate integrand factor if HOD galaxy dist is being fit
-
-        if onevalue:
-            return lambda val, p={}: np.trapz(np.trapz(val*intfac(p), logM), zs)  # take mass/redshift average
-
-        fft = FFTs.mcfit_package(ks=ks)
-        FFT3D, IFFT1D = fft.FFT3D, fft.IFFT1D
-
-        aveprof = lambda prof, p: np.trapz(np.trapz(FFT3D(prof)*intfac(p), logM), zs)  # take mass/redshift average
-        return lambda prof, p={}: IFFT1D(aveprof(prof, p))
-
-    def beam_convolve(self, prof_r, beam, **kwargs):
-        prof_int = np.interp(self.rint, self.rs, prof_r, right=0, left=0)  # interpret to integration rs
-        prof_proj = 2*np.trapz(prof_int, x=self.los)  # Integrate over line of sight
-        prof_ell_beam = self.rht.real2harm(prof_proj)*beam  # Transform to harmonic space and convolve with beam
-        r_unpad, prof2D_beam = self.rht.unpad(self.rht.r, self.rht.harm2real(prof_ell_beam))  # Transform back and unpad
-        return r_unpad.flatten(), prof2D_beam.flatten()
-
-    def aperture_photometry(self, Rsprof, prof2D_beam, **kwargs):
-        sig = np.sum(self.infac_CAP * np.interp(self.Rs_CAP, Rsprof, prof2D_beam, right=0), axis=1)  # normal circle
-        sig2 = np.sum(self.infac_CAP * np.interp(self.Rs_CAP2, Rsprof, prof2D_beam, right=0), axis=1)  # outer disc
-        return (2*sig - sig2)
+        return lambda Rsprof, prof2D_beam: CAP(Rsprof, prof2D_beam)
+    
+    def prof_to_signal(self, prof3D, rs):
+        prof2D = self.proj2D(rs)(prof3D)  # project to 2D
+        r_unpad, prof2D_beam = self.beam_convolve(prof2D)  # convolve with beam and response
+        aper = self.aperture_photometry()
+        return self.aperture_photometry()(r_unpad, prof2D_beam)  # aperture photometry  
 
 
 
@@ -119,7 +129,7 @@ class Moser2023(BaseProjection):  # https://arxiv.org/abs/2307.10919
         self.rs = np.geomspace(np.min(self.rint), np.max(self.rint), 100)  # r values for profile defined by limits of rints
         # self.rs = np.geomspace(np.radians(np.min(Rs)/60)*AngDist**2, np.radians(np.max(Rs)/60)*AngDist**2*disc_fac, 100)
         self.Rs = Rs
-        
+   
     def proj2D(self, prof_r):  # project along line of sight
         prof_int = interp1d(self.rs, prof_r, bounds_error=False, fill_value=0.0)(self.rint)  # interpret to integration rs
         prof_proj = 2*np.trapz(prof_int, x=self.los)  # Integrate over line of sight

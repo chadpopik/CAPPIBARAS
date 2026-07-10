@@ -1,0 +1,80 @@
+likelihood:
+  kSZ_RG25_z1:
+    class: SOLikelihoods.KSZLikelihood
+    Measurement:
+      name: RiedGuachalla2025
+      spefs:
+        bin: z_1
+    TargetData:
+      name: RiedGuachalla2025
+      spefs:
+        bin: z_1
+      dz: 0.01
+      dlogM: 0.05
+    HOD:
+      name: Yuan2023
+      spefs:
+        model: Base
+        sample: LRG1
+params:
+  hh:
+    value: 0.7
+  Omega_L:
+    value: 0.75
+  Omega_m:
+    value: 0.25
+  Omega_b:
+    value: 0.044
+  T_CMB:
+    value: 2.725
+  XH:
+    value: 0.76
+  v_rms:
+    value: 0.00106
+  logrho0:
+    ref: 1
+    prior:
+      min: 1
+      max: 5
+    latex: \log\rho_0
+  beta_k:
+    ref: 2.9
+    prior:
+      min: 1
+      max: 10
+    latex: \beta_k
+  A2h_t:
+    ref: 1
+    prior:
+      min: 0.5
+      max: 10
+    latex: A_{2h, t}
+sampler:
+  mcmc:
+    Rminus1_stop: 0.01
+    max_tries: 200d
+    output_every: 10s
+shared:
+  MapData:
+    name: Coulton2024
+    spefs: {}
+  HaloModel:
+    name: pyccl_model
+    spefs:
+      MassDef: 200c
+      MassFunc: Tinker08
+      HaloBias: Tinker10
+      PowSpec: Linear
+      Concentration: Bhattacharya13
+  Projection:
+    name: Popik2025
+    spefs: {}
+  Profile:
+    name: Amodeo2021
+    spefs:
+      model: GNFW
+    nr: 50
+output: testing_theory
+output_options:
+  columns:
+    add_chain: true

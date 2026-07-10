@@ -1,0 +1,115 @@
+shared:  # Aspects that are shared between all likelihoods
+    MapData: {name: 'Coulton2024', spefs: {}}
+    HaloModel: {name: 'pyccl_model', spefs: {'MassDef':'200c', 'MassFunc':'Tinker08', 'HaloBias': 'Tinker10', 'PowSpec': 'Linear', 'Concentration':'Bhattacharya13'}}
+    Projection: {name: 'Popik2025', spefs: {}}
+    Profile: {name: 'Popik2026', spefs:{}, nr: 100}  # Profile model
+
+
+likelihood:
+    tSZ_M26_LRG_L35:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Moore2026', spefs: {'sample':'lrg', 'prof':'ilc_CIB_deproj', 'bin':'L35'}}
+        TargetData: {name: 'Moore2026', spefs: {'sample':'LRG', 'masstype':'M200c', 'bin':'L36'}, dz: 0.05, dlogM: 0.1}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+    tSZ_M26_LRG_L47:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Moore2026', spefs: {'sample':'lrg', 'prof':'ilc_CIB_deproj', 'bin':'L47'}}
+        TargetData: {name: 'Moore2026', spefs: {'sample':'LRG', 'masstype':'M200c', 'bin':'L48'}, dz: 0.05, dlogM: 0.1}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+    tSZ_M26_LRG_L59:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Moore2026', spefs: {'sample':'lrg', 'prof':'ilc_CIB_deproj', 'bin':'L59'}}
+        TargetData: {name: 'Moore2026', spefs: {'sample':'LRG', 'masstype':'M200c', 'bin':'L60'}, dz: 0.05, dlogM: 0.1}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+    tSZ_M26_LRG_L78:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Moore2026', spefs: {'sample':'lrg', 'prof':'ilc_CIB_deproj', 'bin':'L78'}}
+        TargetData: {name: 'Moore2026', spefs: {'sample':'LRG', 'masstype':'M200c', 'bin':'L79'}, dz: 0.05, dlogM: 0.1}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+    tSZ_M26_LRG_L98:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Moore2026', spefs: {'sample':'lrg', 'prof':'ilc_CIB_deproj', 'bin':'L98'}}
+        TargetData: {name: 'Moore2026', spefs: {'sample':'LRG', 'masstype':'M200c', 'bin':'L98'}, dz: 0.05, dlogM: 0.1}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+
+    # kSZ_RG25_z1:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_1'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_1'}, dz: 0.01, dlogM: 0.05}
+    #     HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+    # tSZ_L25_z1:
+    #     class: SOLikelihoods.TSZLikelihood
+    #     Measurement: {name: 'Liu2025', spefs: {'zbin':'z1', 'ACTDR':'DR6', 'dp':'beta', 'Beta':'1.2', 'TCIB':'10.7'}}
+    #     TargetData: {name: 'Liu2025', spefs: {'zbin':'z1'}, dz: 0.01, dlogM: 0.1}
+    #     HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+    # tSZ_M26_BGS:
+    #     class: SOLikelihoods.TSZLikelihood
+    #     Measurement: {name: 'Moore2026', spefs: {'sample':'bgs', 'prof':'ilc', 'bin':'10.5'}}
+    #     TargetData: {name: 'Moore2026', spefs: {'sample':'BGS', 'bin':'M105'}, dz: 0.05, dlogM: 0.1}
+    #     HOD: {name: 'Hadzhiyska2025B', spefs: {'model': 'M3'}}
+
+    # tSZ_M26_opt:
+    #     class: SOLikelihoods.TSZLikelihood
+    #     Measurement: {name: 'Moore2026', spefs: {'sample':'bgs', 'deproj':'_ILC', 'Lbin':'10.50'}}
+    #     TargetData: {name: 'Moore2026', spefs: {'sample':'BGS', 'bin':'M105'}, dz: 0.05, dlogM: 0.1}
+    #     HOD: {name: 'Hadzhiyska2025B', spefs: {'model': 'M3'}}
+
+    # kSZ_RG25_z2:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_2'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_2'}, dz: 0.01, dlogM: 0.05}
+    #     HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+    # kSZ_RG25_z3:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_3'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_3'}, dz: 0.01, dlogM: 0.05}
+    #     HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+    # kSZ_RG25_z4:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_4'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_4'}, dz: 0.01, dlogM: 0.05}
+    #     HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+
+
+
+params:
+    # Cosmological, fixed
+    hh: {value: 0.7}
+    Omega_L: {value: 0.75}
+    Omega_m: {value: 0.25}
+    Omega_b: {value: 0.044}
+    T_CMB: {value: 2.725}
+    XH: {value: 0.76}
+    v_rms: {value: 1.06e-3}  # v_rms/c
+
+    # GNFW Amplitude
+    P0: {ref: 2, prior: {min: 0.5, max: 5}, latex: 'P_0'}
+    # Outer slope
+    beta_t: {ref: 2.6, prior: {min: 2, max: 4.5}, latex: '\beta_t'}
+    # Two-halo Amplitude
+    A2h_t: {ref: 1, prior: {min: 0.1, max: 5}, latex: 'A_{2h, t}'}
+
+
+sampler:
+    mcmc:
+        Rminus1_stop: 0.01
+        max_tries: 200d
+        output_every: 10s
+    #minimize:
+    #  ignore_prior: True
+
+output: chains/RiedGuachalla2025/testing_theory
+output_options: 
+  columns:
+    add_chain: True
+
+debug: False

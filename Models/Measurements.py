@@ -1,6 +1,5 @@
 """
 Data from studies
-
 """
 
 import os
@@ -15,10 +14,9 @@ import h5py, json, tarfile
 
 import Models.Studies as Studies
 import Models.HaloModels as HaloModels
-import Models.SHMRs as SHMRs
 
 
-datapath = "/global/homes/c/cpopik/CAPPIBARAS/Data"  # path to data
+datapath = "/global/homes/c/cpopik/Data"  # path to data
 
 
 class BaseMeasurement:
@@ -35,7 +33,7 @@ class BaseMeasurement:
 # class Maus2025:  # TODO: In progress DESI DR1 Galaxies correlated with Planck PR4&ACT DR6 Lensing (Maus+ 2025, arxiv.org/abs/2505.20656)
 #     path = f"{datapath}/Maus2025"  # Path to data from zenodo.org/records/17636841
 
-class Popik2025(BaseMeasurement, Studies.Popik2025):  # TODO: In progress
+class Popik2026(BaseMeasurement, Studies.Popik2026):  # TODO: In progress
     path = f"/global/homes/c/cpopik/Stacking_Correlating/Results"
     subs = {
     'zbin': ['z1', 'z2', 'z3', 'z4'],
@@ -75,6 +73,109 @@ class Popik2025(BaseMeasurement, Studies.Popik2025):  # TODO: In progress
 
 
 
+
+class Moore2026(BaseMeasurement, Studies.Moore2026):
+    path = f"{datapath}/Moore2026"
+    # subs = {'sample': ['BGS', 'LRG_deprojected', 'optical', 'LRG_raw'], # Boryana BGS sample, Yun-Hsuin's optical sample, LRG
+    #         'deproj': ['_f090', '_f150', '_ILC', '_ILC_CIB_deproj', '_ILC_dB_deproj'], # deprojection method
+    #         'richbin': ['all', '10', '20'], # richness bin, only for optical
+    #         'mbin': ['10.00', '10.25', '10.50', '10.75', '11.00', '11.25'], # stellar mass bin for BGS sample
+    #         'Lbin': ['L36', 'L48', 'L60', 'L79', 'L98', 'L36D', 'L48D', 'L60D', 'L79D'], # luminosity bin, just for LRGs, cumulative and disjoint
+    #         }
+    
+    subs = {'sample': ['bgs', 'opt', 'lrg'],
+            'prof': ['fiducial_ilc','ilc_CIB_deproj', 'ilc_cib_deproj', 'ilc_dB_deproj', 'f090_raw', 'f150_raw', 'f090_corrected', 'f150_corrected', 'f220_raw', 'f090', 'f150'],
+            'bin': ['L35', 'L47', 'L59', 'L78', 'L98', 'L35D', 'L47D', 'L59D', 'L78D', '10.0', '10.25', '10.5', '10.75', '11.0', '11.25', 'all', '10', '20', 'L36', 'L48', 'L60', 'L79', 'L98', 'L36D', 'L48D', 'L60D', 'L79D'], # luminosity bin, just for LRGs, cumulative and disjoint
+            'radio': ['1', '2p7', '2p1','incl', '2p4']
+            }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+        
+        self.get_data()
+        
+    def get_data(self):
+        self.require(['sample', 'prof', 'bin'])
+        
+        if self.radio!='incl':
+            if self.prof in ['fiducial_ilc', 'ilc_cib_deproj', 'ilc_dB_deproj', 'f090', 'f150']:
+                datadf = pd.read_csv(f"{self.path}/for_chad_20260519/{self.sample}_{self.prof}_profiles_yarcmin2_radio_clean_{self.radio}arcmin.csv")
+            else:
+                datadf = pd.read_csv(f"{self.path}/for_chad_20260519/{self.sample}_{self.prof}_profiles_radio_clean_{self.radio}arcmin.csv")
+        else:
+            if self.prof in ['fiducial_ilc', 'ilc_CIB_deproj', 'ilc_dB_deproj', 'f090', 'f150']:
+                datadf = pd.read_csv(f"{self.path}/profiles/{self.sample}_{self.prof}_profiles_yarcmin2.csv")
+            else:
+                datadf = pd.read_csv(f"{self.path}/profiles/{self.sample}_{self.prof}_profiles.csv")
+
+        rvals = np.unique([col.split('_')[1] for col in datadf.columns[1:]])
+        self.R = np.array([np.float64(rval.replace("p", ".")) for rval in rvals]) *u.arcmin
+        if self.prof in ['fiducial_ilc', 'ilc_CIB_deproj', 'ilc_dB_deproj', 'f090', 'f150', 'ilc_cib_deproj']: areafac = u.arcmin**2
+        else: areafac = np.pi*self.R**2
+        
+        data, err={},{}
+        for i,dfbin in enumerate(datadf.iloc[:,0]):
+            data[f'{dfbin}']= np.array([datadf[f'dT_{rval}_arcmin'][i] for rval in rvals])*areafac
+            err[f'{dfbin}']= np.array([datadf[f'dT_{rval}_arcmin_err'][i] for rval in rvals])*areafac
+            
+        if self.prof in ['fiducial_ilc', 'ilc_CIB_deproj', 'ilc_dB_deproj', 'f090', 'f150', 'ilc_cib_deproj']: self.tSZ_data, self.tSZ_err = data[self.bin], err[self.bin]
+        else: self.tSZ_data, self.tSZ_err = data[self.bin] *u.uK, err[self.bin] *u.uK
+        
+        self.tSZ_cov = np.diag(self.tSZ_err**2)
+        
+        if '090' in self.prof: self.freq = 90*u.GHz
+        elif '150' in self.prof: self.freq = 150*u.GHz
+        elif '220' in self.prof: self.freq = 220*u.GHz
+        else: pass
+
+        
+            
+        
+
+        
+    # def datatest(self):
+    #     self.require(['sample', 'deproj'])
+    #     file = pd.read_csv(f'{self.path}/{self.sample}_AP_results.csv')
+    #     self.file=file
+
+    #     # these are all aperture AVERAGED measurements, so to get them in arcmin^2 units multiple by piR^2
+        
+    #     if self.sample=='LRG_raw':
+    #         self.require(['Lbin'])
+    #         if self.deproj=='':
+    #             self.require(['freq'])
+    #             self.tSZ_data = file[file.iloc[:, 0]==self.Lbin]['dy'+self.freq].values
+    #             self.tSZ_err = file[file.iloc[:, 0]==self.Lbin]['dyerr'+self.freq].values
+    #         else:
+    #             self.tSZ_data = file[file.iloc[:, 0]==self.Lbin]['dy'+self.deproj].values *u.uK
+    #             self.tSZ_err = file[file.iloc[:, 0]==self.Lbin]['dyerr'+self.deproj].values *u.uK
+    #         self.R = np.array([2.1])*u.arcmin
+        
+    #     elif self.sample=='LRG_deprojected':
+    #         self.require(['Lbin'])
+    #         if self.deproj=='':
+    #             self.require(['freq'])
+    #             self.tSZ_data = file[file.iloc[:, 0]==self.Lbin]['dy'+self.freq].values
+    #             self.tSZ_err = file[file.iloc[:, 0]==self.Lbin]['dyerr'+self.freq].values
+    #         else:
+    #             self.tSZ_data = file[file.iloc[:, 0]==self.Lbin]['dy'+self.deproj].values
+    #             self.tSZ_err = file[file.iloc[:, 0]==self.Lbin]['dyerr'+self.deproj].values
+    #         self.R = np.array([2.1])*u.arcmin
+    #     elif self.sample=='BGS':
+    #         self.require(['mbin'])
+    #         self.tSZ_data = file[file.iloc[:, 0]==np.float64(self.mbin)]['dy'+self.deproj].values
+    #         self.tSZ_err = file[file.iloc[:, 0]==np.float64(self.mbin)]['dyerr'+self.deproj].values
+    #         self.R = np.array([2.7]) *u.arcmin
+    #     elif self.sample=='optical':
+    #         self.require(['richbin'])
+    #         self.tSZ_data = file[file.iloc[:, 0]==self.richbin]['dy'+self.deproj].values
+    #         self.tSZ_err = file[file.iloc[:, 0]==self.richbin]['dyerr'+self.deproj].values
+    #         self.R = np.array([2.1]) *u.arcmin
+            
+    #     self.tSZ_cov = np.array([self.tSZ_err]) *self.tSZ_err.unit
+
+
+
 class RiedGuachalla2025(BaseMeasurement, Studies.RiedGuachalla2025):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs (arxiv.org/abs/2503.19870)
     path = f"{datapath}/RiedGuachalla2025"  # Path to data downloaded from zenodo.org/records/15081008
     subs = {
@@ -90,19 +191,21 @@ class RiedGuachalla2025(BaseMeasurement, Studies.RiedGuachalla2025):  # Stacked 
     def get_meas(self):
         # TODO: Add more of the plots as options
         
-        TkSZ_fid = dict(np.load(f"{self.path}/fig8_fiducial.npz")) # The measured stacked kSZ in μK arcmin2 for varying CAP filters with radius R
-        TkSZ_zbins = dict(np.load(f"{self.path}/fig11_ksz_z.npz"))  # Mean stacked kSZ profiles for the different redshift bins
-        TkSZ_mbins = dict(np.load(f"{self.path}/fig12_ksz_mass.npz"))  # kSZ stacked profiles for the different stellar mass bins, denoted by mass
+        kSZ_fid = dict(np.load(f"{self.path}/fig8_fiducial.npz")) # The measured stacked kSZ in μK arcmin2 for varying CAP filters with radius R
+        kSZ_zbins = dict(np.load(f"{self.path}/fig11_ksz_z.npz"))  # Mean stacked kSZ profiles for the different redshift bins
+        kSZ_mbins = dict(np.load(f"{self.path}/fig12_ksz_mass.npz"))  # kSZ stacked profiles for the different stellar mass bins, denoted by mass
 
         if self.bin=='all':
-            self.R, self.TkSZ_data, self.TkSZ_err = TkSZ_fid['R'] *u.arcmin, TkSZ_fid['DESIxACT'] *u.uK*u.arcmin**2, TkSZ_fid['errors_DESIxACT'] *u.uK*u.arcmin**2
+            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_fid['R'] *u.arcmin, kSZ_fid['DESIxACT'] *u.uK*u.arcmin**2, kSZ_fid['errors_DESIxACT'] *u.uK*u.arcmin**2
 
         elif self.bin[0]=='z':
-            self.R, self.TkSZ_data, self.TkSZ_err = TkSZ_zbins['R'] *u.arcmin, TkSZ_zbins[f'{self.bin}'] *u.uK*u.arcmin**2, TkSZ_zbins[f'{self.bin}_error'] *u.uK*u.arcmin**2
+            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_zbins['R'] *u.arcmin, kSZ_zbins[f'{self.bin}'] *u.uK*u.arcmin**2, kSZ_zbins[f'{self.bin}_error'] *u.uK*u.arcmin**2
 
         elif self.bin[0]=='m':
-            self.R, self.TkSZ_data, self.TkSZ_err = TkSZ_mbins['R'] *u.arcmin, TkSZ_mbins[f'{self.bin}'] *u.uK*u.arcmin**2, TkSZ_mbins[f'{self.bin}_error'] *u.uK*u.arcmin**2
+            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_mbins['R'] *u.arcmin, kSZ_mbins[f'{self.bin}'] *u.uK*u.arcmin**2, kSZ_mbins[f'{self.bin}_error'] *u.uK*u.arcmin**2
 
+        self.cormat = dict(np.load(f"{self.path}/fig18_cor.npz"))['cor']
+        self.TkSZ_cov = np.diag(self.TkSZ_err) @ self.cormat @ np.diag(self.TkSZ_err)
   
 
 
@@ -123,18 +226,18 @@ class Hadzhiyska2025(BaseMeasurement, Studies.Hadzhiyska2025):  # Stacked kSZ me
 
         simsload = np.load(f"{self.path}/Fig2_sim.npz")  # Stacked kSZ signal of Main sample, all z bins, and from TNG and Illustris models
         self.R = simsload['theta_arcmins'] *u.arcmin
-        self.Tksz_Illustris1 = simsload['gas_illustris'] *u.uK*u.arcmin**2
-        self.Tksz_TNG300 = simsload['dm_tng']  *u.uK*u.arcmin**2
-        self.Tksz = simsload['signal']  *u.uK*u.arcmin**2
+        self.kSZ_Illustris1 = simsload['gas_illustris'] *u.uK*u.arcmin**2
+        self.kSZ_TNG300 = simsload['dm_tng']  *u.uK*u.arcmin**2
+        self.kSZ = simsload['signal']  *u.uK*u.arcmin**2
 
         samplestr = {'main': '', 'extended': 'extended_', 'all': ''}[self.sample]
         corrstr = {'corrected':'corr', 'uncorrected':''}[self.corr]
         zstr = {'nocut': '', 'cut': 'sigmaz0.05000_'}[self.zoutcut]
         filename = f"{self.path}/Fig1_Fig8_{samplestr}dr10_allfoot_perbin_{zstr}dr6_{corrstr}pzbin{self.zbin[-1]}.npz"
 
-        self.TkSZ_data = np.load(filename)['prof'] *u.uK*u.arcmin**2
-        self.TkSZ_cov = np.load(filename)['cov'] *(u.uK*u.arcmin**2)**2
-        self.TkSZ_err = np.diag(self.TkSZ_cov)**0.5
+        self.kSZ_data = np.load(filename)['prof'] *u.uK*u.arcmin**2
+        self.kSZ_cov = np.load(filename)['cov'] *(u.uK*u.arcmin**2)**2
+        self.kSZ_err = np.diag(self.kSZ_cov)**0.5
 
 
 class Liu2025(BaseMeasurement, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked on DESI LS DR9 LRGs (Liu+ 2025, arxiv.org/abs/2502.08850)
@@ -158,11 +261,11 @@ class Liu2025(BaseMeasurement, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked 
             self.require(['zbin', 'dp', 'Beta', 'TCIB'])
         elif self.ACTDR=='DR5': 
             self.require(['zbin', 'aper', 'freq'])
-
-        self.get_meas()
-        
+            
         try: self.get_meas_shared()
         except: pass
+
+        self.get_meas()
 
     def get_meas(self):
         if self.ACTDR=='DR6':  # ACT DR6 stacked y profiles, fiducial and using deprojection method/values:
@@ -174,16 +277,16 @@ class Liu2025(BaseMeasurement, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked 
             dBetastr = f"Beta_{self.Beta}" if self.Beta!='fiducial' else 'fiducial'
             
             self.R = y['RApArcmin'].values[:-1] *u.arcmin
-            self.y_data= y[f"pz{self.zbin[-1]}_act_dr6_{dBetastr}"].values[:-1] *u.arcmin**2
-            self.y_err = y[f"pz{self.zbin[-1]}_act_dr6_{dBetastr}_err"].values[:-1] *u.arcmin**2
+            self.tSZ_data= y[f"pz{self.zbin[-1]}_act_dr6_{dBetastr}"].values[:-1] *u.arcmin**2
+            self.tSZ_err = y[f"pz{self.zbin[-1]}_act_dr6_{dBetastr}_err"].values[:-1] *u.arcmin**2
 
         elif self.ACTDR=='DR5':  # ACT DR5 stacked y profiles
             if self.aper=='CAP': y = pd.read_csv(f"{self.path}/fig12.csv")  # using standard CAP
             elif self.aper=='RingRing': y = pd.read_csv(f"{self.path}/fig13.csv")  # using ring-ring filter
             
             self.R = y['RApArcmin'].values *u.arcmin
-            self.y_data = y[f"pz{self.zbin[-1]}_act_dr5_f{int(self.freq)}"].values *u.arcmin**2
-            self.y_err = y[f"pz{self.zbin[-1]}_act_dr5_f{int(self.freq)}_err"].values *u.arcmin**2
+            self.tSZ_data = y[f"pz{self.zbin[-1]}_act_dr5_f{int(self.freq)}"].values *u.arcmin**2
+            self.tSZ_err = y[f"pz{self.zbin[-1]}_act_dr5_f{int(self.freq)}_err"].values *u.arcmin**2
             
     def get_meas_shared(self):
         if self.ACTDR=='DR6' and self.TCIB=='10.7':
@@ -192,9 +295,9 @@ class Liu2025(BaseMeasurement, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked 
             ycov = np.genfromtxt(f"{self.sharedpath}/DESI_pz{self.zbin[-1]}_act_dr6_{dBetastr}/cov_diskring_tsz_uniformweight_bootstrap.txt").T
 
             self.R = y[0] *u.arcmin
-            self.y_data = (y[1] *u.sr).to(u.arcmin**2)
-            self.y_err = (y[2] *u.sr).to(u.arcmin**2)
-            self.y_cov = (ycov *u.sr).to(u.arcmin**2)**2
+            self.tSZ_data = (y[1] *u.sr).to(u.arcmin**2)
+            self.tSZ_err = (y[2] *u.sr).to(u.arcmin**2)
+            self.tSZ_cov = (ycov *u.sr**2).to(u.arcmin**4)
 
         
 
@@ -332,42 +435,44 @@ class Schaan2021(BaseMeasurement, Studies.Schaan2021):  # ACT DR5 maps stacked o
         'freq' : ['150', '090'],  # frequency band of obsevation [GHz]
     }
 
-    def __init__(self, inputsdict, **inputvars):
+    def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars)
 
-        self.require(['sample', 'freq'])
-    
-        ACTDR5 = Naess2020({'freq':self.freq})
-        self.beam_ells, self.beam_data = ACTDR5.beam_ells, ACTDR5.beam_data
-        self.resp_ells, self.resp_data = ACTDR5.resp_ells, ACTDR5.resp_data
-
         self.get_meas()  # get measurement
-        
+
     def get_meas(self):
+        self.require(['sample', 'freq'])
+
         measpath = f"{self.path}/{self.sample}_data_sharing_schaan21/f{self.freq}"  # each meas in different folder
         if self.sample=='cmass':
             self.R = np.genfromtxt(f"{measpath}/diskring_tsz_varweight_measured.txt").T[0] *u.arcmin
-            self.TkSZ_data, self.TkSZ_err = (np.genfromtxt(f"{measpath}/diskring_ksz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
-            self.TtSZ_data, self.TtSZ_err = (np.genfromtxt(f"{measpath}/diskring_tsz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
-            self.TkSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_ksz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
-            self.TtSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_tsz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
-    
+            self.kSZ_data, self.kSZ_err = (np.genfromtxt(f"{measpath}/diskring_ksz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.tSZ_data, self.tSZ_err = (np.genfromtxt(f"{measpath}/diskring_tsz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.kSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_ksz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.tSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_tsz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+
         elif self.sample=='lowz':
             freqstr = str(int(self.freq))
             self.R = np.genfromtxt(f"{measpath}/ksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T[0] *u.arcmin
-            self.TkSZ_data = (np.genfromtxt(f"{measpath}/ksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
-            self.TtSZ_data = (np.genfromtxt(f"{measpath}/tsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
-            self.TkSZ_cov = (np.genfromtxt(f"{measpath}/covksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
-            self.TtSZ_cov = (np.genfromtxt(f"{measpath}/covtsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.kSZ_data = (np.genfromtxt(f"{measpath}/ksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.tSZ_data = (np.genfromtxt(f"{measpath}/tsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.kSZ_cov = (np.genfromtxt(f"{measpath}/covksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.tSZ_cov = (np.genfromtxt(f"{measpath}/covtsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+
+        for val in ['kSZ', 'tSZ']:  # get errors from covariance matrices
+            setattr(self, f'{val}_err', np.diag(getattr(self, f'{val}_cov'))**0.5) 
 
         # Convert to y units
-        
-        convfac = 1/HaloModels.y_to_uK(np.float32(self.freq)*u.GHz, self.T_CMB)
-        self.y_data = self.TtSZ_data*convfac
-        self.y_cov = self.TtSZ_cov*convfac**2
 
-        for val in ['TkSZ', 'TtSZ', 'y']:  # get errors from covariance matrices
-            setattr(self, f'{val}_err', np.diag(getattr(self, f'{val}_cov'))**0.5) 
+        # convfac = 1/HaloModels.y_to_uK(np.float32(self.freq)*u.GHz, self.T_CMB)
+        # self.y_data = self.TtSZ_data*convfac
+        # self.y_cov = self.TtSZ_cov*convfac**2
+
+
+
+
+
+
 
 
 class Naess2020(BaseMeasurement, Studies.Naess2020):  # ACT DR5 (Naess 2020, arxiv.org/abs/2007.07290)

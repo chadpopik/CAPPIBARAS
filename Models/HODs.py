@@ -5,8 +5,8 @@ HOD models
 import numpy as np
 import scipy
 from scipy.special import erf, sici
-import Models.FFTs as FFTs
 import Models.Studies as Studies
+import Models.HaloModels as HaloModels
 import astropy.units as u
 
 
@@ -18,32 +18,57 @@ def Ci(q):
 
 class BaseHOD:
     def setdim(self, rs_ks, zs, logMs):  # Set proper dimensions of rs/ks, zs, Ms
-        rs_ks, zs, logMs = np.array(rs_ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)
+        rs_ks, zs, logMs = (rs_ks.unit*np.array(rs_ks, ndmin=1))[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)
         return rs_ks, zs, logMs
 
-    def nc(self, ks, zs, logMs):  # Default central distribution [n density] (FFT of dirac delta=1)
-        ncfunc = np.vectorize(lambda k: 1)
+    def ncen(self, ks, zs, logMs):  # Default central distribution [n density] (FFT of dirac delta=1)
         ks, zs, logMs = self.setdim(ks, zs, logMs)
-        return lambda **kwargs: ncfunc(ks)/u.Mpc**3
+        return lambda *args, **kwargs: np.ones_like(ks*zs*logMs)/u.Mpc**2
+    
+    def nsat(self, ks, zs, logMs):  # Default satellite distribution [n density] (FFT of NFW profile)
+        info = self.info.copy()
+        if not hasattr(self, 'Concentration'): info['Concentration'] = 'Bhattacharya13'
+        if not hasattr(self, 'MassDef'): info['MassDef'] = 'vir'
+        hmod = HaloModels.pyccl_model(**info)
+        ks, zs, logMs = self.setdim(ks, zs, logMs)
+        return lambda *args, **kwargs: hmod.NFW_k(ks, zs, logMs, trunc=True)/(10**logMs*u.Msun)
+    
+    def Ntot(self, logM, **kwargs):
+        Nc, Ns = self.Ncen(logM), self.Nsat(logM)
+        return lambda p={}: Nc(p)+Ns(p)
+        
+    
+    # def ns(self, ks, zs, logMs):  # Default satellite distribution [n density] (FFT of NFW)
+    #     ks, zs, logMs = self.setdim(ks, zs, logMs)
+    #     rS = self.hmod.rdel(zs, logMs)/self.hmod.c(zs, logMs)
+    #     qs = ks*rS
+    #     rhok = 4*np.pi*rho*rS**3 * (np.cos(qs)*(Ci((1+c)*qs)-Ci(qs)) + np.sin(q)*(Si((1+c)*q)-Si(q)) - np.sin(c*q)/(1+c*q))
+    #     rho0 = delta/3 * cdel**3/(np.log(1+cdel)-cdel/(1+cdel)) * rhodel
+    #     nfwprof = rho0/(r/rs*(1+(r/rs))**2)
 
-    def A_NFW(self, c):
-        return (np.log(1+c)-c/(1+c))**(-1)
-        # return (1+c)/(np.log(1+c)*(1+c)-c) # equivalent
+    # def A_NFW(self, c):
+    #     return (np.log(1+c)-c/(1+c))**(-1)
+    #     # return (1+c)/(np.log(1+c)*(1+c)-c) # equivalent
 
-    def NFW_q(self, qs, cs):  # Default satellite distribution (FFT of NFW profile)
-        qs0 = ks/u.Mpc*(rdel(zs, logMs)/cdel(zs, logMs))  # define scaled wavenumber
-        qs = lambda f_tr: qs0/f_tr  # apply truncation
-        cs0 = cdel(zs, logMs)  # concentration
-        cs = lambda f_tr: cs0*f_tr  # apply truncation
-        Si, Ci = lambda q: sici(q)[0], lambda q: sici(q)[1]  # Define sine/cosine integrals
-        nfw = lambda c, q: (np.cos(q)*(Ci((1+c)*q)-Ci(qs)) + np.sin(q)*(Si((1+c)*q)-Si(q)) - np.sin(c*q)/(1+c*q))  # define NFW
-        return 
+    # def NFW_q(self, qs, cs):  # Default satellite distribution (FFT of NFW profile)
+    #     qs0 = ks/u.Mpc*(rdel(zs, logMs)/cdel(zs, logMs))  # define scaled wavenumber
+    #     qs = lambda f_tr: qs0/f_tr  # apply truncation
+    #     cs0 = cdel(zs, logMs)  # concentration
+    #     cs = lambda f_tr: cs0*f_tr  # apply truncation
+    #     Si, Ci = lambda q: sici(q)[0], lambda q: sici(q)[1]  # Define sine/cosine integrals
+    #     nfw = lambda c, q: (np.cos(q)*(Ci((1+c)*q)-Ci(qs)) + np.sin(q)*(Si((1+c)*q)-Si(q)) - np.sin(c*q)/(1+c*q))  # define NFW
+    #     return 
 
-    def ns_r(self, rs, zs, logMs):
-        fft = FFTs.mcfit_package(rs=rs)
-        NFW = self.ns(fft.ks, zs, logMs)
-        func = lambda p: fft.IFFT3D(NFW(p))
-        return lambda p={}: func(self.p0 | p)
+    # def ns_r(self, rs, zs, logMs):
+    #     fft = FFTs.mcfit_package(rs=rs)
+    #     NFW = self.ns(fft.ks, zs, logMs)
+    #     func = lambda p: fft.IFFT3D(NFW(p))
+    #     return lambda p={}: func(self.p0 | p)
+
+    
+
+    
+
 
 
 class Zehavi2005(BaseHOD, Studies.Zehavi2005):  # virial
@@ -52,12 +77,22 @@ class Zehavi2005(BaseHOD, Studies.Zehavi2005):  # virial
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
 
-    def Ncen(self, logM, logMmin):
+    def Nc(self, logM, logMmin):
         return np.heaviside(logM - logMmin, 1)
 
-    def Nsat(self, M, M1, alpha):
+    def Ns(self, M, M1, alpha):
         return (M/M1)**alpha
 
+
+
+"""In this paper, we assume that the satellite galaxy distribution
+follows the dark matter distribution within the halo, which we describe by a spherically symmetric
+NFW profile (Navarro, Frenk, & White 1995, 1996, 1997) truncated at the virial radius (defined to
+enclose a mean overdensity of 200). The satellite-satellite galaxy pair distribution F ′ss(x) is then
+the convolution of the NFW profile with itself (see Sheth et al. 2001). For the dependence of NFW
+halo concentration on halo mass, we use the relation given by Bullock et al. (2001), after modifying
+it to be consistent with our slightly different definition of the halo virial radius
+"""
 
 
 class Zheng2005(BaseHOD, Studies.Zheng2005):  # virial mass
@@ -92,20 +127,20 @@ class Zheng2005(BaseHOD, Studies.Zheng2005):  # virial mass
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
         
-    def Ncen(self, logM, logMmin, sigmalogM):  # Eq 1
+    def Nc(self, logM, logMmin, sigmalogM):  # Eq 1
         return (1/2) * (1+erf((logM-logMmin)/sigmalogM))
 
-    def Nsat(self, M, M0, M1, alpha):  # Eq 3
+    def Ns(self, M, M0, M1, alpha):  # Eq 3
         return np.where(M>=M0, ((M-M0)/M1), 0)**alpha
 
-    def Nc(self, logM):
-        if self.nparams=='3P': func = lambda p: Zehavi2005().Ncen(logM, logMmin=p['logMmin'])
-        elif self.nparams=='5P': func = lambda p: self.Ncen(logM, logMmin=p['logMmin'], sigmalogM=p['sigmalogM'])
+    def Ncen(self, logM):
+        if self.nparams=='3P': func = lambda p: Zehavi2005().Nc(logM, logMmin=p['logMmin'])
+        elif self.nparams=='5P': func = lambda p: self.Nc(logM, logMmin=p['logMmin'], sigmalogM=p['sigmalogM'])
         return lambda p={}: func(self.p0 | p)
     
-    def Ns(self, logM):
-        if self.nparams=='3P': func = lambda p: Zehavi2005().Nsat(10**logM, M1=10**p['logM1'], alpha=p['alpha'])
-        elif self.nparams=='5P': func = lambda p: self.Nsat(10**logM, M0=10**p['logM0'], M1=10**p['logM1'], alpha=p['alpha'])
+    def Nsat(self, logM):
+        if self.nparams=='3P': func = lambda p: Zehavi2005().Ns(10**logM, M1=10**p['logM1'], alpha=p['alpha'])
+        elif self.nparams=='5P': func = lambda p: self.Ns(10**logM, M0=10**p['logM0'], M1=10**p['logM1'], alpha=p['alpha'])
         return lambda p={}: func(self.p0 | p)
 
 
@@ -127,15 +162,18 @@ class More2015(BaseHOD, Studies.More2015):  # BOSS DR11, arxiv.org/abs/1407.1856
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
         
-    def finc(self, logM, alpha_inc, logM_inc):  # Eq 5
-        return 2*np.clip((1+alpha_inc*(logM-logM_inc))/2, 0, 1)
+    def finc(self, logM, alpha_inc, logM_inc, written=True):  # Eq 5
+        if written:
+            return np.clip((1+alpha_inc*(logM-logM_inc)), 0, 1)
+        else:
+            return 2*np.clip((1+alpha_inc*(logM-logM_inc))/2, 0, 1)
 
-    def Nc(self, logM):  # Eq 3
-        func = lambda p: self.finc(logM=logM-np.log10(self.h**2), alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])/2 * Zheng2005().Ncen(logM-np.log10(self.h**0), logMmin=p['logMmin'], sigmalogM=p['sigma^2']**0.5)
+    def Ncen(self, logM):  # Eq 3
+        func = lambda p: self.finc(logM=logM-np.log10(self.h**2), alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'], written=False)/2 * Zheng2005().Nc(logM-np.log10(self.h**0), logMmin=p['logMmin'], sigmalogM=p['sigma^2']**0.5)
         return lambda p={}: func(self.p0 | p)
 
-    def Ns(self, logM):  # Eq 4
-        func = lambda p: Zheng2005().Nsat(M=10**logM/self.h**2, M0=p['kappa']*10**p['logMmin'], M1=10**p['logM1'], alpha=p['alpha']) * self.Nc(logM)(p)
+    def Nsat(self, logM):  # Eq 4
+        func = lambda p: Zheng2005().Ns(M=10**logM/self.h**2, M0=p['kappa']*10**p['logMmin'], M1=10**p['logM1'], alpha=p['alpha']) * self.Ncen(logM)(p)
         return lambda p={}: func(self.p0 | p)
 
     def nc(self, k, z, logM):  # Eq 9 (transform of Eq 11)
@@ -162,12 +200,12 @@ class Kusiak2022(BaseHOD, Studies.Kusiak2022):  # Kusiak 2022, arxiv.org/abs/220
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
 
-    def Nc(self, logMs):
-        func = lambda p: Zheng2005().Ncen(logMs-np.log10(self.h), logMmin=p['logM_min_HOD'], sigmalogM=p['sigma_logM'])
+    def Ncen(self, logMs):
+        func = lambda p: Zheng2005().Nc(logMs-np.log10(self.h), logMmin=p['logM_min_HOD'], sigmalogM=p['sigma_logM'])
         return lambda p={}: func(self.p0 | p)
 
-    def Ns(self, logMs):
-        func = lambda p: Zheng2005().Nsat(10**logMs/self.h, M0=0, M1=10**p['logM_1'], alpha=p['alpha_s']) * self.Nc(logMs)(p)
+    def Nsat(self, logMs):
+        func = lambda p: Zheng2005().Ns(10**logMs/self.h, M0=0, M1=10**p['logM_1'], alpha=p['alpha_s']) * self.Ncen(logMs)(p)
         return lambda p={}: func(self.p0 | p)
 
     def nsat(self, ks, zs, logMs):  # Eq 8-10
@@ -190,7 +228,7 @@ class Yuan2023(BaseHOD, Studies.Yuan2023):  # DESI 1% LRGs and QSO using ABACUSH
     models = {'model':['Base', 'Ext'],  # model, Zheng07+fic or with added velocity bias
             'sample': ['LRG1', 'LRG2', 'QSO', 'LRG3', 'LRG4'],  # sample of galaxies
             }
-    params = { 
+    params = {
         # best-fit HOD parameters, Tables 3 & 4
         "logM_cut": {'Base': {"LRG1": 12.89, "LRG2": 12.78, "QSO": 12.67, "LRG3": 12.89, "LRG4": 12.68},
                      'Ext': {"LRG1": 12.79, "LRG2": 12.64, "QSO": 12.2}},  # Msun/h
@@ -213,16 +251,21 @@ class Yuan2023(BaseHOD, Studies.Yuan2023):  # DESI 1% LRGs and QSO using ABACUSH
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
 
-    def Nc(self, logM):  # Eq 4
-        func = lambda p: Zheng2005().Ncen(logM-np.log10(self.h), logMmin=p['logM_cut'], sigmalogM=np.sqrt(2)*p['sigma']) * p['f_ic']
+    def Ncen(self, logM):  # Eq 4
+        func = lambda p: Zheng2005().Nc(logM-np.log10(self.h), logMmin=p['logM_cut'], sigmalogM=np.sqrt(2)*p['sigma']) * p['f_ic']
         return lambda p={}: func(self.p0 | p)
 
-    def Ns(self, logM):
+    def Nsat(self, logM):
         self.require(['sample'])
-        func1 = lambda p: Zheng2005().Nsat(10**logM/self.h, M0=p['kappa']*10**p['logM_cut'], M1 = 10**p['logM_1'], alpha=p['alpha'])
-        if self.sample[:3]=='LRG': func = lambda p: func1(p) * self.Nc(logM)(p)  # Eq 5
+        func1 = lambda p: Zheng2005().Ns(10**logM/self.h, M0=p['kappa']*10**p['logM_cut'], M1 = 10**p['logM_1'], alpha=p['alpha'])
+        if self.sample[:3]=='LRG': func = lambda p: func1(p) * self.Ncen(logM)(p)  # Eq 5
         elif self.sample[:3]=='QSO': func = func1 # Eq 6
         return lambda p={}: func(self.p0 | p)
+
+    # def nc(self, ks, zs, logM):
+    #     return lambda p={}: 1  # TODO: add velocity bias
+
+    # def ns(self, ks, zs, logM):
 
 
 
@@ -242,13 +285,13 @@ class Kou2023(BaseHOD, Studies.Kou2023):  # Kou 2023, arxiv.org/abs/2211.07502
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
 
-    def Nc(self, logM):  # Eq 19, 21
+    def Ncen(self, logM):  # Eq 19, 21
         finc = lambda p: More2015().finc(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
-        func = lambda p: Zheng2005().Ncen(logM, logMmin=p['logM_min'], sigmalogM=p['sigma_logM'], f_inc=finc(p))
+        func = lambda p: Zheng2005().Nc(logM, logMmin=p['logM_min'], sigmalogM=p['sigma_logM'])*finc(p)
         return lambda p={}: func(self.p0 | p)
 
-    def Ns(self, logM):  # Eq 20
-        func = lambda p: Zheng2005().Nsat(10**logM/self.h, M0=p['logM_min'], M1=p['logM_1'], alpha=1) * self.Nc(logM)(p)
+    def Nsat(self, logM):  # Eq 20
+        func = lambda p: Zheng2005().Ns(10**logM, M0=10**p['logM_min'], M1=10**p['logM_1'], alpha=1) * self.Ncen(logM)(p)
         return lambda p={}: func(self.p0 | p)
 
     def ns_r(self, rs, zs, logMs): #
@@ -259,7 +302,7 @@ class Kou2023(BaseHOD, Studies.Kou2023):  # Kou 2023, arxiv.org/abs/2211.07502
 
     def ns(self, ks, zs, logMs):  # Default satellite distribution (FFT of NFW)
         self.require(['c200m', 'r200m'])
-        fft = FFTs.mcfit_package(ks=ks)
+        fft = HaloModels.mcfit_package(ks=ks)
         NFW = self.ns_r(fft.rs, zs, logMs)
         return lambda p={}: fft.FFT3D(NFW(p))
 
@@ -281,21 +324,22 @@ class Linke2022(BaseHOD, Studies.Linke2022):  # arxiv.org/abs/2204.02418
             'color':['r', 'b']}  # TODO: There are actually many further subsamples cut by stellar mass
     params ={
         # Best-fit parameters, Table 3
-        'alpha_a': {'MS': {'r': 0.47, 'b': 0.1}, 'KVG': {'r': 0.34, 'b': 0.13}},
-        'sigma_a': {'MS': {'r': 0.55, 'b': 0.47}, 'KVG': {'r': 0.52, 'b': 0.47}},
-        'M_th_a': {'MS': {'r': 23.0, 'b': 1.19}, 'KVG': {'r': 15, 'b': 1.4}},  # 1e11 Msol
+        'alpha_a': {'MS': {'r': 0.47, 'b': 0.1}, 'KVG': {'r': 0.34, 'b': 0.13}},  # for the maximum of〈N^a|m〉, gives the fraction of massive halos (m >> M^a_th) with a central galaxy from population a
+        'sigma_a': {'MS': {'r': 0.55, 'b': 0.47}, 'KVG': {'r': 0.52, 'b': 0.47}},  # determines the transition of 〈N^a_cen | m〉from 0 to α^a
+        'M_th_a': {'MS': {'r': 23.0, 'b': 1.19}, 'KVG': {'r': 15, 'b': 1.4}},  # halo mass below which we do not expect halos to contain galaxies, 1e11 Msol
         'beta_a': {'MS': {'r': 0.84, 'b': 0.73}, 'KVG': {'r': 0.88, 'b': 0.55}},
         'M_a': {'MS': {'r': 5.8, 'b': 32}, 'KVG': {'r': 3.6, 'b': 20}},  # 1e13 Msol
+        'f_a': {'MS': {'r': 1.49, 'b': 0.88}, 'KVG': {'r': 1.27, 'b': 0.83}},  # factor in difference of concentration used in NFW from halo matter profile to average number density of satellite galaxies
     }
     def __init__(self, inputsdict, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
 
-    def Nc(self, logM):  # Eq 36
-        func = lambda p: Zheng2005().Ncen(logM, logMmin=np.log10(p['M_th_a']*1e11), sigma=p['sigma_a']) * p['alpha_a']
+    def Ncen(self, logM):  # Eq 36
+        func = lambda p: Zheng2005().Nc(logM, logMmin=np.log10(p['M_th_a']*1e11), sigmalogM=p['sigma_a']) * p['alpha_a']
         return lambda p={}: func(self.p0 | p)
 
-    def Ns(self, logM):  # Eq 37
-        func = lambda p: Zheng2005().Nsat(10**logM/self.h, M0=0, M1 = np.log10(p['M_a']*1e13), alpha=p['beta_a']) * Zheng2005().Ncen(logM, logMmin=np.log10(p['M_th_a']*1e11), sigma=p['sigma_a'])
+    def Nsat(self, logM):  # Eq 37
+        func = lambda p: Zheng2005().Ns(10**logM/self.h/self.h, M0=0, M1 = p['M_a']*1e13, alpha=p['beta_a']) * self.Ncen(logM)(p)/p['alpha_a']
         return lambda p={}: func(self.p0 | p)
 
     def ns_r(self, rs, zs, logMs):
@@ -310,7 +354,7 @@ class Linke2022(BaseHOD, Studies.Linke2022):  # arxiv.org/abs/2204.02418
 
     def ns(self, ks, zs, logMs):
         self.require(['rhoc', 'c200m', 'r200m'])
-        fft = FFTs.mcfit_package(ks=ks)
+        fft = HaloModels.mcfit_package(ks=ks)
         NFW = self.ns_r(fft.rs, zs, logMs)()
         val = fft.FFT3D(NFW)
         return lambda **kwargs: val
@@ -332,13 +376,45 @@ class Hadzhiyska2025B(BaseHOD, Studies.Hadzhiyska2025B):  #
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
 
-    def Nc(self, logM):  # Eq 36
-        func = lambda p: Yuan2023().Ncen(logM, logMmin=p['logMcut'], sigma=p['sigma_logM']) * p['alpha']
+    def Ncen(self, logM):  # Eq 36
+        func = lambda p: Zheng2005().Nc(logM-np.log10(self.h), logMmin=p['logMcut'], sigmalogM=p['sigma_logM'])
         return lambda p={}: func(self.p0 | p)
 
-    def Ns(self, logM):  # Eq 37
-        func = lambda p: Yuan2023().Nsat(10**logM/self.h, M0=0, M1 = np.log10(p['M_a']*1e13), alpha=p['beta_a']) * Zheng2005().Ncen(logM, logMmin=np.log10(p['M_th_a']*1e11), sigma=p['sigma_a'])
+    def Nsat(self, logM):  # Eq 37
+        func = lambda p: Zheng2005().Ns(10**logM/self.h, M0=p['kappa']*10**p['logMcut'], M1=10**p['logM1'], alpha=p['alpha']) * self.Ncen(logM)(p)
         return lambda p={}: func(self.p0 | p)
+    
+
+class Hadzhiyska2025A(BaseHOD, Studies.Hadzhiyska2025A):  #
+    models = {'sample': ['Main_z1', 'Main_z2', 'Main_z3', 'Main_z4', 'Main_all', 'Ext_z1', 'Ext_z2', 'Ext_z3', 'Ext_z4', 'Ext_all', 'BGS'],
+    }
+    params = {
+        # best fit HOD parameters
+        "logMcut": {"Main_z1": 12.61, "Main_z2": 12.63, "Main_z3": 12.73, "Main_z4": 12.63, "Main_all": 12.683, "Ext_z1": 12.49, "Ext_z2": 12.44, "Ext_z3": 12.52, "Ext_z4": 12.38, "Ext_all": 12.491, "BGS": 12.133},  # the characteristic halo mass at which a halo has a 50% probability of hosting a central galaxy, Msol/h
+        "logM1": {"Main_z1": 13.91, "Main_z2": 14.02, "Main_z3": 13.98, "Main_z4": 13.97, "Main_all": 14.063, "Ext_z1": 13.96, "Ext_z2": 14.01, "Ext_z3": 14.05, "Ext_z4": 14.10, "Ext_all": 14.196, "BGS": 13.83},  # the typical halo mass required to host one satellite galaxy, Msol/h
+        "sigma_logM": {"Main_z1": 0.30, "Main_z2": 0.18, "Main_z3": 0.21, "Main_z4": 0.23, "Main_all": 0.133, "Ext_z1": 0.24, "Ext_z2": 0.14, "Ext_z3": 0.17, "Ext_z4": 0.20, "Ext_all": 0.108, "BGS": 0.107},  # the scatter in log 𝑀 describing the smooth transition of the central galaxy occupation function
+        "alpha": {"Main_z1": 1.00, "Main_z2": 0.84, "Main_z3": 0.96, "Main_z4": 0.96, "Main_all": 0.848, "Ext_z1": 0.92, "Ext_z2": 0.76, "Ext_z3": 0.89, "Ext_z4": 0.82, "Ext_all": 0.642, "BGS": 1.219},  # the power-law slope governing the number of satellites in high-mass halos
+        "kappa": {"Main_z1": 1.30, "Main_z2": 1.30, "Main_z3": 1.33, "Main_z4": 1.28, "Main_all": 1.245, "Ext_z1": 1.28, "Ext_z2": 1.23, "Ext_z3": 1.23, "Ext_z4": 1.10, "Ext_all": 0.941, "BGS": 1.069},  # multiplied by Mcut, the cutoff mass below which no satellites arehosted
+        "nbar_x1000": {"Main_z1": 1.30, "Main_z2": 1.09, "Main_z3": 0.69, "Main_z4": 0.91, "Main_all": 0.745, "Ext_z1": 1.58, "Ext_z2": 1.66, "Ext_z3": 1.16, "Ext_z4": 1.72, "Ext_all": 1.254, "BGS": 3.608},  # comoving number density  ̄𝑛 (in [Mpc/ℎ]−3)
+        "fsat": {"Main_z1": 0.08, "Main_z2": 0.09, "Main_z3": 0.08, "Main_z4": 0.07, "Main_all": 0.080, "Ext_z1": 0.07, "Ext_z2": 0.08, "Ext_z3": 0.06, "Ext_z4": 0.06, "Ext_all": 0.098, "BGS": 0.108},  # satellite fraction 𝑓sat,
+        "logMh_bar": {"Main_z1": 13.19, "Main_z2": 13.22, "Main_z3": 13.20, "Main_z4": 13.12, "Main_all": 13.179, "Ext_z1": 13.11, "Ext_z2": 13.09, "Ext_z3": 13.05, "Ext_z4": 12.92, "Ext_all": 13.025, "BGS": 13.022},  # mean halo mass⟨𝑀halo⟩ (in 𝑀⊙ /ℎ).
+    }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+
+    def Ncen(self, logM):  # Eq 2
+        logM = logM-np.log10(self.h)
+        func = lambda p: Zheng2005().Nc(logM, logMmin=p['logMcut'], sigmalogM=2*p['sigma_logM'])
+        return lambda p={}: func(self.p0 | p)
+
+    def Nsat(self, logM):  # Eq 3
+        logM = logM-np.log10(self.h)
+        func = lambda p: Zheng2005().Ns(logM, M0=p['kappa']*10**p['logMcut'], M1=10**p['logM1'], alpha=p['alpha']) * self.Ncen(logM)(p)
+        return lambda p={}: func(self.p0 | p)
+    
+
+
 
 
 

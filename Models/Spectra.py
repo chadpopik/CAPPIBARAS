@@ -15,7 +15,9 @@ from scipy.interpolate import RegularGridInterpolator
 import Models.FFTs as FFTs
 import Models.Studies as Studies
 import Models.HODs as HODs
-import Models.Data as Data
+import Models.TargetData as TargetData
+import Models.MapData as MapData
+
 
 
 

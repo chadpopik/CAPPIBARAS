@@ -1,0 +1,17 @@
+massselect,colorselect,halo,match,log10p0,alphak,betak,Ak2h,P0,xct,betat,At2h
+mstar,tot,GNFW,matched,3.67,0.64,3.37,1.40,4.18,0.97,6.09,0.57
+mstar,red,GNFW,matched,3.28,0.80,3.20,1.37,4.03,1.00,6.14,0.53
+mh,tot,GNFW,matched,4.34,0.43,3.44,1.31,2.74,0.98,6.31,0.51
+mh,red,GNFW,matched,3.38,0.68,3.30,1.34,2.86,0.93,5.80,0.51
+mstar,tot,GNFW,unmatched,4.11,0.49,3.30,1.31,3.95,0.98,5.00,0.49
+mstar,red,GNFW,unmatched,3.38,0.68,2.91,1.28,4.91,0.98,4.65,0.47
+mh,tot,GNFW,unmatched,5.68,0.30,3.54,1.20,3.84,0.98,4.61,0.44
+mh,red,GNFW,unmatched,3.48,0.61,3.03,1.30,4.47,0.95,4.55,0.47
+mstar,tot,GNFW1h,matched,6.00,0.17,2.06,,18.33,0.06,1.53,
+mstar,red,GNFW1h,matched,6.00,0.16,1.99,,17.37,0.06,1.54,
+mh,tot,GNFW1h,matched,6.00,0.17,2.03,,13.26,0.05,1.42,
+mh,red,GNFW1h,matched,6.00,0.16,1.92,,13.80,0.05,1.41,
+mstar,tot,GNFW1h,unmatched,6.00,0.16,1.97,,19.54,0.06,1.39,
+mstar,red,GNFW1h,unmatched,6.00,0.16,1.88,,19.23,0.08,1.42,
+mh,tot,GNFW1h,unmatched,6.00,0.16,1.94,,16.64,0.07,1.29,
+mh,red,GNFW1h,unmatched,6.00,0.15,1.84,,16.50,0.08,1.39,

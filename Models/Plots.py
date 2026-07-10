@@ -1,6 +1,20 @@
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import re
 
 plotpath = "/global/homes/c/cpopik/CAPPIBARAS/Models/PlotChecks"
+
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+# Plot Styling
+plt.style.use('dark_background')
+plt.rcParams.update({
+    'font.family':'serif', 'mathtext.fontset':'dejavuserif',
+    'axes.grid':True, 'grid.linestyle': ':', 'grid.alpha': 0.5,
+    'xtick.direction':'in', 'xtick.minor.visible': True, 'xtick.top':True,
+    'ytick.direction':'in', 'ytick.minor.visible': True, 'ytick.right':True,
+})
 
 
 class BasePlots:
@@ -8,9 +22,9 @@ class BasePlots:
         self.paper = self.name = self.__class__.__name__
 
     def axsetup(self, ax, ax2, filename, xlabel, ylabel, xlim, ylim, xscale, yscale):
+        img = plt.imread(f"{plotpath}/{self.paper}/{filename}.png")
         ax.set(ylabel=ylabel, xlabel=xlabel, xlim=xlim, ylim=ylim, xscale=xscale, yscale=yscale)
         ax2.set_axis_off(); ax2.set_zorder(0); ax.patch.set_alpha(0); ax.set_zorder(1)
-        img = plt.imread(f"{plotpath}/{self.paper}/{filename}.png")
         ax2.imshow(img, extent=[*ax.get_xlim(), *ax.get_ylim()], aspect='auto')
 
     def plot(self, filename, width, height, xlabel, ylabel, xlim, ylim, xscale, yscale, nrow=1, ncol=1):
@@ -29,26 +43,46 @@ class BasePlots:
                 ylim=ylim[i] if isinstance(ylim, list) else ylim,
                 xscale=xscale[i] if isinstance(xscale, list) else xscale,
                 yscale=yscale[i] if isinstance(yscale, list) else yscale)
+            
+        self.autofontsize(fig)
         return fig, axs
     
+    def autofontsize(self, fig, label_mult=2, tick_mult=1.5, title_mult=5, legend_mult=5):
+        """
+        Automatically set fontsize for labels, ticks, titles, and legends
+        for all axes in a figure based on figure size and subplot grid.
+        """
+        figsize = fig.get_size_inches()
+        axes = fig.get_axes()
+        nrows, ncols = axes[0].get_subplotspec().get_gridspec().get_geometry()
+
+        fig_area = figsize[0] * figsize[1]
+        n_panels = nrows * ncols
+        base = max(8, np.sqrt(fig_area / n_panels))
+
+        fs_label  = int(base * label_mult)
+        fs_tick   = int(base * tick_mult)
+        fs_title  = int(base * title_mult)
+        fs_legend = int(base * legend_mult)
+
+        for ax in axes:
+            ax.xaxis.label.set_fontsize(fs_label)
+            ax.yaxis.label.set_fontsize(fs_label)
+            ax.tick_params(axis='both', labelsize=fs_tick)
+            ax.title.set_fontsize(fs_title)
+            if ax.get_legend():
+                ax.get_legend().prop.set_size(fs_legend)
+
+        if fig._suptitle:
+            fig._suptitle.set_fontsize(int(base * title_mult * 1.2))
+
+        return {'label': fs_label, 'tick': fs_tick, 'title': fs_title, 'legend': fs_legend}
     
-class Zhou2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2023JCAP...11..097Z
-    def Fig2(self, width=16, height=6):
-        return self.plot(filename=['Fig2a','Fig2b'], nrow=1, ncol=2, width=width, height=height,
-            xlabel=r'Redshift', ylabel=r'$N (\text{deg}^{-2})$',
-            xlim=(0.15, 1.25), ylim=[(0, 28), (0, 75)], xscale='linear', yscale='linear')
+    
+
         
-    def Fig3(self, width=16, height=6):
-        return self.plot(filename=['Fig3a','Fig3b'], nrow=1, ncol=2, width=width, height=height,
-            xlabel=r'Redshift', ylabel=r'$10^{3} n(z) (h^{3} \ \text{Mpc}^{-3})$',
-            xlim=(0.15, 1.1), ylim=[(0, 0.65), (0, 1.65)], xscale='linear', yscale='linear')
-    
-    
-class White2022(BasePlots):  # ui.adsabs.harvard.edu/abs/2022JCAP...02..007W
-    def Fig2(self, width=8, height=4):
-        return self.plot(filename='Fig2', width=width, height=height,
-            xlabel=r'$z$', ylabel=r'$d \text{ln} N/dz$',
-            xlim=(0.2, 1.2), ylim=(-0.3, 7.05), xscale='linear', yscale='linear')
+
+
 
 
 class Zheng2005(BasePlots):  # ui.adsabs.harvard.edu/abs/2005ApJ...633..791Z
@@ -144,7 +178,7 @@ class Vikram2017(BasePlots):  # ui.adsabs.harvard.edu/abs/2017MNRAS.467.2315V
 
 
 class Kravtsov2018(BasePlots):  # ui.adsabs.harvard.edu/abs/2018AstL...44....8K
-    def Fig4(self, width=6, height=6):
+    def Fig4(self, width=4, height=4):
         return self.plot(filename='Fig4', width=width, height=height,
             xlabel=r'$M_{500} \ [M_\odot]$', ylabel=r'$M_{*, \text{BCG}} \ [M_\odot]$',
             xlim=(1.8e13, 2e15), ylim=(5e10, 2.5e13), xscale='log', yscale='log')
@@ -226,28 +260,39 @@ class Moser2021(BasePlots):  # ui.adsabs.harvard.edu/abs/2021ApJ...919....2M
             xlabel=[r'$R (\text{Mpc})$', r'$R (\text{Mpc})$'], ylabel=[r'$\rho_\text{gas} [\text{g cm}^{-3}]$', r'$P_\text{th} [\text{g} \text{cm}^{-1} \text{s}^{-2}]$'],
             xlim=[[7.5e-3,1.1e1],[7.5e-3,1.1e1]], ylim=[[6.5e-31,4e-26],[1.5e-16,1.1e-11]], xscale=['log','log'], yscale=['log','log'])
 
-        
-        
+
+
 class Schaan2021(BasePlots):  # ui.adsabs.harvard.edu/abs/2021PhRvD.103f3513S
     def Fig2(self, width=6, height=4):
         return self.plot(filename='Fig2', width=width, height=height,
             xlabel=r'$z$', ylabel=r'$N_\text{galaxies}$',
-            xlim=(0, 0.7), ylim=(0, 3.2e4))
+            xlim=(0, 0.7), ylim=(0, 3.2e4),
+            xscale='linear', yscale='linear')
 
     def Fig3(self, width=5, height=4):
         return self.plot(filename='Fig3', width=width, height=height,
             xlabel=r'$M_\text{vir} \ [M_\odot]$', ylabel=r'$N_\text{galaxies}/N_\text{total}$',
-            xlim=(1e11, 1e15), ylim=(0, 6.9e-14), xscale='log')
+            xlim=(1e11, 1e15), ylim=(0, 6.9e-14), xscale='log', yscale='linear')
 
     def Fig5(self, width=6, height=4):
         return self.plot(filename='Fig5', width=width, height=height,
             xlabel=r'$\theta \ [\text{arcmin}]$', ylabel=r'$B(\theta)/B(0)$',
             xlim=(8e-2, 1.25e1), ylim=(1e-3, 2e0), xscale='log', yscale='log')
 
+    def Fig7a(self, width=5, height=4):
+        return self.plot(filename='Fig7a', width=width, height=height,
+            xlabel=r'$R \ [\text{arcmin}]$', ylabel=r'$T_\text{kSZ} [\mu \text{K} \cdot \text{arcmin}^2]$',
+            xlim=(0.75, 6.3), ylim=(3e-2, 7e1), xscale='linear', yscale='log')
+        
+    def Fig9(self, width=5, height=4):
+        return self.plot(filename='Fig9', width=width, height=height,
+            xlabel=r'$R \ [\text{arcmin}]$', ylabel=r'$T_\text{tSZ+dust} [\mu \text{K} \cdot \text{arcmin}^2]$',
+            xlim=(0.75, 6.3), ylim=(-25, 0.3), xscale='linear', yscale='log')
+
     def Fig31(self, width=5, height=4):
         return self.plot(filename='Fig31', width=width, height=height,
             xlabel=r'$M_* \ [M_\odot]$', ylabel=r'$N_\text{galaxies}/N_\text{total}$',
-            xlim=(2e10, 2e12), ylim=(0, 5.45e-12), xscale='log')
+            xlim=(2e10, 2e12), ylim=(0, 5.45e-12), xscale='log', yscale='linear')
 
 
 
@@ -262,9 +307,9 @@ class Amodeo2021(BasePlots):  # ui.adsabs.harvard.edu/abs/2021PhRvD.103f3514A
     def Fig6_row2(self, width=16, height=6):
         return self.plot(filename=['Fig6c','Fig6d'], nrow=1, ncol=2, width=width, height=height,
             xlabel=[r'$R [\text{arcmin}]$', r'$R [\text{arcmin}]$'],
-            ylabel=[r'$\rho_\text{gas} \ [\text{g cm}^{-3}]$', r'$P_\text{th} \ [\text{erg cm}^{-3}]$'],
-            xlim=[[0.8,6.1],[0.8,6.1]], ylim=[[6.9e-5,1.5e-3],[1.5e-16,2.5e-12]],
-            xscale='log', yscale='log')
+            ylabel=[r'$\rho^\text{2D}_\text{gas} \ [\text{g cm}^{-3}] \cdot \text{Mpc}$', r'$P^\text{2D}_\text{th} \ [\text{erg cm}^{-3}] \cdot \text{Mpc} $'],
+            xlim=[[0.8,6.1],[0.8,6.1]], ylim=[[6.9e-5,1.5e-3],[3e10,9.5e11]],
+            xscale='linear', yscale='log')
 
     def Fig6_row3(self, width=15, height=5):
         return self.plot(filename=['Fig6e','Fig6f'], nrow=1, ncol=2, width=width, height=height,
@@ -347,12 +392,12 @@ class Gao2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2023ApJ...954..207G
     def Fig7a(self, width=8, height=6):
         return self.plot(filename='Fig7a', width=width, height=height,
             xlabel=r'$\log(M_h) \ [M_\odot /h]$', ylabel=r'$\log(M_*) \ [M_\odot]$',
-            xlim=(10, 15), ylim=(7.5, 12), xscale='log', yscale='log')
+            xlim=(10, 15), ylim=(7.5, 12), xscale='linear', yscale='linear')
 
     def Fig2(self, width=10, height=3.5):
         return self.plot(filename=['Fig2a','Fig2b'], nrow=1, ncol=2, width=width, height=height,
             xlabel=r'$\log M_* \ [M_\odot]$', ylabel=r'$n \ [h^3 \text{Mpc}^{-3} \text{dex}^{-1}]$',
-            xlim=[(9, 12.5), (7, 12.5)], ylim=(5e-7, 2e-3), xscale='log', yscale='log')
+            xlim=[(9, 12.5), (7, 12.5)], ylim=(5e-7, 2e-3), xscale='linear', yscale='log')
 
 
 
@@ -376,9 +421,9 @@ class Yuan2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2024MNRAS.530..947Y
         return self.plot(filename='Fig14', width=width, height=height,
             xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N_\text{gal}$',
             xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')
-        
-        
-    
+
+
+
 class Kou2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2023A%26A...675A.149K
     def Fig4(self, width=9, height=6):
         return self.plot(filename='Fig4', width=width, height=height,
@@ -407,16 +452,194 @@ class RiedGuachalla2025(BasePlots):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112j3
         return self.plot(filename='Fig3', width=width, height=height,
             xlabel=r'Stellar Mass $M_* \ [M_\odot]$', ylabel=r'Number',
             xlim=(2.6e10, 3.5e12), ylim=(5.5e-1, 1.5e5), xscale='log', yscale='log')
+        
+    def Fig8(self, width=10, height=3.5):
+        return self.plot(filename=['Fig8a','Fig8b'], nrow=1, ncol=2, width=width, height=height,
+            xlabel=r'$R \ [\text{arcmin}]$', ylabel=r'$T_\text{kSZ} \ [\mu \text{K arcmin}^2]$',
+            xlim=(0.525, 6.525), ylim=(0.1, 20), xscale='linear', yscale='log')
+        
+    def Fig11(self, width=5, height=3.5):
+        return self.plot(filename='Fig11', width=width, height=height,
+            xlabel=r'$R \ [\text{arcmin}]$', ylabel=r'$T_\text{kSZ} \ [\mu \text{K arcmin}^2]$',
+            xlim=(0.75, 6.4), ylim=(0.045, 35), xscale='linear', yscale='log')
+        
+    def Fig12(self, width=5, height=3.5):
+        return self.plot(filename='Fig12', width=width, height=height,
+            xlabel=r'$R \ [\text{arcmin}]$', ylabel=r'$T_\text{kSZ} \ [\mu \text{K arcmin}^2]$',
+            xlim=(0.75, 6.4), ylim=(0.065, 28), xscale='linear', yscale='log')
 
     def Fig20(self, width=6, height=4.5):
         return self.plot(filename='Fig20', width=width, height=height,
             xlabel=r'$z$', ylabel=r'Number',
             xlim=(0.1, 1.15), ylim=(0, 60e3), xscale='linear', yscale='linear')
 
-    
-    
+
+
+class White2022(BasePlots):  # ui.adsabs.harvard.edu/abs/2022JCAP...02..007W
+    def Fig2(self, width=8, height=4):
+        return self.plot(filename='Fig2', width=width, height=height,
+            xlabel=r'$z$', ylabel=r'$d \text{ln} N/dz$ (actually $\frac{1}{N}\frac{dN}{dz}$)',
+            xlim=(0.2, 1.2), ylim=(-0.3, 7.05), xscale='linear', yscale='linear')
+        
+        
+class Zhou2023(BasePlots):  # ui.adsabs.harvard.edu/abs/2023JCAP...11..097Z
+    def Fig2(self, width=16, height=6):
+        return self.plot(filename=['Fig2a','Fig2b'], nrow=1, ncol=2, width=width, height=height,
+            xlabel=r'Redshift', ylabel=r'$N (\text{deg}^{-2})$',
+            xlim=(0.15, 1.25), ylim=[(0, 28), (0, 75)], xscale='linear', yscale='linear')
+        
+    def Fig3(self, width=16, height=6):
+        return self.plot(filename=['Fig3a','Fig3b'], nrow=1, ncol=2, width=width, height=height,
+            xlabel=r'Redshift', ylabel=r'$10^{3} n(z) (h^{3} \ \text{Mpc}^{-3})$',
+            xlim=(0.15, 1.1), ylim=[(0, 0.65), (0, 1.65)], xscale='linear', yscale='linear')
+        
+        
 class Liu2025(BasePlots):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112h3561L
     def Fig2(self, width=6, height=5):
         return self.plot(filename='Fig2', width=width, height=height,
             xlabel=r'$z$', ylabel=r'$dN/dz$ (actually $n(z)$)',
             xlim=(0.1, 1.3), ylim=(0, 10.25), xscale='linear', yscale='linear')
+        
+    def Fig3(self, width=12, height=10):
+        return self.plot(filename=['Fig3a', 'Fig3b', 'Fig3c', 'Fig3d'], nrow=2, ncol=2, width=width, height=height,
+            xlabel=r'$R [\text{arcmin}]$', ylabel=r'Compton Y-parameter [arcmin$^2$]',
+            xlim=(0.75, 6.25), ylim=[(-0.8e-6, 4.4e-6), (-0.8e-6, 4.4e-6), (-1.15e-6, 4.2e-6), (-1.15e-6, 4.2e-6)], xscale='linear', yscale='linear')
+        
+    def Fig4(self, width=12, height=10):
+        return self.plot(filename=['Fig4a', 'Fig4b', 'Fig4c', 'Fig4d'], nrow=2, ncol=2, width=width, height=height,
+            xlabel=r'$R [\text{arcmin}]$', ylabel=r'Compton Y-parameter [arcmin$^2$]',
+            xlim=(0.75, 6.25), ylim=[(-0.45e-6, 5.5e-6), (-0.45e-6, 5.5e-6), (-0.5e-6, 5.5e-6), (-0.5e-6, 5.5e-6)], xscale='linear', yscale='linear')
+    
+    
+class Hadzhiyska2026(BasePlots):  # ui.adsabs.harvard.edu/abs/2025arXiv251014135H
+    def Fig2a(self, width=5, height=4):
+        return self.plot(filename='Fig2a', width=width, height=height,
+            xlabel=r'$\log (M/M_\odot)$', ylabel=r'$N_\text{gal}$',
+            xlim=(9.9, 12.15), ylim=(-0.6e3, 12.7e3), xscale='linear', yscale='linear')
+        
+    def Fig2b(self, width=5, height=4):
+        return self.plot(filename='Fig2b', width=width, height=height,
+            xlabel=r'$z$', ylabel=r'$N_\text{gal}$',
+            xlim=(0.06, 0.6), ylim=(-0.5e3, 11.25e3), xscale='linear', yscale='linear')
+        
+    
+    
+    
+class BasePlots2():
+    def __init__(self, plotpath):
+        self.plotpath = plotpath
+        self.paper = self.name = self.__class__.__name__
+
+    def axsetup(self, ax, ax2, filename, xlabel, ylabel, xlim, ylim, xscale, yscale):
+        img = plt.imread(f"{self.plotpath}/{filename}.png")
+        ax.set(ylabel=ylabel, xlabel=xlabel, xlim=xlim, ylim=ylim, xscale=xscale, yscale=yscale)
+        ax2.set_axis_off(); ax2.set_zorder(0); ax.patch.set_alpha(0); ax.set_zorder(1)
+        ax2.imshow(img, extent=[*ax.get_xlim(), *ax.get_ylim()], aspect='auto')
+
+    def plot(self, filename, width, height, xlabel, ylabel, xlim, ylim, xscale, yscale, nrow=1, ncol=1):
+        fig, axs = plt.subplots(nrow, ncol, figsize=(width, height), layout='constrained')
+        if nrow==1 and ncol==1:
+            ax2 = fig.add_subplot(111, frameon=False)
+            self.axsetup(axs, ax2, filename, xlabel, ylabel, xlim, ylim, xscale, yscale)
+            return fig, axs
+        
+        for i, ax in enumerate(axs.flatten()):
+            ax2 = fig.add_subplot(int(f'{nrow}{ncol}{i+1}'), frameon=False)
+            self.axsetup(ax, ax2, filename[i], 
+                xlabel=xlabel[i] if isinstance(xlabel, list) else xlabel, 
+                ylabel=ylabel[i] if isinstance(ylabel, list) else ylabel, 
+                xlim=xlim[i] if isinstance(xlim, list) else xlim,
+                ylim=ylim[i] if isinstance(ylim, list) else ylim,
+                xscale=xscale[i] if isinstance(xscale, list) else xscale,
+                yscale=yscale[i] if isinstance(yscale, list) else yscale)
+            
+        self.autofontsize(fig)
+        return fig, axs
+    
+    def autofontsize(self, fig, label_mult=2, tick_mult=1.5, title_mult=5, legend_mult=5):
+        """
+        Automatically set fontsize for labels, ticks, titles, and legends
+        for all axes in a figure based on figure size and subplot grid.
+        """
+        figsize = fig.get_size_inches()
+        axes = fig.get_axes()
+        nrows, ncols = axes[0].get_subplotspec().get_gridspec().get_geometry()
+
+        fig_area = figsize[0] * figsize[1]
+        n_panels = nrows * ncols
+        base = max(8, np.sqrt(fig_area / n_panels))
+
+        fs_label  = int(base * label_mult)
+        fs_tick   = int(base * tick_mult)
+        fs_title  = int(base * title_mult)
+        fs_legend = int(base * legend_mult)
+
+        for ax in axes:
+            ax.xaxis.label.set_fontsize(fs_label)
+            ax.yaxis.label.set_fontsize(fs_label)
+            ax.tick_params(axis='both', labelsize=fs_tick)
+            ax.title.set_fontsize(fs_title)
+            if ax.get_legend():
+                ax.get_legend().prop.set_size(fs_legend)
+
+        if fig._suptitle:
+            fig._suptitle.set_fontsize(int(base * title_mult * 1.2))
+
+        return {'label': fs_label, 'tick': fs_tick, 'title': fs_title, 'legend': fs_legend}
+    
+    
+    
+def splittable(df):
+    # df is your original DataFrame
+    val_df = df.copy()
+    up_df = df.copy()
+    down_df = df.copy()
+
+    pat = re.compile(
+    r'^([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)'
+    r'(?:\+(\d*\.?\d+(?:[eE][+-]?\d+)?))?'
+    r'(?:[−-](\d*\.?\d+(?:[eE][+-]?\d+)?))?$'
+    )
+
+    for col in df.columns[1:]:  # skip the parameter-name column
+        vals, ups, downs = [], [], []
+
+        for s in df[col].astype(str).str.strip():
+            m = pat.fullmatch(s)
+            if m:
+                vals.append(float(m.group(1)))
+                ups.append(float(m.group(2)) if m.group(2) else None)
+                downs.append(float(m.group(3)) if m.group(3) else None)
+            else:
+                try: vals.append(float(s))
+                except: vals.append(s)
+                ups.append(None)
+                downs.append(None)
+
+        val_df[col] = vals
+        up_df[col] = ups
+        down_df[col] = downs
+        
+    return val_df, up_df, down_df
+
+
+
+class ParamTable(): 
+    def __init__(self, filename):
+        self.df = pd.read_csv(filename)
+
+    def getcol(self, key):
+        return self.df[key].values
+
+    def getparams(self, **keys):
+        df = self.df.copy()
+        for k,v in keys.items():
+            if isinstance(df, pd.Series):
+                df = pd.DataFrame(df).T
+            if k not in df.columns: 
+                print(f"key {k} not in {df.columns.to_list()}")
+                pass
+            elif v in df[k].values: df = df.set_index(k).loc[v]
+            else: print(f"Value {v} not in {np.unique(df[k].values)}")
+        return df
+    
