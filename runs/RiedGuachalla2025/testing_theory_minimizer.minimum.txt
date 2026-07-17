@@ -1,2 +1,0 @@
-#        weight    minuslogpost              P0          beta_t           A2h_t   minuslogprior minuslogprior__0            chi2   chi2__tSZ_ILC
-              1      -50.126548       13.550885       2.9962504       4.7775185        7.469724         7.469724      -115.19254      -115.19254

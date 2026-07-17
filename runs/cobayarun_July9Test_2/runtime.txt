@@ -1,4 +1,0 @@
----- SLURM timing ----
-Started: Thu Jul  9 01:35:14 PM PDT 2026
-Ended: Thu Jul  9 01:35:32 PM PDT 2026
-Wall time: 18 seconds

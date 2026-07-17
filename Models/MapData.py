@@ -14,9 +14,10 @@ import h5py, json, tarfile
 
 import Models.Studies as Studies
 
+from config import DATA_PATH
 
 
-datapath = "/global/homes/c/cpopik/Data"  # path to data
+datapath = DATA_PATH
 
 
 class BaseMapData:
@@ -27,8 +28,8 @@ class BaseMapData:
 
 class ACTDR6(BaseMapData, Studies.Coulton2024):  # ACT DR6 component-separated maps
     path = f"{datapath}/ACTDR6"  # Path to data downloaded from portal.nersc.gov/project/act/dr6_nilc/ymaps_20230220/
-    otherpath = "/global/cfs/projectdirs/act/data/act_dr6/dr6.02/beams/daytime_beams/"
-    # NERSC_path = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220"  # path to data in NERSC
+    # NERSC_path_1 = "/global/cfs/projectdirs/act/data/act_dr6/dr6.02/beams/daytime_beams/"
+    # NERSC_path_2 = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220"  # path to data in NERSC
     subs={'freq': ['f150', 'f220','f090']}
     info={}
     def __init__(self, inputsdict={}, **inputvars):
@@ -50,7 +51,7 @@ class ACTDR6(BaseMapData, Studies.Coulton2024):  # ACT DR6 component-separated m
 
 class Coulton2024(BaseMapData, Studies.Coulton2024):  # ACT DR6 component-separated maps
     path = f"{datapath}/ACTDR6"  # Path to data downloaded from portal.nersc.gov/project/act/dr6_nilc/ymaps_20230220/
-    otherpath = "/global/cfs/projectdirs/act/data/act_dr6/dr6.02/beams/daytime_beams/"
+    # NERSC_path_1 = "/global/cfs/projectdirs/act/data/act_dr6/dr6.02/beams/daytime_beams/"
     # NERSC_path = "/global/cfs/projectdirs/act/www/dr6_nilc/ymaps_20230220"  # path to data in NERSC
     subs={}
     info={}

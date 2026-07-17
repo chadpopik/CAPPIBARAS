@@ -4,24 +4,20 @@ Likelihood for SZ model
 """
 
 
+import time
 import sys
 import numpy as np
-import astropy
 import astropy.units as u
-import astropy.constants as c
 from typing import Optional, Sequence, Dict, Any
-from astropy.cosmology import default_cosmology, Planck18
-from scipy.interpolate import RegularGridInterpolator
 
 from Models import TargetData, MapData, HaloModels, FFTs, Projections, Profiles, SHMRs, HODs, Dust, Measurements, Spectra2
 
 from cobaya.yaml import yaml_load_file
 from cobaya.theory import Theory
 
-sys.path.append('/global/homes/c/cpopik/soliket/')
+from config import SOLIKET_PATH
+sys.path.append(str(SOLIKET_PATH))
 from soliket.gaussian import GaussianData, GaussianLikelihood
-
-
 
 YAML_FILE = None  # yaml filename set right before running cobaya
 VERBOSE = False  # verbose option for testing in notebook
@@ -61,9 +57,9 @@ class SZLikelihood(GaussianLikelihood):
         self.targetdata = getattr(TargetData, self.TargetData['name'])(self.TargetData['spefs'])
         if VERBOSE: print("Making Redshift and Halo Mass Distributions:")
         # Construct redshift distribution
-        self.targetdata.make_zdist(dz=self.TargetData['dz'])
+        self.targetdata.make_zdist(**self.TargetData)
         # Construct halo mass distribution, needs halo model for density unit calculations
-        self.targetdata.make_Mhdist(logMhMax=17, dlogMh=self.TargetData['dlogM'], halomodel=self.halomodel)
+        self.targetdata.make_Mhdist(halomodel=self.halomodel, **self.TargetData)
         if PaperCheck: self.print_datainfo()
 
         if VERBOSE: print("Setting up Projection, Beam Convolution, Aperture methods:", self.Projection['name'], self.Projection['spefs'])
@@ -106,7 +102,8 @@ class SZLikelihood(GaussianLikelihood):
         self.model = lambda params={}: self.project(self.avemeth(self.prof(params)))
 
         print(f"{self.r.min():.2e}<r<{self.r.max():.2e}, N_r={self.r.shape[0]}")
-
+            
+        
 
     def get_requirements(self):
         return {k: None for k in yaml_load_file(YAML_FILE)['params'].keys()}
@@ -124,6 +121,60 @@ class SZLikelihood(GaussianLikelihood):
     def logp(self, **params_values):
         theory = self._get_theory({**params_values})
         return self.data.loglike(theory)
+    
+    def test_timing(self):
+        timings = {
+            "profile1h": [],
+            "profile2h": [],
+            "profile_total": [],
+            "average": [],
+            "project": [],
+            "forward_total": [],
+            "cobaya": [],
+            "loglike": [],
+        }
+
+        for i in range(10):
+            time0 = time.time()
+
+            prof = self.prof({})
+            time1 = time.time()
+            timings["profile_total"].append((time1 - time0) * 1000)
+
+            profave = self.avemeth(prof)
+            time2 = time.time()
+            timings["average"].append((time2 - time1) * 1000)
+
+            _ = self.project(profave)
+            time3 = time.time()
+            timings["project"].append((time3 - time2) * 1000)
+
+            timings["forward_total"].append((time3 - time0) * 1000)
+
+            theory = self._get_theory({})
+            time4 = time.time()
+            timings["cobaya"].append((time4 - time3) * 1000)
+
+            _ = self.data.loglike(theory)
+            time5 = time.time()
+            timings["loglike"].append((time5 - time4) * 1000)
+            
+            prof2h = self.prof2h({})
+            time6 = time.time()
+            timings["profile2h"].append((time6 - time5) * 1000)
+            
+            prof1h = self.prof1h({})
+            time7 = time.time()
+            timings["profile1h"].append((time7 - time6) * 1000)
+
+        results = {}
+        for label, values in timings.items():
+            mean_t = np.mean(values)
+            median_t = np.median(values)
+            results[label] = {"mean": mean_t, "median": median_t}
+            print(f"{label}: mean={mean_t:.2f} ms, median={median_t:.2f} ms")
+
+        return results
 
 
 

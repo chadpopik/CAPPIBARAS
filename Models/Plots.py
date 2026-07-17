@@ -3,7 +3,9 @@ import numpy as np
 import pandas as pd
 import re
 
-plotpath = "/global/homes/c/cpopik/CAPPIBARAS/Models/PlotChecks"
+from config import CAPPIBARAS_PATH
+
+plotpath = f"{CAPPIBARAS_PATH}/Models/PlotChecks"
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -522,124 +524,3 @@ class Hadzhiyska2026(BasePlots):  # ui.adsabs.harvard.edu/abs/2025arXiv251014135
             xlabel=r'$z$', ylabel=r'$N_\text{gal}$',
             xlim=(0.06, 0.6), ylim=(-0.5e3, 11.25e3), xscale='linear', yscale='linear')
         
-    
-    
-    
-class BasePlots2():
-    def __init__(self, plotpath):
-        self.plotpath = plotpath
-        self.paper = self.name = self.__class__.__name__
-
-    def axsetup(self, ax, ax2, filename, xlabel, ylabel, xlim, ylim, xscale, yscale):
-        img = plt.imread(f"{self.plotpath}/{filename}.png")
-        ax.set(ylabel=ylabel, xlabel=xlabel, xlim=xlim, ylim=ylim, xscale=xscale, yscale=yscale)
-        ax2.set_axis_off(); ax2.set_zorder(0); ax.patch.set_alpha(0); ax.set_zorder(1)
-        ax2.imshow(img, extent=[*ax.get_xlim(), *ax.get_ylim()], aspect='auto')
-
-    def plot(self, filename, width, height, xlabel, ylabel, xlim, ylim, xscale, yscale, nrow=1, ncol=1):
-        fig, axs = plt.subplots(nrow, ncol, figsize=(width, height), layout='constrained')
-        if nrow==1 and ncol==1:
-            ax2 = fig.add_subplot(111, frameon=False)
-            self.axsetup(axs, ax2, filename, xlabel, ylabel, xlim, ylim, xscale, yscale)
-            return fig, axs
-        
-        for i, ax in enumerate(axs.flatten()):
-            ax2 = fig.add_subplot(int(f'{nrow}{ncol}{i+1}'), frameon=False)
-            self.axsetup(ax, ax2, filename[i], 
-                xlabel=xlabel[i] if isinstance(xlabel, list) else xlabel, 
-                ylabel=ylabel[i] if isinstance(ylabel, list) else ylabel, 
-                xlim=xlim[i] if isinstance(xlim, list) else xlim,
-                ylim=ylim[i] if isinstance(ylim, list) else ylim,
-                xscale=xscale[i] if isinstance(xscale, list) else xscale,
-                yscale=yscale[i] if isinstance(yscale, list) else yscale)
-            
-        self.autofontsize(fig)
-        return fig, axs
-    
-    def autofontsize(self, fig, label_mult=2, tick_mult=1.5, title_mult=5, legend_mult=5):
-        """
-        Automatically set fontsize for labels, ticks, titles, and legends
-        for all axes in a figure based on figure size and subplot grid.
-        """
-        figsize = fig.get_size_inches()
-        axes = fig.get_axes()
-        nrows, ncols = axes[0].get_subplotspec().get_gridspec().get_geometry()
-
-        fig_area = figsize[0] * figsize[1]
-        n_panels = nrows * ncols
-        base = max(8, np.sqrt(fig_area / n_panels))
-
-        fs_label  = int(base * label_mult)
-        fs_tick   = int(base * tick_mult)
-        fs_title  = int(base * title_mult)
-        fs_legend = int(base * legend_mult)
-
-        for ax in axes:
-            ax.xaxis.label.set_fontsize(fs_label)
-            ax.yaxis.label.set_fontsize(fs_label)
-            ax.tick_params(axis='both', labelsize=fs_tick)
-            ax.title.set_fontsize(fs_title)
-            if ax.get_legend():
-                ax.get_legend().prop.set_size(fs_legend)
-
-        if fig._suptitle:
-            fig._suptitle.set_fontsize(int(base * title_mult * 1.2))
-
-        return {'label': fs_label, 'tick': fs_tick, 'title': fs_title, 'legend': fs_legend}
-    
-    
-    
-def splittable(df):
-    # df is your original DataFrame
-    val_df = df.copy()
-    up_df = df.copy()
-    down_df = df.copy()
-
-    pat = re.compile(
-    r'^([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)'
-    r'(?:\+(\d*\.?\d+(?:[eE][+-]?\d+)?))?'
-    r'(?:[−-](\d*\.?\d+(?:[eE][+-]?\d+)?))?$'
-    )
-
-    for col in df.columns[1:]:  # skip the parameter-name column
-        vals, ups, downs = [], [], []
-
-        for s in df[col].astype(str).str.strip():
-            m = pat.fullmatch(s)
-            if m:
-                vals.append(float(m.group(1)))
-                ups.append(float(m.group(2)) if m.group(2) else None)
-                downs.append(float(m.group(3)) if m.group(3) else None)
-            else:
-                try: vals.append(float(s))
-                except: vals.append(s)
-                ups.append(None)
-                downs.append(None)
-
-        val_df[col] = vals
-        up_df[col] = ups
-        down_df[col] = downs
-        
-    return val_df, up_df, down_df
-
-
-
-class ParamTable(): 
-    def __init__(self, filename):
-        self.df = pd.read_csv(filename)
-
-    def getcol(self, key):
-        return self.df[key].values
-
-    def getparams(self, **keys):
-        df = self.df.copy()
-        for k,v in keys.items():
-            if isinstance(df, pd.Series):
-                df = pd.DataFrame(df).T
-            if k not in df.columns: 
-                print(f"key {k} not in {df.columns.to_list()}")
-                pass
-            elif v in df[k].values: df = df.set_index(k).loc[v]
-            else: print(f"Value {v} not in {np.unique(df[k].values)}")
-        return df
-    

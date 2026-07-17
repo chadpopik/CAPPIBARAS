@@ -46,6 +46,9 @@ class Popik2026(BaseSpectra, Studies.Popik2026):
         aveprof = lambda prof, p: np.trapz(np.trapz(self.FFT3D(prof)*intfac(p), logM), zs) # take mass/redshift average
 
         return lambda prof, p={}: self.IFFT1D(aveprof(prof, p))*prof.unit
+    
+    
+
 
 
     

@@ -21,8 +21,9 @@ import Models.Studies as Studies
 import Models.HaloModels as HaloModels
 import Models.SHMRs as SHMRs
 
+from config import DATA_PATH, STACKING_PATH
 
-datapath = "/global/homes/c/cpopik/Data"  # path to data
+datapath = DATA_PATH
 
 class BaseTargetData:
     # From a catalof, make histogrammed distributions of a given column
@@ -70,7 +71,7 @@ class Schaan2021(BaseTargetData, Studies.Schaan2021):  # ACT DR5 maps stacked on
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars)
         
-        self.bigdata_cmass = np.loadtxt('/global/homes/c/cpopik/Data/Schaan2021/catalog.txt')
+        self.bigdata_cmass = np.loadtxt(f'{datapath}/Schaan2021/catalog.txt')
           
     def make_zdist(self, zMin=None, zMax=None, dz=None, zNum=None):
         self.catdist('z', self.bigdata_cmass[:, 2], qMin=zMin, qMax=zMax, dq=dz, qNum=zNum, densspace=self.area)
@@ -90,7 +91,7 @@ class Schaan2021(BaseTargetData, Studies.Schaan2021):  # ACT DR5 maps stacked on
 
 class Zhou2023(BaseTargetData, Studies.Zhou2023):  # DESI LS DR9 LRGs for Cross-correlation (Zhou+ 2023, arxiv.org/abs/2309.06443)
     path = f"{datapath}/Zhou2023B"  # path to data from zenodo.org/records/8319955
-    rawpath = f'/global/cfs/projectdirs/desi/public/papers/c3/lrg_xcorr_2023/v1/catalogs' # path to raw data from https://data.desi.lbl.gov/public/papers/c3/lrg_xcorr_2023/v1/catalogs/
+    # rawpath = f'/global/cfs/projectdirs/desi/public/papers/c3/lrg_xcorr_2023/v1/catalogs' # path to raw data from https://data.desi.lbl.gov/public/papers/c3/lrg_xcorr_2023/v1/catalogs/
     # https://data.desi.lbl.gov/public/papers/c3/lrg_xcorr_2023/v1/catalogs/
 
     subs = {
@@ -106,7 +107,7 @@ class Zhou2023(BaseTargetData, Studies.Zhou2023):  # DESI LS DR9 LRGs for Cross-
         self.require(['zbin', 'sample', 'hemisphere'])
 
         sampstr = 'extended_' if self.sample=='ext' else ''
-        rawcat = Table.read(f"{self.rawpath}/dr9_{sampstr}lrg_pzbins.fits")
+        rawcat = Table.read(f"{self.path}/dr9_{sampstr}lrg_pzbins.fits")
         
         # spec = importlib.util.spec_from_file_location("cuts", f"{self.path}/quality_cuts.py")
         # cuts = importlib.util.module_from_spec(spec)
@@ -169,7 +170,7 @@ class RiedGuachalla2025(BaseTargetData, Studies.RiedGuachalla2025):  # Stacked k
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars)
         
-    def make_zdist(self, zMin=None, zMax=None, dz=None, zNum=None):
+    def make_zdist(self, zMin=None, zMax=None, dz=None, zNum=None, **kwargs):
         self.require(['bin'])  # require bin for file specification
         self.allcat_zs = dict(np.load(f"{self.path}/fig2_hist_z.npz"))  # load redshifts of all galaxies in catalog
         if self.bin[0]=='z': self.cat_zs = self.allcat_zs[f'{self.bin}']  # if zbin is specified, select for that subsample
@@ -177,7 +178,7 @@ class RiedGuachalla2025(BaseTargetData, Studies.RiedGuachalla2025):  # Stacked k
 
         self.catdist('z', self.cat_zs, qMin=zMin, qMax=zMax, dq=dz, qNum=zNum, densspace=self.area)
         
-    def make_Msdist(self, halomodel, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None):
+    def make_Msdist(self, halomodel, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None, **kwargs):
         self.require(['bin'])  # require bin for file specification
         self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
         if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
@@ -188,7 +189,7 @@ class RiedGuachalla2025(BaseTargetData, Studies.RiedGuachalla2025):  # Stacked k
         
         self.catdist('logMs', self.cat_logMs, qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
         
-    def make_Mhdist(self, halomodel, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None):
+    def make_Mhdist(self, halomodel, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None, **kwargs):
         self.require(['bin'])  # require bin for file specification
         self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
         if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
@@ -415,7 +416,7 @@ class Liu2025(BaseTargetData, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked o
 
 
 class Kusiak2022(BaseTargetData, Studies.Kusiak2022):  # unWISE galaxies and Planck lensing
-    path = "/global/homes/c/cpopik/Data/Kusiak2022"  # path to data, provided by author
+    path = f"{datapath}/Kusiak2022"  # path to data, provided by author
     subs = {'sample':['Blue', 'Green', 'Red']}
 
     def __init__(self, inputsdict={}, **inputvars):
@@ -522,7 +523,7 @@ class White2022(BaseTargetData, Studies.White2022):  # DESI LS DR9 LRGs correlat
 
 
 class Popik2026(BaseTargetData, Studies.Popik2026):  # TODO: In progress
-    path = f"/global/homes/c/cpopik/Stacking_Correlating/Results"
+    path = f"{STACKING_PATH}/Results"
     subs = {
     'zbin': ['z1', 'z2', 'z3', 'z4'],
     'deproj' : ['Base', 'cib', 'cib_cibdBeta', 'cib_cibdBeta_cibdT', 'cib_cibdT'],
@@ -634,7 +635,7 @@ class Gao2023(BaseTargetData, Studies.Gao2023):  # DESI 1% LRGs and ELGs (Gao+ 2
 
 
 class Kou2023(BaseTargetData, Studies.Kou2023):
-    path = "/global/homes/c/cpopik/Data/Kou2023"  # path to data, taken from plots using webplotdigitizer
+    path = f"{datapath}/Kou2023"  # path to data, taken from plots using webplotdigitizer
     subs = {'mbin':['M1', "M2", "M3", "M4"]}
 
     def __init__(self, inputsdict, **inputvars):
@@ -650,7 +651,7 @@ class Kou2023(BaseTargetData, Studies.Kou2023):
 
 
 class Amodeo2021(BaseTargetData, Studies.Amodeo2021):  # Inference on BOSS DR10 stacked ACT DR5 (arxiv.org/abs/2009.05558)
-    path = '/global/homes/c/cpopik/Data/Amodeo2021/'  # path to data, taken from plots using webplotdigitizer and various repos
+    path = f"{datapath}/Amodeo2021/"  # path to data, taken from plots using webplotdigitizer and various repos
     subs = {'prof': ['Amodeo', 'Battaglia', 'TNG']}
     
     info = { # galaxy catalog detailed, II.Ap1/Ap4/Figure2

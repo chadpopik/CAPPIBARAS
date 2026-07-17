@@ -1,0 +1,8 @@
+sample,lowz,cmass,CMASSm
+v_rms,320,313,
+MhMean,5e13,3e13,
+zMean,0.31,0.55,
+Ngal_catalog,218905,501844,777202
+Ngal_overlap,151713,325518,385137
+Ngal_masked,145714,312708,368701
+Ngal,134702,311309,360084

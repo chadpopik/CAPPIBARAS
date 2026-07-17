@@ -1,2 +1,0 @@
-#        weight    minuslogpost           P0_A0       P0_alphaz        alpha_A0    beta_pres_A0           xc_A0           A2h_t   minuslogprior minuslogprior__0            chi2     chi2__zbin1     chi2__zbin2     chi2__zbin3     chi2__zbin4
-              1      -394.18123       1.0223623     -0.99240917      0.89064195       2.9381546      0.67777741      0.72810819       8.6738892        8.6738892      -805.71023      -221.46958      -215.04048      -198.62587       -170.5743

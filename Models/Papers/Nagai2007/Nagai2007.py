@@ -13,7 +13,7 @@ import pandas as pd
 import astropy.units as u
 import astropy.constants as c
 
-from Models.Plots import BasePlots2, ParamTable
+from Models.Papers.PlotsTables import BasePlots2, ParamTable
 from Models.HaloModels import pyccl_model
 
 
@@ -32,8 +32,8 @@ class Cosmology(pyccl_model):
         super().__init__(self.definedparams | inputdict | inputvars)
         for key, value in (self.definedparams | inputdict | inputvars).items(): setattr(self, key, value)
 
-        
-    
+
+
 
 class HaloModel():
     # 2. The masses are reported at the radius r500 enclosing overdensities with respect to the critical density at the redshift of the output.
@@ -81,20 +81,97 @@ class TableA1(ParamTable):
         
 
 # Fig. 1.— Radial profiles of the ICM in relaxed simulated clusters at z = 0. For each of the physical profiles the upper panels show the profiles, while the bottom panels show the corresponding fractional deviations of the profiles in the CSF simulation from the corresponding profiles in the non-radiative runs. The figure shows gas density (top-left), temperature (top-right), entropy (bottom-left), and pressure (bottom-right) profiles. Thick solid and dashed lines show the average profiles of the relaxed clusters in the CSF and non-radiative runs, respectively. The shaded band indicates the rms scatter around the mean profile for the CSF run. In addition, the dashed and dotted lines indicate the average profiles of systems with TX > 2.5 and < 2.5 keV, respectively, in the CSF simulations. Note that the entropy profiles of the non-radiative runs outside 0.3r500 are well-described by a power-law radial profile K ∝ r1.2, indicated by the dashed line in the bottom-left panel.
-def Fig1d(width=5.5, height=5):
-    return BasePlots2(thispath).plot(filename='Fig1d', width=width, height=height,
-        xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
-        xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 3.8e2), xscale='log', yscale='log')
+class Fig1d(BasePlots2):
+    subplots = [[
+        dict(name='Fig1d', filename='Fig1d', figsize=(5.5, 5),
+             xlabel=r'$r/r_{500}$', xlim=(4.5e-2, 2.3), xscale='log',
+             ylabel=r'$P(r)/P_{500}$', ylim=(2.4e-3, 3.8e2), yscale='log'),
+    ]]
+
+    def __init__(self):
+        super().__init__(thispath)
 
 
 # Fig. 2.— Comparison of the ICM profiles in relaxed clusters at the present day (z ≈ 0) in cosmological cluster simulations and the Chandra sample of Vikhlinin et al. (2006). The panels show the gas density (top-left), temperature (top-right), entropy (bottom-left), and pressure (bottom-right). Thick solid and dashed lines show the mean profiles in the CSF and non-radiative simulations, respectively, while the observed profiles are shown by the thin dotted, long-dashed and short-dashed lines for the systems with TX > 5 keV, 2.5 < TX < 5 keV, and TX < 2.5 keV, respectively. Note that at r & 0.1r500 the profiles of the CSF simulations provide a better match to the observed profiles than the profiles in the non-radiative runs.
-def Fig2d(width=5.5, height=5):
-    return BasePlots2(thispath).plot(filename='Fig2d', width=width, height=height,
-        xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
-        xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 1.9e2), xscale='log', yscale='log')
+class Fig2d(BasePlots2):
+    subplots = [[
+        dict(name='Fig2d', filename='Fig2d', figsize=(5.5, 5),
+             xlabel=r'$r/r_{500}$', xlim=(4.5e-2, 2.3), xscale='log',
+             ylabel=r'$P(r)/P_{500}$', ylim=(2.4e-3, 1.9e2), yscale='log'),
+    ]]
+
+    def __init__(self):
+        super().__init__(thispath)
+
 
 # Fig. A1.— Generalized NFW fits to the pressure profiles of relaxed clusters in simulations and Chandra X-ray observations. Open circles and squares show the mean profiles in the CSF and non-radiative simulations, respectively. Thin dotted shows Chandra X-ray clusters with TX > 5 keV. Thick lines show the best-fit generalized NFW model to simulation and observed profiles (see Table A1 for the best-fit parameters).
-def FigA1(width=5.5, height=5):
-    return BasePlots2(thispath).plot(filename='FigA1', width=width, height=height,
-        xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
-        xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 1.9e2), xscale='log', yscale='log')
+class FigA1(BasePlots2):
+    subplots = [[
+        dict(name='FigA1', filename='FigA1', figsize=(5.5, 5),
+             xlabel=r'$r/r_{500}$', xlim=(4.5e-2, 2.3), xscale='log',
+             ylabel=r'$P(r)/P_{500}$', ylim=(2.4e-3, 1.9e2), yscale='log'),
+    ]]
+
+    def __init__(self):
+        super().__init__(thispath)
+
+
+class Studies(BaseStudy):  # Effects of Galaxy Formation on Thermodynamics of the Intracluster Medium, ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
+    subs = {}
+    info = {
+        # Cosmological Parameters, 2p1/2p3/3p2
+        'Om0':0.3, 'Ob0':0.04286, 'h':0.7, 'sigma8':0.9,
+        'Ol0':0.7, 'Fb':0.175,
+        'MassDef':'500c', 'Concentration': 'Constant', # Mass definition, S2p3/Eq11
+        # right after eq 1/2/3
+        'mu':0.59, 'mu_e':'1.14'
+    }
+
+
+class ParamsTable(ParamTable):  # Table A1
+    def __init__(self, filename=f"{thispath}/params.csv"):
+        super().__init__(filename)
+
+
+class Profiles(BaseProfile, Studies.Nagai2007):  # Pressure Profile from GADGET-2 made hydro sims
+    models = {
+        'Run': ['Obs', 'CSF', 'NR'],  # Observed/cooling+SF sims/Non-rad sims
+        'Sample':['Rel', 'Unrel'],  # relaxed or unrelaxed sample
+    }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
+        self.p0 = ParamsTable().getparams(Run=self.Run, Sample=self.Sample).to_dict()
+
+    def P500(self, z, logM500c, units='cosmo'):  # Eq 3
+        val = 1.45e-11*u.erg/u.cm**3 * (10**logM500c/1e15)**(2/3) * (self.H(z)/self.H0)**(8/3)
+        return val.to(self.units('pres', units))
+
+    def PGNFW(self, x, gamma, alpha, beta, P0):  # Eq A1
+        return P0 / (x**gamma * (1+x**alpha)**((beta-gamma)/alpha))
+
+    def Pressure(self, r, z, logM500c, units='cosmo'):
+        self.require(list(self.models.keys()))
+        r, z, logM500c = self.setdim(r, z, logM500c)  # set proper dimensions
+        P500 = self.P500(z, logM500c, units)
+        x = r*u.Mpc/(self.r500c(z, logM500c))
+        PGNFW = lambda p: self.PGNFW(x=x*p['c500'], gamma=p['gamma'], alpha=p['alpha'], beta=p['beta'], P0=p['P0'])
+        return lambda p={}: P500*PGNFW(self.p0 | p)
+
+
+class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
+    def Fig1d(self, width=5.5, height=5):
+        return self.plot(filename='Fig1d', width=width, height=height,
+            xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
+            xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 3.8e2), xscale='log', yscale='log')
+
+    def Fig2d(self, width=5.5, height=5):
+        return self.plot(filename='Fig2d', width=width, height=height,
+            xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
+            xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 1.9e2), xscale='log', yscale='log')
+
+    def FigA1(self, width=5.5, height=5):
+        return self.plot(filename='FigA1', width=width, height=height,
+            xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
+            xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 1.9e2), xscale='log', yscale='log')

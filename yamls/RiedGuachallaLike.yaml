@@ -1,0 +1,38 @@
+shared:  # Aspects that are shared between all likelihoods
+    MapData: {name: 'Coulton2024', spefs: {}}
+    # MapData: {name: 'ACTDR6', spefs: {}}
+    HaloModel: {name: 'pyccl_model', spefs: {'MassDef':'200c', 'MassFunc':'Tinker08', 'HaloBias': 'Tinker10', 'PowSpec': 'Linear', 'Concentration':'Bhattacharya13'}}
+    Projection: {name: 'Popik2025', spefs: {}}
+    Profile: {name: 'Popik2026', spefs:{}, nr: 50}  # Profile model
+
+likelihood:
+    kSZ_RG25_z1:
+        class: SOLikelihoods.KSZLikelihood
+        Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'all'}}
+        TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'all'}, zNum: 10, logMhNum: 20, logMhMax: 16}
+        MapData: {name: 'Coulton2024', spefs: {}}
+        HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_all'}}
+
+    # kSZ_RG25_z2:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_2'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_2'}, zNum: 10, logMhNum: 20, logMhMax: 16}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z2'}}
+
+    # kSZ_RG25_z3:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_3'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_3'}, zNum: 10, logMhNum: 20, logMhMax: 16}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z3'}}
+
+    # kSZ_RG25_z4:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_4'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_4'}, zNum: 10, logMhNum: 20, logMhMax: 16}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z4'}}
+
+    # tSZ_L25_z1:
+    #     class: SOLikelihoods.TSZLikelihood
+    #     Measurement: {name: 'Liu2025', spefs: {'zbin':'z1', 'ACTDR': 'DR6', 'dp':'dBeta', 'Beta':'fiducial', 'TCIB':'10.7'}}
+    #     TargetData: {name: 'Liu2025', spefs: {'zbin':'z1'}, dz: 0.05, dlogM: 0.05, zMin: 0.2, zMax: 0.7}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z1'}}

@@ -15,8 +15,10 @@ import h5py, json, tarfile
 import Models.Studies as Studies
 import Models.HaloModels as HaloModels
 
+from config import DATA_PATH, STACKING_PATH
 
-datapath = "/global/homes/c/cpopik/Data"  # path to data
+
+datapath = DATA_PATH
 
 
 class BaseMeasurement:
@@ -34,7 +36,7 @@ class BaseMeasurement:
 #     path = f"{datapath}/Maus2025"  # Path to data from zenodo.org/records/17636841
 
 class Popik2026(BaseMeasurement, Studies.Popik2026):  # TODO: In progress
-    path = f"/global/homes/c/cpopik/Stacking_Correlating/Results"
+    path = f"{STACKING_PATH}/Results"
     subs = {
     'zbin': ['z1', 'z2', 'z3', 'z4'],
     'deproj' : ['Base', 'cib', 'cib_cibdBeta', 'cib_cibdBeta_cibdT', 'cib_cibdT'],
@@ -242,7 +244,7 @@ class Hadzhiyska2025(BaseMeasurement, Studies.Hadzhiyska2025):  # Stacked kSZ me
 
 class Liu2025(BaseMeasurement, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked on DESI LS DR9 LRGs (Liu+ 2025, arxiv.org/abs/2502.08850)
     path = f"{datapath}/Liu2025"  # path to data from zenodo.org/records/14706729
-    sharedpath = f"/global/homes/c/cpopik/Data/Liu2025_shared"  # path to data from author
+    sharedpath = f"{datapath}/Liu2025_shared"  # path to data from author
     subs = {
         'zbin' : ['z1', 'z2', 'z3', 'z4'],  # photometric redshift bin
         'ACTDR' : ['DR5', 'DR6'],  # ACT y map DR
@@ -304,7 +306,7 @@ class Liu2025(BaseMeasurement, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked 
     
     
 class Kou2023(BaseMeasurement, Studies.Kou2023):
-    path = "/global/homes/c/cpopik/Data/Kou2023"  # path to data, taken from plots using webplotdigitizer
+    path = f"{datapath}/Kou2023"  # path to data, taken from plots using webplotdigitizer
     subs = {'mbin':['M1', "M2", "M3", "M4"]}
 
     def __init__(self, inputsdict, **inputvars):
@@ -350,7 +352,7 @@ class Zhou2023(BaseMeasurement, Studies.Zhou2023):  # DESI LS DR9 LRGs for Cross
 
 
 class Kusiak2022(BaseMeasurement, Studies.Kusiak2022):  # HOD for unWISE galaxies and Planck lensing arxiv.org/abs/2203.12583
-    path = "/global/homes/c/cpopik/Data/Kusiak2022"  # path to data, taken from plots using webplotdigitizer
+    path = f"{datapath}/Kusiak2022"  # path to data, taken from plots using webplotdigitizer
     subs = {'sample':['Blue', 'Green', 'Red']}
 
     def __init__(self, inputsdict={}, **inputvars):
@@ -393,7 +395,7 @@ class White2022(BaseMeasurement, Studies.White2022):  # DESI LS DR9 LRGs correla
 
 
 class Amodeo2021(BaseMeasurement, Studies.Amodeo2021):  # Inference on BOSS DR10 stacked ACT DR5 (arxiv.org/abs/2009.05558)
-    path = '/global/homes/c/cpopik/Data/Amodeo2021/'  # path to data, taken from plots using webplotdigitizer and various repos
+    path = f"{datapath}/Amodeo2021/"  # path to data, taken from plots using webplotdigitizer and various repos
     subs = {'prof': ['Amodeo', 'Battaglia', 'TNG'],
                 'units': ['cosmo', 'cgs']}
 
@@ -493,7 +495,7 @@ class Naess2020(BaseMeasurement, Studies.Naess2020):  # ACT DR5 (Naess 2020, arx
 
 
 class Koukoufilippas2020(BaseMeasurement, Studies.Koukoufilippas2020):  # arxiv.org/abs/1909.09102
-    path = "/global/homes/c/cpopik/Data/Koukoufilippas2020"  # path to data, taken from plots using webplotdigitizer
+    path = f"{datapath}/Koukoufilippas2020"  # path to data, taken from plots using webplotdigitizer
     subs = {'sample':['2MPZ','WIxSC-1','WIxSC-2','WIxSC-3','WIxSC-4','WIxSC-5']}
 
     def __init__(self, inputsdict, **inputvars):
@@ -513,7 +515,7 @@ class Koukoufilippas2020(BaseMeasurement, Studies.Koukoufilippas2020):  # arxiv.
             
             
 class CAMELShalo(BaseMeasurement):  # Random halo
-    path = "/global/homes/c/cpopik/Data/CAMELS"
+    path = f"{datapath}/CAMELS"
     subs = {'units':['cgs','cosmo']}
 
     def __init__(self, inputs, **kwargs):

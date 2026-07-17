@@ -12,7 +12,9 @@ from scipy.interpolate import RegularGridInterpolator
 
 from Models import SHMRs  # For running on level of CAPPIABRAS, one folder up from Models where SMFs is
 
-datapath = "/global/homes/c/cpopik/CAPPIBARAS/Data"
+from config import DATA_PATH
+
+datapath = DATA_PATH
 
 class BaseSMF:
     # Checks if the model specification is in the list
@@ -66,7 +68,7 @@ class BaseSMF:
 class Jenna_Catalog(BaseSMF):
     info = {'area': 16700,  # assuming the same as XCorr LRGs
             }
-    path = "/global/homes/c/cpopik/Data/"  # location of data
+    path = datapath  # location of data
     masstypes = ['Mstar', 'M200c', 'Mvir']  # Mass type (column names)
     
     def __init__(self, spefs):

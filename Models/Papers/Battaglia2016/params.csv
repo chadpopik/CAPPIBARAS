@@ -1,0 +1,10 @@
+model,AGN,SH
+rho0_A0,4e3,1.9e4
+rho0_alpham,0.29,0.09
+rho0_alphaz,-0.66,-0.95
+alpha_A0,0.88,0.70
+alpha_alpham,-0.03,-0.017
+alpha_alphaz,0.19,0.27
+beta_A0,3.83,4.43
+beta_alpham,0.04,0.005
+beta_alphaz,-0.025,0.037

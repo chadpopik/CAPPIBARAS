@@ -1,0 +1,119 @@
+shared:  # Aspects that are shared between all likelihoods
+    MapData: {name: 'Coulton2024', spefs: {}}
+    # MapData: {name: 'ACTDR6', spefs: {}}
+    HaloModel: {name: 'pyccl_model', spefs: {'MassDef':'200c', 'MassFunc':'Tinker08', 'HaloBias': 'Tinker10', 'PowSpec': 'Linear', 'Concentration':'Bhattacharya13'}}
+    Projection: {name: 'Popik2025', spefs: {}}
+    Profile: {name: 'Popik2026', spefs:{}, nr: 50}  # Profile model
+
+likelihood:
+    kSZ_RG25_z1:
+        class: SOLikelihoods.KSZLikelihood
+        Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'all'}}
+        TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'all'}, zNum: 10, logMhNum: 20, logMhMax: 16}
+        HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_all'}}
+
+    # kSZ_RG25_z2:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_2'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_2'}, zNum: 10, logMhNum: 20, logMhMax: 16}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z2'}}
+
+    # kSZ_RG25_z3:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_3'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_3'}, zNum: 10, logMhNum: 20, logMhMax: 16}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z3'}}
+
+    # kSZ_RG25_z4:
+    #     class: SOLikelihoods.KSZLikelihood
+    #     Measurement: {name: 'RiedGuachalla2025', spefs: {'bin':'z_4'}}
+    #     TargetData: {name: 'RiedGuachalla2025', spefs: {'bin':'z_4'}, zNum: 10, logMhNum: 20, logMhMax: 16}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z4'}}
+
+    # tSZ_L25_z1:
+    #     class: SOLikelihoods.TSZLikelihood
+    #     Measurement: {name: 'Liu2025', spefs: {'zbin':'z1', 'ACTDR': 'DR6', 'dp':'dBeta', 'Beta':'fiducial', 'TCIB':'10.7'}}
+    #     TargetData: {name: 'Liu2025', spefs: {'zbin':'z1'}, dz: 0.05, dlogM: 0.05, zMin: 0.2, zMax: 0.7}
+    #     HOD: {name: 'Hadzhiyska2025A', spefs: {'sample':'Main_z1'}}
+
+
+params:
+    # Cosmological, fixed
+    hh: {value: 0.7}
+    Omega_L: {value: 0.75}
+    Omega_m: {value: 0.25}
+    Omega_b: {value: 0.044}
+    T_CMB: {value: 2.725}
+    XH: {value: 0.76}
+    v_rms: {value: 1.06e-3}  # v_rms//c
+
+    logrho0: {latex: '\log \rho_0', # GNFW Amplitude
+        prior: {min: 0, max: 5},
+        ref: {dist: norm, loc: 2.6, scale: 0.4},
+    }
+    beta_k: {latex: '\beta_k', # Outer slope
+        prior: {min: 0, max: 20},
+        ref: {dist: norm, loc: 2.6, scale: 1},
+    }
+    alpha_k: {latex: '\alpha_k', # Intermediate slope
+        prior: {min: 0, max: 10},
+        ref: 1,
+    }
+    xc_k: {latex: 'x_{c, k}', # Core Radius
+        prior: {min: 0, max: 10},
+        ref: {dist: norm, loc: 0.6, scale: 0.3},
+    }
+    gamma_k: {latex: '\gamma_k', # Inner Slope
+        # value: -0.2
+        prior: {min: -2, max: 0},
+        ref: -0.2,
+    }
+
+    logrho0_2h: {latex: '\log \rho_{0_2h}', # GNFW Amplitude
+        prior: {min: 0, max: 5},
+        ref: {dist: norm, loc: 2.6, scale: 0.4},
+    }
+    beta_k_2h: {latex: '\beta_{k, 2h}', # Two-halo Amplitude
+        prior: {min: 0, max: 20},
+        ref: {dist: norm, loc: 2.6, scale: 1},
+    }
+    alpha_k_2h: {latex: '\alpha_{k, 2h}', # Intermediate slope
+        prior: {min: 0.1, max: 10},
+        ref: 1,
+    }
+    xc_k_2h: {latex: 'x_{c, k, 2h}', # Core Radius
+        prior: {min: 0, max: 10},
+        ref: {dist: norm, loc: 0.6, scale: 0.3},
+    }
+    gamma_k_2h: {latex: '\gamma_{k, 2h}', # Inner Slope
+        # value: -0.2
+        prior: {min: -2, max: 0},
+        ref: -0.2,
+    }
+
+    A2h_k: {latex: 'A_{2h, k}', # Two-halo Amplitude
+        # prior: {min: 0, max: 20},
+        # ref: {dist: norm, loc: 1.1, scale: 0.8},
+        value: 1
+    }
+
+    # # GNFW Amplitude
+    # P0: {ref: 2, prior: {min: 0.5, max: 20}, latex: 'P_0'}
+    # # Outer slope
+    # beta_t: {ref: 3.5, prior: {min: 1.5, max: 6}, latex: '\beta_t'}
+    # # Two-halo Amplitude
+    # A2h_t: {ref: 5, prior: {min: 0.01, max: 20}, latex: 'A_{2h, t}'}
+
+
+# sampler:
+#     mcmc:
+#         Rminus1_stop: 0.01
+#         max_tries: 200d
+#         output_every: 10s
+#         learn_every: 40
+
+# output: runs/Semifinal/testing_theory_3
+# debug: False
+# output_options: 
+#   columns:
+#     add_chain: True

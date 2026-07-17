@@ -606,8 +606,6 @@ class Popik2026(BaseProfile, Studies.Amodeo2021):  #
             xc=xc(p['xc_t'], p['xc_t_z'], p['xc_t_m']), 
             beta=beta(p['beta_t'], p['beta_t_z'], p['beta_t_m']))
         return lambda p={}: P200c*PGNFW(self.p0 | p)
-    
-    
 
     def prof2h(self, r, z, logM200c): 
         dndlogm = lambda z, logM200c: self.dndlogm(z, logM200c)
@@ -615,17 +613,17 @@ class Popik2026(BaseProfile, Studies.Amodeo2021):  #
         Plin = lambda k, z: self.Plin(k, z)
         
         V17 = Vikram2017(dndlogm=dndlogm, bh=bh, Plin=Plin)
-        logM200c_2h = np.linspace(10, 15, 50)
+        logM200c_2h = np.linspace(10, 15, 10)
         lin2h = V17.twohalo(r, z, logM200c, logM200c_2h)  # linear two-halo calculation
         return lambda prof, p={}: lin2h(prof(r, z, logM200c_2h)(p))
 
     def Density2h(self, r, z, logM200c, units='cosmo'):  # two-halo density component
         twohalocalc = self.prof2h(r, z, logM200c)
-        return lambda p={}: (self.p0 | p)['A2h_k']*twohalocalc(self.Density1h, p).to(self.units('dens', units))
+        return lambda p={}: (self.p0 | p)['A2h_k']*twohalocalc(self.Density1h, p | {par[:-3]: p[par] for par in p if '_2h' in par}).to(self.units('dens', units))
 
     def Pressure2h(self, r, z, logM200c, units='cosmo'):  # two-halo pressure component
         twohalocalc = self.prof2h(r, z, logM200c)
-        return lambda p={}: (self.p0 | p)['A2h_t']*twohalocalc(self.Pressure1h, p).to(self.units('pres', units))
+        return lambda p={}: (self.p0 | p)['A2h_t']*twohalocalc(self.Pressure1h, p ).to(self.units('pres', units))
 
     def Pressure(self, r, z, logM200c, units='cosmo'):
         P1h, P2h = self.Pressure1h(r, z, logM200c, units), self.Pressure2h(r, z, logM200c, units)
@@ -634,11 +632,6 @@ class Popik2026(BaseProfile, Studies.Amodeo2021):  #
     def Density(self, r, z, logM200c, units='cosmo'):
         p1h, p2h = self.Density1h(r, z, logM200c, units), self.Density2h(r, z, logM200c, units)
         return lambda p={}: p1h(self.p0 | p) + p2h(self.p0 | p)
-    
-
-    
-    
-
 
 
 

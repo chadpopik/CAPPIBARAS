@@ -13,7 +13,7 @@ import astropy.constants as c
 from scipy.special import erf
 
 import sys,os
-from Models.Plots import BasePlots2, splittable, ParamTable
+from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -48,9 +48,6 @@ class HOD():
         try: self.p0 = Table3_4().getparams(Tracer=self.Tracer,Model=self.Model).to_dict()
         except: self.p0 = {}
         
-        if "LRG" in self.Tracer: self.Nsat = self.Nsat_LRG
-        elif "QSO" in self.Tracer: self.Nsat = self.Nsat_QSO
-        
     def Ncen(self, pdict={}, **kwargs): # Eq 4
         p = self.p0 | pdict | kwargs
         return (p['fic']/2) * (1+erf((self.logM-p['logMcut'])/(np.sqrt(2)*p['sigma'])))
@@ -62,6 +59,9 @@ class HOD():
     def Nsat_QSO(self, pdict={}, **kwargs):  # Eq 5
         p = self.p0 | pdict | kwargs
         return np.where(10**self.logM>=p['kappa']*10**p['logMcut'], ((10**self.logM-p['kappa']*10**p['logMcut'])/10**p['logM1']), 0)**p['alpha']
+    
+    def Nsat(self, pdict={}, **kwargs):
+        return self.Nsat_LRG(pdict, **kwargs) if "LRG" in self.Tracer else self.Nsat_QSO(pdict, **kwargs)
 
 
 
@@ -76,26 +76,123 @@ class Table3_4(ParamTable):
 
     
     
-def Fig1(width=6, height=3.5):
-    # Figure 1. The DESI One-Percent Survey LRG and QSO mean number density as a function of redshift. The dashed vertical lines show the fiducial LRG redshift bin edges of 𝑧 = 0.6, 𝑧 = 0.8, and the maximum redshift we consider for the QSO sample 𝑧 = 2.1.
-    return BasePlots2(thispath).plot(filename='Fig1', width=width, height=height,
-        xlabel=r'$z$', ylabel=r'$n(z) \ [h^3 \text{Mpc}^{-3}]$',
-        xlim=(0.4, 2.3), ylim=(3e-6, 2e-3), xscale='linear',yscale='log')
+# Figure 1. The DESI One-Percent Survey LRG and QSO mean number density as a function of redshift. The dashed vertical lines show the fiducial LRG redshift bin edges of 𝑧 = 0.6, 𝑧 = 0.8, and the maximum redshift we consider for the QSO sample 𝑧 = 2.1.
+class Fig1(BasePlots2):
+    subplots = [[
+        dict(name='Fig1', filename='Fig1', figsize=(6, 3.5),
+             xlabel=r'$z$', xlim=(0.4, 2.3), xscale='linear',
+             ylabel=r'$n(z) \ [h^3 \text{Mpc}^{-3}]$', ylim=(3e-6, 2e-3), yscale='log'),
+    ]]
 
-def Fig7(width=14, height=6):
-    # Figure 7. The LRG HOD best-fit the posterior. The shaded regions correspond to 1 and 2𝜎 posteriors (68% and 95% intervals centered around the median prediction). The horizontal dotted line denotes 𝑁gal = 1.
-    return BasePlots2(thispath).plot(filename=['Fig7a','Fig7b'], nrow=1, ncol=2, width=width, height=height,
-        xlabel=r'$M_h [h^{-1} M_\odot]$', ylabel=r'$N_\text{gal}$',
-        xlim=(1e12, 1e15), ylim=(1e-2, 1e1), xscale='log', yscale='log')
+    def __init__(self):
+        super().__init__(thispath)
 
-def Fig10(width=6, height=5):
-    # Figure 10. The HOD posterior band (central+satellite) of LRG sample at𝑧 > 0.8. The results from 0.8 < 𝑧 < 0.95 and 0.95 < 𝑧 < 1.1 are shown in red and blue respectively. The shaded regions correspond to 1 and 2 𝜎posteriors.
-    return BasePlots2(thispath).plot(filename='Fig10', width=width, height=height,
-        xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N^{(c+s)}_\text{gal}$',
-        xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')
 
-def Fig14(width=6, height=5):
-    # Figure 14. The HOD posterior for the QSO sample. The shaded regions correspond to 1 and 2𝜎 posteriors.
-    return BasePlots2(thispath).plot(filename='Fig14', width=width, height=height,
-        xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N_\text{gal}$',
-        xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')
+# Figure 7. The LRG HOD best-fit the posterior. The shaded regions correspond to 1 and 2𝜎 posteriors (68% and 95% intervals centered around the median prediction). The horizontal dotted line denotes 𝑁gal = 1.
+class Fig7(BasePlots2):
+    subplots = [[
+        dict(name='Fig7a', filename='Fig7a', figsize=(7, 6),
+             xlabel=r'$M_h [h^{-1} M_\odot]$', xlim=(1e12, 1e15), xscale='log',
+             ylabel=r'$N_\text{gal}$', ylim=(1e-2, 1e1), yscale='log'),
+        dict(name='Fig7b', filename='Fig7b', figsize=(7, 6),
+             xlabel=r'$M_h [h^{-1} M_\odot]$', xlim=(1e12, 1e15), xscale='log',
+             ylabel=r'$N_\text{gal}$', ylim=(1e-2, 1e1), yscale='log'),
+    ]]
+
+    def __init__(self):
+        super().__init__(thispath)
+
+
+# Figure 10. The HOD posterior band (central+satellite) of LRG sample at𝑧 > 0.8. The results from 0.8 < 𝑧 < 0.95 and 0.95 < 𝑧 < 1.1 are shown in red and blue respectively. The shaded regions correspond to 1 and 2 𝜎posteriors.
+class Fig10(BasePlots2):
+    subplots = [[
+        dict(name='Fig10', filename='Fig10', figsize=(6, 5),
+             xlabel=r'$M_h \ [h^{-1} M_\odot]$', xlim=(1e12, 1e15), xscale='log',
+             ylabel=r'$N^{(c+s)}_\text{gal}$', ylim=(3e-2, 1e1), yscale='log'),
+    ]]
+
+    def __init__(self):
+        super().__init__(thispath)
+
+
+# Figure 14. The HOD posterior for the QSO sample. The shaded regions correspond to 1 and 2𝜎 posteriors.
+class Fig14(BasePlots2):
+    subplots = [[
+        dict(name='Fig14', filename='Fig14', figsize=(6, 5),
+             xlabel=r'$M_h \ [h^{-1} M_\odot]$', xlim=(1e12, 1e15), xscale='log',
+             ylabel=r'$N_\text{gal}$', ylim=(3e-2, 1e1), yscale='log'),
+    ]]
+
+    def __init__(self):
+        super().__init__(thispath)
+
+
+class StudiesInfoTable(ParamTable):  # satellite fraction, halo mass, bias, z-range, per zbin
+    def __init__(self, filename=f"{thispath}/studies_info.csv"):
+        self.df = read_wide_table(filename)
+
+
+class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2024MNRAS.530..947Y
+    subs = {'zbin': ['LRG1', 'LRG2', 'QSO', 'LRG3', 'LRG4']}
+    info = {
+        # fixed cosmo params, 1.p7
+        'Oc0h2': 0.1200, 'Ob0h2': 0.02237, 'sigma8': 0.811355, 'ns': 0.9649, 'h': 0.6736, 'w0':-1, 'wa':0,
+        'mdef': '200c',  # M not clear, maybe same as zheng 2005/2007? or cmass?
+        'MhMin': 1.3e11,  # Msun/h
+    }
+    info['MhMin'] = cycle(info['MhMin'], lambda M, h=info['h']: M*u.Msun/h)
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+        row = StudiesInfoTable().getparams(zbin=self.zbin).to_dict()
+        row['logMhMean'] = np.log10(10**row['logMhMean']/self.h)
+        for k, v in row.items(): setattr(self, k, v)
+
+
+class HODParamsTable(ParamTable):  # best-fit HOD parameters, Tables 3 & 4
+    def __init__(self, filename=f"{thispath}/hod_params.csv"):
+        super().__init__(filename)
+
+
+class HODs(BaseHOD, Studies.Yuan2023):  # DESI 1% LRGs and QSO using ABACUSHOD
+    models = {'model':['Base', 'Ext'],  # model, Zheng07+fic or with added velocity bias
+            'sample': ['LRG1', 'LRG2', 'QSO', 'LRG3', 'LRG4'],  # sample of galaxies
+            }
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
+        row = HODParamsTable().getparams(model=self.model, sample=self.sample).to_dict()
+        self.p0 = {k: v for k, v in row.items() if pd.notna(v)}
+
+    def Ncen(self, logM):  # Eq 4
+        func = lambda p: Zheng2005().Nc(logM-np.log10(self.h), logMmin=p['logM_cut'], sigmalogM=np.sqrt(2)*p['sigma']) * p['f_ic']
+        return lambda p={}: func(self.p0 | p)
+
+    def Nsat(self, logM):
+        self.require(['sample'])
+        func1 = lambda p: Zheng2005().Ns(10**logM/self.h, M0=p['kappa']*10**p['logM_cut'], M1 = 10**p['logM_1'], alpha=p['alpha'])
+        if self.sample[:3]=='LRG': func = lambda p: func1(p) * self.Ncen(logM)(p)  # Eq 5
+        elif self.sample[:3]=='QSO': func = func1 # Eq 6
+        return lambda p={}: func(self.p0 | p)
+
+
+class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2024MNRAS.530..947Y
+    def Fig1(self, width=6, height=3.5):
+        return self.plot(filename='Fig1', width=width, height=height,
+            xlabel=r'$z$', ylabel=r'$n(z) \ [h^3 \text{Mpc}^{-3}]$',
+            xlim=(0.4, 2.3), ylim=(3e-6, 2e-3), yscale='log')
+
+    def Fig7(self, width=14, height=6):
+        return self.plot(filename=['Fig7a','Fig7b'], nrow=1, ncol=2, width=width, height=height,
+            xlabel=r'$M_h [h^{-1} M_\odot]$', ylabel=r'$N_\text{gal}$',
+            xlim=(1e12, 1e15), ylim=(1e-2, 1e1), xscale='log', yscale='log')
+
+    def Fig10(self, width=6, height=5):
+        return self.plot(filename='Fig10', width=width, height=height,
+            xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N^{(c+s)}_\text{gal}$',
+            xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')
+
+    def Fig14(self, width=6, height=5):
+        return self.plot(filename='Fig14', width=width, height=height,
+            xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N_\text{gal}$',
+            xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')

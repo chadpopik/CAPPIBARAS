@@ -11,7 +11,7 @@ import astropy.units as u
 import astropy.constants as c
 
 import sys,os
-from Models.Plots import BasePlots2
+from Models.Papers.PlotsTables import BasePlots2
 thispath = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -36,6 +36,7 @@ class Table3():  # Best-fit HOD Parameters for Luminosity-Threshold Samples
 
 class Cosmology():
     Om=0.3  # Section 4.1
+
 
 
 # Section 4.1
@@ -67,8 +68,33 @@ class HOD(Cosmology):
     
     
     
-def Fig15(width=3, height=3):  # HOD fits to the projected correlation function of the Mr < −20 sample, which has the greatest sensitivity to limiting redshift (Fig. 9). In the left panel, open circles show the measuredwp(rp) for zmax = 0.10, and the dashed curve shows the predic
-    return BasePlots2(thispath).plot(filename='Fig15b', nrow=1, ncol=1, width=width, height=height,
-        xlabel=r'$M (h^{-1} M_\odot)$', ylabel=r'$\langle N \rangle$',
-        xlim=(1e11, 3e15), ylim=(0.1, 2e2), xscale='log', yscale='log')
+# HOD fits to the projected correlation function of the Mr < −20 sample, which has the greatest sensitivity to limiting redshift (Fig. 9). In the left panel, open circles show the measuredwp(rp) for zmax = 0.10, and the dashed curve shows the predic
+class Fig15(BasePlots2):
+    subplots = [[
+        dict(name='Fig15b', filename='Fig15b', figsize=(3, 3),
+             xlabel=r'$M (h^{-1} M_\odot)$', xlim=(1e11, 3e15), xscale='log',
+             ylabel=r'$\langle N \rangle$', ylim=(0.1, 2e2), yscale='log'),
+    ]]
+
+    def __init__(self):
+        super().__init__(thispath)
     
+
+
+class Studies(BaseStudy):  # The Luminosity and Color Dependence of the Galaxy Correlation Function, ui.adsabs.harvard.edu/abs/2005ApJ...630....1Z
+    subs = {}
+    info = {
+        }
+
+
+class HODs(BaseHOD, Studies.Zehavi2005):  # virial
+    models = {}
+    params = {}
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+
+    def Nc(self, logM, logMmin):
+        return np.heaviside(logM - logMmin, 1)
+
+    def Ns(self, M, M1, alpha):
+        return (M/M1)**alpha
