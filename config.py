@@ -30,19 +30,9 @@ plt.rcParams.update({
 # Root directory of CAPPIBARAS itself, derived from this file's location
 CAPPIBARAS_PATH = Path(__file__).resolve().parent
 
-# Path to data that couldn't fit in CAPPIBARAS and must be downloaded separately
-DATA_PATH = Path("/global/homes/c/cpopik/Data")
-
-# NOTE: You can ignore this
-# Location of stacking/correlating results, used by the in-progress Popik2026 measurement/target data
-STACKING_PATH = Path("/global/homes/c/cpopik/Stacking_Correlating")
-
-# NOTE: you only need the following two if you're fitting things with cobaya
-# Location of the SOLikeT package (added to sys.path since it's not pip-installed)
-SOLIKET_PATH = Path("/global/homes/c/cpopik/soliket")
-
-# Location where cobaya run outputs (chains, logs, etc.) are stored
-OUTPUT_PATH = Path("/pscratch/sd/c/cpopik/CAPPIBARAS/runs")
+# Machine-local paths (DATA_PATH, STACKING_PATH, SOLIKET_PATH, OUTPUT_PATH) live in
+# config_local.py, which is gitignored so each checkout can set its own without churn.
+from config_local import DATA_PATH, STACKING_PATH, SOLIKET_PATH, OUTPUT_PATH
 
 
 __all__ = [
