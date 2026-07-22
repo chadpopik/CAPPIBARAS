@@ -5,14 +5,11 @@ ui.adsabs.harvard.edu/abs/2023A%26A...675A.149K
 arxiv.org/pdf/2211.07502
 """
 
-import numpy as np
-import pandas as pd
 
-import astropy.units as u
-import astropy.constants as c
+from config import *
+
 from scipy.special import erf
 
-import sys,os
 from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
 
@@ -64,8 +61,6 @@ class Data():
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
 
 
-
-
 class HOD():
     def __init__(self, inputdict={}, **inputvars):
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
@@ -98,7 +93,6 @@ class HOD():
         p['gamma'], p['alpha'] = 1, 1
         NFW = 1/ ( (self.r/rs)**p['gamma'] * (1+(self.r/rs)**p['alpha'])**((p['beta_s']-p['gamma'])/p['alpha']))
         pass
-
 
 
 class PowerSpectra():
@@ -266,7 +260,7 @@ class HODs(BaseHOD, Studies.Kou2023):  # Kou 2023, arxiv.org/abs/2211.07502
     def ns_r(self, rs, zs, logMs): #
         self.require(['r200m'])  # needs radius definition
         GNFW_func = lambda p: self.GNFW_r(rs, zs, logMs, self.r200m, self.conc)(beta=p['beta_s'])
-        func = lambda p: GNFW_func(p)/np.trapz(GNFW_func(p)*4*np.pi*rs**2, rs, axis=0)
+        func = lambda p: GNFW_func(p)/np.trapezoid(GNFW_func(p)*4*np.pi*rs**2, rs, axis=0)
         return lambda p={}: func(self.p0 | p)
 
     def ns(self, ks, zs, logMs):  # Default satellite distribution (FFT of NFW)

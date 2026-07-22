@@ -1,8 +1,7 @@
 
 
+from config import *
 
-import os
-import pandas as pd
 from Models.Papers.PlotsTables import ParamTable
 thispath = os.path.dirname(os.path.abspath(__file__))
 

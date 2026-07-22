@@ -1,18 +1,31 @@
-sampler:
-    mcmc:
-        Rminus1_stop: 0.01
-        max_tries: 200d
-        output_every: 10s
-    #minimize:
-    #  ignore_prior: True
+shared:
+    Projection: {name: 'Popik2025', spefs: {}}
+    Profile: {name: 'Popik2026', spefs: {}, nr: 50}
+    HaloModel: {name: 'pyccl_model', spefs: {'MassFunc':'Tinker08', 'MassDef':'200c', 'HaloBias': 'Tinker10', 'PowSpec': 'Linear', 'Concentration':'Bhattacharya13'}}
+    MapData: {name: 'Coulton2024', spefs: {}}
 
+likelihood:
+    zbin1:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Liu2025', spefs: {'zbin':'z1', 'ACTDR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}}
+        TargetData: {name: 'Liu2025', spefs: {'zbin':'z1'}, zNum: 10, zMin: 0.3, zMax: 0.7, logMhNum: 20, logMhMax: 16}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG1'}}
+    zbin2:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Liu2025', spefs: {'zbin':'z2', 'ACTDR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}}
+        TargetData: {name: 'Liu2025', spefs: {'zbin':'z2'}, zNum: 10, zMin: 0.5, zMax: 0.9, logMhNum: 20, logMhMax: 16}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG2'}}
+    zbin3:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Liu2025', spefs: {'zbin':'z3', 'ACTDR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}}
+        TargetData: {name: 'Liu2025', spefs: {'zbin':'z3'}, zNum: 10, zMin: 0.7, zMax: 1.1, logMhNum: 20, logMhMax: 16}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG3'}}
+    zbin4:
+        class: SOLikelihoods.TSZLikelihood
+        Measurement: {name: 'Liu2025', spefs: {'zbin':'z4', 'ACTDR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}}
+        TargetData: {name: 'Liu2025', spefs: {'zbin':'z4'}, zNum: 10, zMin: 0.9, zMax: 1.3, logMhNum: 20, logMhMax: 16}
+        HOD: {name: 'Yuan2023', spefs: {'model': 'Base', 'sample':'LRG4'}}
 
-output: chains/Liu2025/testing_theory
-output_options: 
-  columns:
-    add_chain: True
-
-debug: False
 
 params:
     # Cosmological, fixed
@@ -22,55 +35,54 @@ params:
     Omega_b: {value: 0.044}
     T_CMB: {value: 2.725}
     XH: {value: 0.76}
-    v_rms: {value: 1.06e-3}  # v_rms/c
+    v_rms: {value: 1.06e-3}  # v_rms//c
 
-    # GNFW Amplitude
-    P0_A0: {ref: 1, prior: {min: 1, max: 5}, latex: 'P_0^{A_0}'}
-    P0_alpham: {value: 0}
-    P0_alphaz: {ref: -0.8, prior: {min: -1, max: 1}, latex: 'P_0^{\alpha_z}'}
-    # Intermediate Slope
-    alpha_A0: {ref: 0.9, prior: {min: 0.1, max: 1}, latex: '\alpha_t^{A_0}'}
-    alpha_alpham: {value: 0}
-    alpha_alphaz: {value: 0}
-    # Outer slope
-    beta_pres_A0: {ref: 2.9, prior: {min: 1, max: 10}, latex: '\beta_t^{A_0}'}
-    beta_pres_alpham: {value: 0}
-    beta_pres_alphaz: {value: 0}
-    # Core Radius
-    xc_A0: {ref: 0.7, prior: {min: 0.5, max: 10}, latex: 'x_{c, t}'}
-    xc_alpham: {value: 0}
-    xc_alphaz: {value: 0}
-    # Two-halo Amplitude
-    A2h_t: {ref: 1, prior: {min: 0.5, max: 10}, latex: 'A_{2h, t}'}
+    P0: {latex: '\log \rho_0', # GNFW Amplitude
+        prior: {min: 0, max: 5},
+        ref: {dist: norm, loc: 2, scale: 2},
+    }
+    beta_t: {latex: '\beta_t', # Outer slope
+        prior: {min: 0, max: 20},
+        ref: {dist: norm, loc: 2.6, scale: 1},
+    }
+    alpha_t: {latex: '\alpha_t', # Intermediate slope
+        prior: {min: 0, max: 10},
+        ref: {dist: norm, loc: 0.8, scale: 0.3},
+    }
+    xc_t: {latex: 'x_{c, t}', # Core Radius
+        prior: {min: 0, max: 10},
+        ref: 0.5,
+    }
+    gamma_t: {latex: '\gamma_t', # Inner Slope
+        # value: -0.2
+        prior: {min: -2, max: 0},
+        ref: -0.3,
+    }
 
-    
+    P0_2h: {latex: '\log \rho_{0_2h}', # GNFW Amplitude
+        prior: {min: 0, max: 5},
+        ref: {dist: norm, loc: 2, scale: 2},
+    }
+    beta_t_2h: {latex: '\beta_{t, 2h}', # Two-halo Amplitude
+        prior: {min: 0, max: 20},
+        ref: {dist: norm, loc: 2.6, scale: 1},
+    }
+    alpha_t_2h: {latex: '\alpha_{t, 2h}', # Intermediate slope
+        prior: {min: 0.1, max: 10},
+        ref: {dist: norm, loc: 0.8, scale: 0.3},
+    }
+    xc_t_2h: {latex: 'x_{c, t, 2h}', # Core Radius
+        prior: {min: 0, max: 10},
+        ref: 0.5,
+    }
+    gamma_t_2h: {latex: '\gamma_{t, 2h}', # Inner Slope
+        # value: -0.2
+        prior: {min: -2, max: 0},
+        ref: -0.3,
+    }
 
-
-shared:
-    profile: {name: 'Popik2025', spefs: {}}
-    HaloModel: {name: 'pyccl_model', spefs: {'MassFunc':'Tinker08', 'MassDef':'200c', 'HaloBias': 'Tinker10'}}
-    MapData: {name: 'Coulton2024', spefs: {}}
-    yaml_file: "/global/homes/c/cpopik/CAPPIBARAS/chains/runchainsLiu.yaml"
-
-
-likelihood:
-    zbin1:
-        class: SOLikelihoods.TSZLikelihood
-        Measurement: {name: 'Liu2025', spefs: {'zbin':'z1', 'ACTDR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}}
-        TargetData: {name: 'Liu2025', spefs: {'zbin':'z1'}, dz: 0.1, dlogM: 0.2}
-        HOD: {name: 'Yuan2023', spefs: {'sample':'LRG 0.4<z<0.6'}}
-    zbin2:
-        class: SOLikelihoods.TSZLikelihood
-        Measurement: {name: 'Liu2025', spefs: {'zbin':'z2', 'ACTDR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}}
-        TargetData: {name: 'Liu2025', spefs: {'zbin':'z2'}, dz: 0.1, dlogM: 0.2}
-        HOD: {name: 'Yuan2023', spefs: {'sample':'LRG 0.4<z<0.6'}}
-    zbin3:
-        class: SOLikelihoods.TSZLikelihood
-        Measurement: {name: 'Liu2025', spefs: {'zbin':'z3', 'ACTDR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}}
-        TargetData: {name: 'Liu2025', spefs: {'zbin':'z3'}, dz: 0.1, dlogM: 0.2}
-        HOD: {name: 'Yuan2023', spefs: {'sample':'LRG 0.6<z<0.8'}}
-    zbin4:
-        class: SOLikelihoods.TSZLikelihood
-        Measurement: {name: 'Liu2025', spefs: {'zbin':'z4', 'ACTDR':'DR6', 'Beta':'1.2', 'dp':'dBeta', 'TCIB':'10.7'}}
-        TargetData: {name: 'Liu2025', spefs: {'zbin':'z4'}, dz: 0.1, dlogM: 0.2}
-        HOD: {name: 'Yuan2023', spefs: {'sample':'LRG 0.6<z<0.8'}}
+    A2h_t: {latex: 'A_{2h, t}', # Two-halo Amplitude
+        # prior: {min: 0, max: 20},
+        # ref: {dist: norm, loc: 1.1, scale: 0.8},
+        value: 1
+    }

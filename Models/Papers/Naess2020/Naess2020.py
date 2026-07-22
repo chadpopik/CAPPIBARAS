@@ -6,6 +6,7 @@ arxiv.org/pdf/2007.07290
 """
 
 
+from config import *
 class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2020JCAP...12..046N
     subs={}
     info={}

@@ -5,14 +5,10 @@ arxiv.org/pdf/2103.02469
 ui.adsabs.harvard.edu/abs/2021ApJ...919....2M
 """
 
-import sys,os
+
+from config import *
 from Models.Papers.PlotsTables import BasePlots2, ParamTable, splittable
 thispath = os.path.dirname(os.path.abspath(__file__))
-
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
 
 
 class Table3_bestfit(ParamTable):
@@ -29,7 +25,6 @@ class Table4(ParamTable):  # best-fit values from 2D fits
         dfraw = pd.read_csv(filename)
         self.df, self.df_errlow, self.df_errhigh = splittable(dfraw)
         
-
 
 class Fig2(BasePlots2):
     subplots = [[
@@ -184,7 +179,7 @@ class Profiles(BaseProfile, Studies.Moser2021):  # TODO in progress
         windfunc = lambda k: np.where(k*0.7 > 1/50, 1, 0)  # two-halo window function, [k]=1/Mpc
         prefac = self.bh(zs, logMs)*self.Plin(ks, zs)*windfunc(ks)  # collect factors outside int
         intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
-        P2h = lambda prof1h: prefac*(np.trapz(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
+        P2h = lambda prof1h: prefac*(np.trapezoid(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
         return lambda prof1h: IFFT3D(P2h(prof1h)) *prof1h.unit  # IFFT to real space and return its units destroyed by the FFT
 
     def prof2h(self, rs, zs, logMs):  # linear two-halo calculation, Section II.C Eq 17

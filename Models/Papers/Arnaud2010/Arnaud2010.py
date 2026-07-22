@@ -5,14 +5,10 @@ ui.adsabs.harvard.edu/abs/2010A%26A...517A..92A
 arxiv.org/pdf/0910.1234
 """
 
-import sys,os
+
+from config import *
 from Models.Papers.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
-
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
 
 
 class Cosmology():

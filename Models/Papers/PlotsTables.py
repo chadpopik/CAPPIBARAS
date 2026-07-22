@@ -19,7 +19,7 @@ thispath = os.path.dirname(os.path.abspath(__file__))
 
 class BasePlots2():
     def __init__(self, plotpath):
-        self.plotpath = thispath
+        self.plotpath = plotpath
         self.paper = self.name = self.__class__.__name__
 
     def axsetup(self, ax, ax2, filename, xlabel, ylabel, xlim, ylim, xscale, yscale):

@@ -297,7 +297,7 @@ class Kou2023(BaseHOD, Studies.Kou2023):  # Kou 2023, arxiv.org/abs/2211.07502
     def ns_r(self, rs, zs, logMs): #
         self.require(['r200m'])  # needs radius definition
         GNFW_func = lambda p: self.GNFW_r(rs, zs, logMs, self.r200m, self.conc)(beta=p['beta_s'])
-        func = lambda p: GNFW_func(p)/np.trapz(GNFW_func(p)*4*np.pi*rs**2, rs, axis=0)
+        func = lambda p: GNFW_func(p)/np.trapezoid(GNFW_func(p)*4*np.pi*rs**2, rs, axis=0)
         return lambda p={}: func(self.p0 | p)
 
     def ns(self, ks, zs, logMs):  # Default satellite distribution (FFT of NFW)
@@ -311,8 +311,8 @@ class Kou2023(BaseHOD, Studies.Kou2023):  # Kou 2023, arxiv.org/abs/2211.07502
         # rs, zs, logMs = self.setdim(rs, zs, logMs)
         # xs = rs*u.Mpc/(self.r200m(zs, logMs)/self.c200m(zs, logMs))  # scaled radius
         # NFW = 1 / (xs * (1+xs)**2)
-        # NFW_int = np.trapz(NFW, xs, axis=0)
-        # print(np.trapz(NFW, xs, axis=0), np.trapz(NFW, rs, axis=0))
+        # NFW_int = np.trapezoid(NFW, xs, axis=0)
+        # print(np.trapezoid(NFW, xs, axis=0), np.trapezoid(NFW, rs, axis=0))
         # return lambda p={}: NFW/NFW_int
 
 

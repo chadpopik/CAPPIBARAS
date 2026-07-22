@@ -68,7 +68,7 @@ class Popik2025(BaseProjection):
         self.r3D = np.sqrt(self.dLOS**2 + (self.rht.r[:,None])**2*AngDist**2)  # r values for LOS integration
 
     def proj2D(self, rs):  # takes in function of R
-        return lambda prof3D: 2*np.trapz(np.interp(self.r3D, rs, prof3D, left=0, right=0), x=self.dLOS)  # Integrate over line of sight
+        return lambda prof3D: 2*np.trapezoid(np.interp(self.r3D, rs, prof3D, left=0, right=0), x=self.dLOS)  # Integrate over line of sight
 
     # Function for convolving a beam/response with a 2D projected profile
     def beam_convolve(self, b_ell=None, bTF=None, r_ell=None, rTF=None, **kwargs):
@@ -132,7 +132,7 @@ class Moser2023(BaseProjection):  # https://arxiv.org/abs/2307.10919
    
     def proj2D(self, prof_r):  # project along line of sight
         prof_int = interp1d(self.rs, prof_r, bounds_error=False, fill_value=0.0)(self.rint)  # interpret to integration rs
-        prof_proj = 2*np.trapz(prof_int, x=self.los)  # Integrate over line of sight
+        prof_proj = 2*np.trapezoid(prof_int, x=self.los)  # Integrate over line of sight
         return prof_proj
 
     def beam_convolve(self, prof2D, beam, **kwargs):
@@ -204,7 +204,7 @@ def project_Hankel(rs, thetas, AngDist, beam_data, beam_ells, resp_data, resp_el
     beams = beamTF*respTF
 
     def project_convolve(prof3D):  # This has to be redone for every new profile, everything above is only done once
-        prof2D = 2*np.trapz(interp1d(rs, prof3D, bounds_error=False, fill_value=0.0)(rint), x=los)  # Interpolate and integrate Pth over LOS
+        prof2D = 2*np.trapezoid(interp1d(rs, prof3D, bounds_error=False, fill_value=0.0)(rint), x=los)  # Interpolate and integrate Pth over LOS
         lprofs = rht.real2harm(np.interp(rht.r, thta_smooth, prof2D))  # Interpolate and transform Pth to harmonic space
         rprofs = rht.harm2real(lprofs*beams)  # Convolve with beam and response and transform back to real space
         r_unpad, rprofs = rht.unpad(rht.r, rprofs)  # Unpad (removes points add on edges for smoothness)
@@ -254,7 +254,7 @@ def project_tsz_Hankel2(rs, zs, thetas, AngDistFunc, LumDistFunc, galaxydist,
     los = LumDistFunc(zs[:, None]) - LumDistFunc(zs[:, None]+dzs)
     
     dndz = np.sum(galaxydist, axis=0)
-    dndz_norm = dndz/np.trapz(dndz, zs)
+    dndz_norm = dndz/np.trapezoid(dndz, zs)
     # TODO: watch angdist here, if we're intergrating over the line of sight should we have to make angdist change?
     rint = np.sqrt(los**2 + thta_smooth[:, None, None]**2*AngDistFunc(zs[:, None]+dzs)**2)
 
@@ -267,9 +267,9 @@ def project_tsz_Hankel2(rs, zs, thetas, AngDistFunc, LumDistFunc, galaxydist,
         Pth_interps = [interp1d(rs, Pths[:, i], axis=0, bounds_error=False, fill_value=0.0) for i in range(Pths.shape[-1])]
         Pth_interp_z = np.array([Pth_interps[i](rint[:, i, :]) for i in range(Pths.shape[1])]).swapaxes(0, 1)
         
-        Pth2D_z = np.trapz(-Pth_interp_z[..., :los.shape[-1]//2], los[:, :los.shape[-1]//2])+np.trapz(-Pth_interp_z[..., los.shape[-1]//2:], los[:, los.shape[-1]//2:])
+        Pth2D_z = np.trapezoid(-Pth_interp_z[..., :los.shape[-1]//2], los[:, :los.shape[-1]//2])+np.trapezoid(-Pth_interp_z[..., los.shape[-1]//2:], los[:, los.shape[-1]//2:])
         
-        Pth2D = np.trapz(Pth2D_z*dndz_norm, zs) 
+        Pth2D = np.trapezoid(Pth2D_z*dndz_norm, zs) 
         
         # Interpolate and integrate Pth over LOS 
         lprofs = rht.real2harm(np.interp(rht.r, thta_smooth, Pth2D))  # Interpolate and transform Pth to harmonic space
@@ -291,9 +291,9 @@ def project_tsz_Hankel2(rs, zs, thetas, AngDistFunc, LumDistFunc, galaxydist,
     # rs_theta, rs_theta2  = thta_smooth[:, 0]*AngDis, thta2_smooth[:, 0]*AngDis
     # Rints = np.sqrt(R_mis[None, ..., None]**2+rs_theta[..., None, None]**2 \
     #                 +2*R_mis[None, ..., None]*rs_theta[..., None, None]*np.cos(phis))
-    # Pth2D_R_Rmis = np.trapz(Pth2Dfunc(Rints, Pth_inter), phis, axis=-1)/(2*np.pi)
+    # Pth2D_R_Rmis = np.trapezoid(Pth2Dfunc(Rints, Pth_inter), phis, axis=-1)/(2*np.pi)
 
     # gamma = lambda r_mis: r_mis/tauRg**2 * np.exp(-r_mis/tauRg)
-    # Pth2D_mis_R = np.trapz(gamma(R_mis) * Pth2D_R_Rmis, R_mis)
+    # Pth2D_mis_R = np.trapezoid(gamma(R_mis) * Pth2D_R_Rmis, R_mis)
 
     # Pth2D_mis = (1-f_mis)*Pth2D+f_mis*Pth2D_mis_R

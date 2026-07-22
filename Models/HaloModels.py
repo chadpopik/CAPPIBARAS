@@ -103,19 +103,20 @@ class astropy_model(BaseModel):  # https://docs.astropy.org/en/stable/cosmology/
 
 
 class pyccl_model(BaseModel):  # https://ccl.readthedocs.io/en/latest/index.html
-    import pyccl as ccl  # Import package only if using this model
-    ccl = ccl  # Set the package as an attribute of the class to use later
-    Parameters = list(ccl.CosmologyVanillaLCDM().to_dict().keys())  # All cosmological parameters that can be input into the initialization
-    options = {
-        'TransFunc': ccl.cosmology.TransferFunctions._member_names_,  # Transfer Functions
-        'PowSpec': ccl.cosmology.MatterPowerSpectra._member_names_,  # Power Spectrum calculations
-        'MassDef': [mod.replace('MassDef','') for mod in dir(ccl.halos) if 'MassDef' in mod and mod!='MassDef'],  # Mass Definitions (TODO: can actually use any overdensity number for c and m?)
-        'MassFunc' : [mod.replace('MassFunc','') for mod in dir(ccl.halos.hmfunc) if 'MassFunc' in mod and mod!='MassFunc'],  # Halo Mass Function Models
-        'HaloBias' : [mod .replace('HaloBias','') for mod in dir(ccl.halos.hbias) if 'HaloBias' in mod and mod!='HaloBias'],  # Halo Bias Models
-        'Concentration' : [mod.replace('Concentration','')  for mod in dir(ccl.halos.concentration) if 'Concentration' in mod and mod!='Concentration'],  # Concentration Models
-    }    
-
     def __init__(self, inputdict={}, **inputvars):
+        import pyccl as ccl  # Imported here (rather than at class level) so importing this module doesn't require pyccl unless this model is used
+        self.ccl = ccl  # Set the package as an attribute of the instance to use later
+
+        self.Parameters = list(ccl.CosmologyVanillaLCDM().to_dict().keys())  # All cosmological parameters that can be input into the initialization
+        self.options = {
+            'TransFunc': ccl.cosmology.TransferFunctions._member_names_,  # Transfer Functions
+            'PowSpec': ccl.cosmology.MatterPowerSpectra._member_names_,  # Power Spectrum calculations
+            'MassDef': [mod.replace('MassDef','') for mod in dir(ccl.halos) if 'MassDef' in mod and mod!='MassDef'],  # Mass Definitions (TODO: can actually use any overdensity number for c and m?)
+            'MassFunc' : [mod.replace('MassFunc','') for mod in dir(ccl.halos.hmfunc) if 'MassFunc' in mod and mod!='MassFunc'],  # Halo Mass Function Models
+            'HaloBias' : [mod .replace('HaloBias','') for mod in dir(ccl.halos.hbias) if 'HaloBias' in mod and mod!='HaloBias'],  # Halo Bias Models
+            'Concentration' : [mod.replace('Concentration','')  for mod in dir(ccl.halos.concentration) if 'Concentration' in mod and mod!='Concentration'],  # Concentration Models
+        }
+
         self.setup(self.fixnames(inputdict | inputvars))
         for opt in ['TransFunc', 'PowSpec']: 
             try: setattr(self, opt, getattr(self, opt).upper())
@@ -221,23 +222,23 @@ class pyccl_model(BaseModel):  # https://ccl.readthedocs.io/en/latest/index.html
 
 
 class colossus_model(BaseModel):  # https://ccl.readthedocs.io/en/latest/index.html
-    import colossus
-    from colossus.cosmology import cosmology, power_spectrum
-    from colossus.halo import concentration, mass_defs, mass_adv
-    from colossus.lss import bias, mass_function
-    colossus = colossus
-    
-    Parameters = list({i for k in cosmology.cosmologies.values() for i in k.keys()})  # cosmological parameters
-    options={
-        'Cosmology': list(cosmology.cosmologies.keys()),
-        'MassFunc': list(colossus.lss.mass_function.models.keys()),
-        'HaloBias': list(colossus.lss.bias.models.keys()),
-        'Concentration': list(colossus.halo.concentration.models.keys()),
-        'PlinMod': list(colossus.cosmology.cosmology.power_spectrum.models.keys()),
-        'MassDef': ['fof', 'vir', 'sp-apr-mn', '200c', '500c', '200m', '500m'],  # TODO: get actual list
-              } 
-
     def __init__(self, inputdict={}, **inputvars):
+        import colossus  # Imported here (rather than at class level) so importing this module doesn't require colossus unless this model is used
+        from colossus.cosmology import cosmology, power_spectrum
+        from colossus.halo import concentration, mass_defs, mass_adv
+        from colossus.lss import bias, mass_function
+        self.colossus = colossus
+
+        self.Parameters = list({i for k in cosmology.cosmologies.values() for i in k.keys()})  # cosmological parameters
+        self.options = {
+            'Cosmology': list(cosmology.cosmologies.keys()),
+            'MassFunc': list(colossus.lss.mass_function.models.keys()),
+            'HaloBias': list(colossus.lss.bias.models.keys()),
+            'Concentration': list(colossus.halo.concentration.models.keys()),
+            'PlinMod': list(colossus.cosmology.cosmology.power_spectrum.models.keys()),
+            'MassDef': ['fof', 'vir', 'sp-apr-mn', '200c', '500c', '200m', '500m'],  # TODO: get actual list
+        }
+
         self.setup(inputdict | inputvars)
         for opt in ['MassDef', 'MassFunc', 'HaloBias', 'Concentration']: 
             try: setattr(self, opt, getattr(self, opt).lower())

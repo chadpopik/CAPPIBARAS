@@ -25,7 +25,7 @@ import Models.MapData as MapData
 class BaseSpectra:
     def ngal(self, zs, logMs):  # mean galaxy density
         dndlogm = self.dndlogm(zs, logMs)  # setup
-        return lambda Nc, Ns: np.trapz((Nc+Ns)*dndlogm, logMs*u.dex)
+        return lambda Nc, Ns: np.trapezoid((Nc+Ns)*dndlogm, logMs*u.dex)
     
     def u_g(self, zs, logMs):  # galaxy overdensity fourier profile
         ngal = ngal(zs, logMs)  # setup
@@ -44,11 +44,11 @@ class BaseSpectra:
 
     def P1h_gg(self, zs, logMs):  # galaxy overdensity one-halo auto-spectra
         dndlogm, ug2 = self.dndlogm(zs, logMs), self.u_g2(zs, logMs)  # setup
-        return lambda Nc, Ns, nc, ns: np.trapz(ug2(Nc, Ns, nc, ns)*dndlogm, logMs*u.dex)
+        return lambda Nc, Ns, nc, ns: np.trapezoid(ug2(Nc, Ns, nc, ns)*dndlogm, logMs*u.dex)
 
     def P2h_gg(self, ks, zs, logM):  # galaxy overdensity one-halo auto-spectra
         u_g, intfac, Plin = u_g(zs, logM), self.dndlogm(zs, logM)*self.bh(zs, logM), self.Plin(ks, zs)  # setup
-        return lambda Nc, Ns, nc, ns: Plin*np.trapz(u_g(Nc, Ns, nc, ns)*intfac, logM*u.dex)**2
+        return lambda Nc, Ns, nc, ns: Plin*np.trapezoid(u_g(Nc, Ns, nc, ns)*intfac, logM*u.dex)**2
     
     def P_gg(self, ks, zs, logM):  # galaxy overdensity total auto-spectra
         P1h_gg, P2h_gg = self.P1h_gg(zs, logM), self.P2h_gg(ks, zs, logM)  # setup
@@ -56,11 +56,11 @@ class BaseSpectra:
     
     def P1h_gy(self, zs, logM):  # galaxy overdensity compton y one-halo cross-spectra
         u_g, u_y, dndlogm = u_g(zs, logM), u_y(zs), dndlogm(zs, logM)  # setup
-        return lambda Nc, Ns, nc, ns, Pe: np.trapz(u_g(Nc, Ns, nc, ns)*u_y(Pe)*dndlogm, logM*u.dex)
+        return lambda Nc, Ns, nc, ns, Pe: np.trapezoid(u_g(Nc, Ns, nc, ns)*u_y(Pe)*dndlogm, logM*u.dex)
 
     def P2h_gy(self, ks, zs, logM):  # galaxy overdensity compton y two-halo cross-spectra
         u_g, u_y, intfac, Plin = u_g(zs, logM), u_y(zs), self.dndlogm(zs, logM)*self.bh(zs, logM), self.Plin(ks, zs)  # setup
-        return lambda Nc, Ns, nc, ns, Pe: Plin*np.trapz(u_g(Nc, Ns, nc, ns)*intfac, logM*u.dex)*np.trapz(u_y(Pe)*intfac, logM*u.dex)
+        return lambda Nc, Ns, nc, ns, Pe: Plin*np.trapezoid(u_g(Nc, Ns, nc, ns)*intfac, logM*u.dex)*np.trapezoid(u_y(Pe)*intfac, logM*u.dex)
 
     def P_gy(self, ks, zs, logM):  # galaxy overdensity total auto-spectra
         P1h_gy, P2h_gy = P1h_gy(zs, logM), P2h_gy(ks, zs, logM)  # setup
@@ -70,10 +70,10 @@ class BaseSpectra:
     def C_AB(self, ells, ks, zs, W_A, W_B, beam, **kwargs):
         Pk_to_Pell = self.k_to_ell(ells, ks, self.chi(zs), zs)
         intfac = beam[:, None] * W_A * W_B * self.H(zs)/c.c.to(u.km/u.s).value/self.chi(zs)**2  # integrand factor
-        return lambda P_AB: np.trapz(intfac*Pk_to_Pell(P_AB), zs)  # return lambda function to not recalculate above
+        return lambda P_AB: np.trapezoid(intfac*Pk_to_Pell(P_AB), zs)  # return lambda function to not recalculate above
     
     def W_g(self, dNdz, zs, **kwargs):  # Galaxy Kernel
-        return dNdz/np.trapz(dNdz, zs)
+        return dNdz/np.trapezoid(dNdz, zs)
 
     def W_y(self, zs, **kwargs):  # Compton y kernel
         return 1/(1+zs)
@@ -141,13 +141,13 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
     def C1h_ij(self, zs, logMs, **kwargs):  # Eq. 4
         self.require(['dndlogM'])
         intfactor = self.dndlogM(zs, logMs)*self.d2VdzdOmega(zs)
-        return lambda u_i, u_j: np.trapz(np.trapz(intfactor*u_i*u_j, logMs), zs)
+        return lambda u_i, u_j: np.trapezoid(np.trapezoid(intfactor*u_i*u_j, logMs), zs)
 
     def C2h_ij(self, ks, zs, logMsi, logMsj, **kwargs):  # Eq. 5
         self.require(['Plin', 'dndlogM', 'bh', 'ells'])
         Plin_k = self.k_to_ell(self.ells, ks[:, :, 0], zs[:, 0])(self.Plin(ks, zs)[:, :, 0])[:, :, None]
         intfac_i, intfac_j = Plin_k*self.d2VdzdOmega(zs)*self.dndlogM(zs, logMsi)*self.bh(zs, logMsi), self.dndlogM(zs, logMsj)*self.bh(zs, logMsj)
-        return lambda u_i, u_j: np.trapz(np.trapz(intfac_i*u_i, logMsi)*np.trapz(intfac_j*u_j, logMsj), zs)
+        return lambda u_i, u_j: np.trapezoid(np.trapezoid(intfac_i*u_i, logMsi)*np.trapezoid(intfac_j*u_j, logMsj), zs)
 
     def u_g(self, ks, zs, logMs, **kwargs):  # Eq. 11
         Wg, Nc, Ns, ugl, ngal = self.W_g(zs), self.Nc(logMs), self.Nc(logMs), self.ugl(ks, zs, logMs), self.ngal(zs, logMs)
@@ -155,11 +155,11 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
     
     def ngal(self, zs, logMs, **kwargs):  # Eq. 12
         Nc, Ns, dndlogm = self.Nc(logMs), self.Nc(logMs), self.dndlogM(zs, logMs)
-        return lambda p: np.trapz((Nc+Ns)*dndlogm, logMs)
+        return lambda p: np.trapezoid((Nc+Ns)*dndlogm, logMs)
     
     def W_g(self, zs):  # Eq 13 & 14
         self.require(['dNdz', 'H', 'chi'])
-        phig = self.dNdz/np.trapz(self.dNdz, zs)
+        phig = self.dNdz/np.trapezoid(self.dNdz, zs)
         return (self.H(zs)/c.c*phig/self.chi(zs)).decompose()
 
     def C1h_gg(self, ks, zs, logMs):  # Eq. 15
@@ -187,16 +187,16 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
     
     # def ngal(self, Nc, Ns, hmf, logM, zs, **kwargs):
     #     hmf
-    #     return lambda p={}: np.trapz((Nc(p)+Ns(p))*hmf, logM)
+    #     return lambda p={}: np.trapezoid((Nc(p)+Ns(p))*hmf, logM)
         
     # def W_g(self, Hz, chis, dNdz, zs, **kwargs):
-    #     phi_g = dNdz / np.trapz(dNdz, zs)
+    #     phi_g = dNdz / np.trapezoid(dNdz, zs)
     #     return (Hz/c.c.to(u.km/u.s).value * phi_g/chis**2)[:, None]
     
     # def C1h_gg(self, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ells, ks, **kwargs):
     #     d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
     #     ug2 = self.ug2(Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, ells, ks, zs)
-    #     return lambda p={}: np.trapz(d2V_dzdOmega*np.trapz(hmf*ug2(p), logM), zs)
+    #     return lambda p={}: np.trapezoid(d2V_dzdOmega*np.trapezoid(hmf*ug2(p), logM), zs)
 
     # def ug2(self, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, ells, ks, zs, **kwargs):
     #     k_to_ell = self.Pk_to_Pell(ells, ks, chis, zs)
@@ -209,10 +209,10 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
     #     Plinl = self.uk_to_ul(ells, ks, chis, zs)(Plin)
     #     ug = self.u_g(ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks)
     #     d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
-    #     return lambda p={}: np.trapz(d2V_dzdOmega*Plinl*np.trapz(bh*hmf*ug(p), logM)**2, zs)
+    #     return lambda p={}: np.trapezoid(d2V_dzdOmega*Plinl*np.trapezoid(bh*hmf*ug(p), logM)**2, zs)
 
     # def SN(self, area, dNdz, ells, zs, **kwargs):
-    #     return area*(u.deg**2).to(u.sr)/np.trapz(dNdz, zs) *np.ones(ells.shape)
+    #     return area*(u.deg**2).to(u.sr)/np.trapezoid(dNdz, zs) *np.ones(ells.shape)
 
 
 
@@ -226,12 +226,12 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #         return lambda u_A, u_B: P_AB(P1h_AB(u_A, u_B), P2h_AB(u_A, u_B))
 
 #     def P1h_AB(self, logM, dndlogM, **kwargs):  # one-halo 3D power spectrum
-#         return lambda u_A, u_B: np.trapz(u_A*u_B*dndlogM, logM)
+#         return lambda u_A, u_B: np.trapezoid(u_A*u_B*dndlogM, logM)
 
 #     def P2h_AB(self, logM, dndlogM, b_h, P_lin, **kwargs):  # two-halo 3D power spectrum
 #         intfac_A = dndlogM*b_h  # combined int factors
 #         intfac_B = intfac_A *P_lin[..., None] # combined int factor, and throw Plin to not have to multiply it later
-#         return lambda u_A, u_B: np.trapz(u_A*intfac_A, logM)*np.trapz(u_B*intfac_B, logM)
+#         return lambda u_A, u_B: np.trapezoid(u_A*intfac_A, logM)*np.trapezoid(u_B*intfac_B, logM)
 
 #     def u_g(self, logM, dndlogM):  # galaxy overdensity fourier profile
 #         n_g = self.n_g(logM, dndlogM)
@@ -242,16 +242,16 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #         return lambda N_c, N_s, n_c, n_s: (2*N_c*n_c*N_s*n_s+N_s**2*n_s**2)/n_g(N_c, N_s)[:, None]**2
 
 #     def n_g(self, logM, dndlogM):  # mean galaxy density
-#         return lambda N_c, N_s: np.trapz((N_c+N_s)*dndlogM, logM)
+#         return lambda N_c, N_s: np.trapezoid((N_c+N_s)*dndlogM, logM)
 
 #     def P1h_gg(self, logM, dndlogM, **kwargs):  # galaxy overdensity one-halo auto-spectra
-#         P1h_gg = lambda u_g2: np.trapz(u_g2*dndlogM, logM)
+#         P1h_gg = lambda u_g2: np.trapezoid(u_g2*dndlogM, logM)
 #         u_g2 = self.u_g2(dndlogM, logM)
 #         return lambda N_c, N_s, n_c, n_s: P1h_gg(u_g2(N_c, N_s, n_c, n_s))
 
 #     def P2h_gg(self, logM, dndlogM, b_h, P_lin, **kwargs):  # galaxy overdensity two-halo auto-spectra
 #         intfac = dndlogM*b_h  # combined int factors
-#         P2h_gg = lambda u_g: P_lin*np.trapz(u_g*intfac, logM)**2
+#         P2h_gg = lambda u_g: P_lin*np.trapezoid(u_g*intfac, logM)**2
 #         u_g = self.u_g(logM, dndlogM)
 #         return lambda N_c, N_s, n_c, n_s: P2h_gg(u_g(N_c, N_s, n_c, n_s))
 
@@ -309,11 +309,11 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 
 #     def C_AB(self, W_A, W_B, beam, **kwargs):
 #         intfac = beam[:, None] * W_A * W_B * self.Hs/c.c.to(u.km/u.s).value/self.chis**2  # integrand factor
-#         return lambda P_AB: np.trapz(intfac*self.Pk_to_Pell(P_AB), self.zs)  # return lambda function to not recalculate above
+#         return lambda P_AB: np.trapezoid(intfac*self.Pk_to_Pell(P_AB), self.zs)  # return lambda function to not recalculate above
     
 #     def C_gg(self, **kwargs):  # galaxy overdensity angular auto-spectra
 #         C_AB = self.C_AB(self.W_g(), self.W_g(), np.ones(self.ells.shape))
-#         ngaltot = np.trapz(self.dNdz, self.zs) *np.ones(self.ells.shape)
+#         ngaltot = np.trapezoid(self.dNdz, self.zs) *np.ones(self.ells.shape)
 #         SN = lambda p: p['ASN']/ngaltot
 #         return lambda P_gg, p={}: C_AB(P_gg)+SN(p | {'ASN':1})
 
@@ -327,12 +327,12 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #         return lambda u_A, u_B: P_AB(P1h_AB(u_A, u_B), P2h_AB(u_A, u_B))
 
 #     def P1h_AB(self, logM, dndlogM, **kwargs):  # one-halo 3D power spectrum
-#         return lambda u_A, u_B: np.trapz(u_A*u_B*dndlogM, logM)
+#         return lambda u_A, u_B: np.trapezoid(u_A*u_B*dndlogM, logM)
 
 #     def P2h_AB(self, logM, dndlogM, b_h, P_lin, **kwargs):  # two-halo 3D power spectrum
 #         intfac_A = dndlogM*b_h  # combined int factors
 #         intfac_B = intfac_A *P_lin[..., None] # combined int factor, and throw Plin to not have to multiply it later
-#         return lambda u_A, u_B: np.trapz(u_A*intfac_A, logM)*np.trapz(u_B*intfac_B, logM)
+#         return lambda u_A, u_B: np.trapezoid(u_A*intfac_A, logM)*np.trapezoid(u_B*intfac_B, logM)
 
 #     def u_g(self, logM, dndlogM):  # galaxy overdensity fourier profile
 #         n_g = self.n_g(logM, dndlogM)
@@ -343,16 +343,16 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #         return lambda N_c, N_s, n_c, n_s: (2*N_c*n_c*N_s*n_s+N_s**2*n_s**2)/n_g(N_c, N_s)[:, None]**2
 
 #     def n_g(self, logM, dndlogM):  # mean galaxy density
-#         return lambda N_c, N_s: np.trapz((N_c+N_s)*dndlogM, logM)
+#         return lambda N_c, N_s: np.trapezoid((N_c+N_s)*dndlogM, logM)
 
 #     def P1h_gg(self, logM, dndlogM, **kwargs):  # galaxy overdensity one-halo auto-spectra
-#         P1h_gg = lambda u_g2: np.trapz(u_g2*dndlogM, logM)
+#         P1h_gg = lambda u_g2: np.trapezoid(u_g2*dndlogM, logM)
 #         u_g2 = self.u_g2(dndlogM, logM)
 #         return lambda N_c, N_s, n_c, n_s: P1h_gg(u_g2(N_c, N_s, n_c, n_s))
 
 #     def P2h_gg(self, logM, dndlogM, b_h, P_lin, **kwargs):  # galaxy overdensity two-halo auto-spectra
 #         intfac = dndlogM*b_h  # combined int factors
-#         P2h_gg = lambda u_g: P_lin*np.trapz(u_g*intfac, logM)**2
+#         P2h_gg = lambda u_g: P_lin*np.trapezoid(u_g*intfac, logM)**2
 #         u_g = self.u_g(logM, dndlogM)
 #         return lambda N_c, N_s, n_c, n_s: P2h_gg(u_g(N_c, N_s, n_c, n_s))
 
@@ -408,11 +408,11 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #         return lambda N_c, N_s, u_m, n_g: W_g / n_g * (N_c+N_s*u_m)
     
 #     # def ngal(self, Nc, Ns, dndlogm, logM, **kwargs):  # Eq. 12
-#     #     return np.trapz((Nc+Ns)*dndlogm, logM)
+#     #     return np.trapezoid((Nc+Ns)*dndlogm, logM)
     
 #     def C1h_gg(self, dndlogm, logms, d2VdzdOmega, zs):  # Eq. 15
 #         intfactor = dndlogm*d2VdzdOmega
-#         return lambda u2_g: np.trapz(np.trapz(intfactor*u2_g, logms), zs)
+#         return lambda u2_g: np.trapezoid(np.trapezoid(intfactor*u2_g, logms), zs)
     
 #     def u2_g(self, W_g, Hz, chis, dNdz, zs):  # Eq. 16
 #         W_g = Hz/c * self.W_g(zs, dNdz)/chis**2  # Eq. 13 & 14
@@ -421,19 +421,19 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #     def C2h_gg(self, dndlogm, logms, b_h, d2VdzdOmega, zs, Plin, ells, ks, chis):  # Eq. 17
 #         Plin_k = self.Pk_to_Pell(ells, ks, chis, zs)(Plin)
 #         intfac = Plin_k*d2VdzdOmega*dndlogm*b_h
-#         return lambda u_g: np.trapz(np.trapz(intfac*u_g, logms)**2, zs)
+#         return lambda u_g: np.trapezoid(np.trapezoid(intfac*u_g, logms)**2, zs)
     
 #     def C_ij(self, C1h_ij, C2h_ij):  # Eq. 3
 #         return C1h_ij+C2h_ij
     
 #     def C1h_ij(self, dndlogm, logms, d2VdzdOmega, zs, **kwargs):  # Eq. 4
 #         intfactor = dndlogm*d2VdzdOmega
-#         return lambda u_i, u_j: np.trapz(np.trapz(intfactor*u_i*u_j, logms), zs)
+#         return lambda u_i, u_j: np.trapezoid(np.trapezoid(intfactor*u_i*u_j, logms), zs)
     
 #     def C2h_ij(self, dndlogm_i, dndlogm_j, logms_i, logms_j, b_h_i, b_h_j, d2VdzdOmega, zs, Plin, ells, ks, chis, **kwargs):  # Eq. 5
 #         Plin_k = self.Pk_to_Pell(ells, ks, chis, zs)(Plin)
 #         intfac_i, intfac_j = Plin_k*d2VdzdOmega*dndlogm_i*b_h_i, dndlogm_j*b_h_j
-#         return lambda u_i, u_j: np.trapz(np.trapz(intfac_i*u_i, logms_i)*np.trapz(intfac_j*u_j, logms_j), zs)
+#         return lambda u_i, u_j: np.trapezoid(np.trapezoid(intfac_i*u_i, logms_i)*np.trapezoid(intfac_j*u_j, logms_j), zs)
     
     
 
@@ -449,16 +449,16 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
     
     # def ngal(self, Nc, Ns, hmf, logM, zs, **kwargs):
     #     hmf
-    #     return lambda p={}: np.trapz((Nc(p)+Ns(p))*hmf, logM)
+    #     return lambda p={}: np.trapezoid((Nc(p)+Ns(p))*hmf, logM)
         
     # def W_g(self, Hz, chis, dNdz, zs, **kwargs):
-    #     phi_g = dNdz / np.trapz(dNdz, zs)
+    #     phi_g = dNdz / np.trapezoid(dNdz, zs)
     #     return (Hz/c.c.to(u.km/u.s).value * phi_g/chis**2)[:, None]
     
     # def C1h_gg(self, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ells, ks, **kwargs):
     #     d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
     #     ug2 = self.ug2(Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, ells, ks, zs)
-    #     return lambda p={}: np.trapz(d2V_dzdOmega*np.trapz(hmf*ug2(p), logM), zs)
+    #     return lambda p={}: np.trapezoid(d2V_dzdOmega*np.trapezoid(hmf*ug2(p), logM), zs)
 
     # def ug2(self, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, ells, ks, zs, **kwargs):
     #     k_to_ell = self.Pk_to_Pell(ells, ks, chis, zs)
@@ -471,10 +471,10 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
     #     Plinl = self.uk_to_ul(ells, ks, chis, zs)(Plin)
     #     ug = self.u_g(ells, Nc, Ns, usk, hmf, logM, Hz, chis, dNdz, zs, ks)
     #     d2V_dzdOmega = c.c.to(u.km/u.s).value*chis**2/Hz
-    #     return lambda p={}: np.trapz(d2V_dzdOmega*Plinl*np.trapz(bh*hmf*ug(p), logM)**2, zs)
+    #     return lambda p={}: np.trapezoid(d2V_dzdOmega*Plinl*np.trapezoid(bh*hmf*ug(p), logM)**2, zs)
 
     # def SN(self, area, dNdz, ells, zs, **kwargs):
-    #     return area*(u.deg**2).to(u.sr)/np.trapz(dNdz, zs) *np.ones(ells.shape)
+    #     return area*(u.deg**2).to(u.sr)/np.trapezoid(dNdz, zs) *np.ones(ells.shape)
 
         
 
@@ -485,24 +485,24 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 
 #     def C_SN(self, ells, area, dNdz, zs, **kwargs):  # Shot Noise, Eq. 9
 #         frac = area/(4*np.pi*(180/np.pi)**2)
-#         return 4*np.pi*(area/(4*np.pi*(180/np.pi)**2))/np.trapz(dNdz, zs) * np.ones(ells.shape)
+#         return 4*np.pi*(area/(4*np.pi*(180/np.pi)**2))/np.trapezoid(dNdz, zs) * np.ones(ells.shape)
     
 #     def C_AB(self, W_A, W_B, chis, Hs, zs, ells, ks, **kwargs):  # Angular power spectra, Eq. 14
 #         P_AB_k_to_ell = self.Pk_to_Pell(ells, ks, zs, chis, plushalf=False)  # P_AB(k) to P_AB(ell) interpolator
 #         intfac = W_A * W_B * Hs/c.c.to(u.km/u.s).value/chis**2  # integrand factor
-#         return lambda P_AB: np.trapz(intfac*P_AB(P_AB), zs)  # return a lambda function to not recalculate above
+#         return lambda P_AB: np.trapezoid(intfac*P_AB(P_AB), zs)  # return a lambda function to not recalculate above
     
 #     def W_g(self, dNdz, zs, **kwargs):  # Galaxy Kernel, Eq. 15
-#         return dNdz/np.trapz(dNdz, zs)
+#         return dNdz/np.trapezoid(dNdz, zs)
 
 #     def W_y(self, zs, **kwargs):  # Compton y kernel, Eq. 16
 #         return 1/(1+zs)
 
 #     def P1h(self, Hx, Hy, hmf, logM, **kwargs):  # one-halo power spectrum, Eq. 24
-#         return np.trapz(Hx*Hy*hmf, logM)
+#         return np.trapezoid(Hx*Hy*hmf, logM)
 
 #     def P2h(self, Hx, Hy, hmf, logM, bh, Plin, **kwargs):  # two-halo power spectrum, Eq. 25
-#         return Plin*np.trapz(Hx*bh*hmf, logM)*np.trapz(Hy*bh*hmf, logM)
+#         return Plin*np.trapezoid(Hx*bh*hmf, logM)*np.trapezoid(Hy*bh*hmf, logM)
 
 #     def H_c(self, Nc, Ns, logM, hmf, **kwargs):  # central function, Eq. 27
 #         return Nc/self.n_gal(Nc, Ns, hmf, logM)
@@ -513,7 +513,7 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 
 #     def n_gal(self, zs, logM, **kwargs):  # comoving galaxy number density, Eq. 29
 #         dndlogm = self.dndlogm(zs, logM)
-#         return lambda p: np.trapz((self.Nc(p)+self.Ns(p))*dndlogm, logM)
+#         return lambda p: np.trapezoid((self.Nc(p)+self.Ns(p))*dndlogm, logM)
 
 #     def H_y(self, FFT_func, Hz, XH, **kwargs):  # Compton y function, Eq. 30
 #         efrac = (2+2*XH)/(3+5*XH)  # electron fraction
@@ -576,7 +576,7 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #         return lambda Pth, p={}: beam*Cl(Pgy_2h(Pth, p))
     
 #     def Cgg(self):
-#         C_SN = 4*np.pi*(area/(4*np.pi*(180/np.pi)**2))/np.trapz(dNdz, zs) * np.ones(ells.shape)
+#         C_SN = 4*np.pi*(area/(4*np.pi*(180/np.pi)**2))/np.trapezoid(dNdz, zs) * np.ones(ells.shape)
 
 
 
@@ -603,7 +603,7 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #     gzs = np.asarray(gzs)
 #     chis = self.comoving_radial_distance(gzs)
 #     hzs = self.h_of_z(gzs) # 1/Mpc
-#     nznorm = np.trapz(gdndz,gzs)
+#     nznorm = np.trapezoid(gdndz,gzs)
 #     term = (c.sigma_T/(c.m_e*c.c**2)).to(u.s**2/u.M_sun)*u.M_sun/u.s**2
 #     Wz1s = gdndz/nznorm
 #     Wz2s = 1/(1+gzs)
@@ -614,7 +614,7 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #     gzs = np.asarray(gzs)
 #     chis = self.comoving_radial_distance(gzs)
 #     hzs = self.h_of_z(gzs) # 1/Mpc
-#     nznorm = np.trapz(gdndz,gzs)
+#     nznorm = np.trapezoid(gdndz,gzs)
 #     Wz1s = gdndz/nznorm
 #     Wz2s = gdndz/nznorm
 #     return limber_integral(ells,zs,ks,Pgg,gzs,Wz1s,Wz2s,hzs,chis)
@@ -626,7 +626,7 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #     return lambda Pek: prefac*Pek
 
 # def u_g(zs, mshalo, Nc, Ns, hmf):
-#     ng = np.trapz((Nc(mshalo)+Ns(mshalo))*hmf(zs, mshalo), np.log10(mshalo))
+#     ng = np.trapezoid((Nc(mshalo)+Ns(mshalo))*hmf(zs, mshalo), np.log10(mshalo))
 
 
 # Limber Integral from hmvec
@@ -667,5 +667,5 @@ class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galax
 #         else:
 #             interpolated = f(kevals)
 #         if zevals.size==1: Cells[i] = interpolated * prefactor
-#         else: Cells[i] = np.trapz(interpolated*prefactor,zevals)
+#         else: Cells[i] = np.trapezoid(interpolated*prefactor,zevals)
 #     return Cells

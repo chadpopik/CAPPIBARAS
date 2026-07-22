@@ -5,14 +5,11 @@ ui.adsabs.harvard.edu/abs/2023JCAP...11..097Z
 arxiv.org/pdf/2309.06443
 """
 
-import numpy as np
-import pandas as pd
 
-import astropy.units as u
-import astropy.constants as c
+from config import *
+
 from scipy.special import erf
 
-import sys,os
 from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable
 thispath = os.path.dirname(os.path.abspath(__file__))
 

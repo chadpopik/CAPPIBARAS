@@ -5,21 +5,50 @@ ui.adsabs.harvard.edu/abs/2025PhRvD.112j3512R
 arxiv.org/pdf/2503.19870
 """
 
-import numpy as np
-import pandas as pd
 
-import astropy.units as u
-import astropy.constants as c
+from config import *
+
 from scipy.special import erf
 
-import sys,os
 from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
 
 
 
+class Data():
+    # III.A The DESI LRG Y1 galaxies overlapping with ACT are distributed in ∼4,300 deg2
+    area = 4300 *u.deg**2
+    
+    
+class Measurements():
+    path = f"{DATA_PATH}/RiedGuachalla2025"  # zenodo.org/records/15081008
+
+    def __init__(self, inputdict={}, **inputvars):
+        for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
+
+    def get_meas(self):
+        # TODO: Add more of the plots as options
+
+        kSZ_fid = dict(np.load(f"{self.path}/fig8_fiducial.npz")) # The measured stacked kSZ in μK arcmin2 for varying CAP filters with radius R
+        kSZ_zbins = dict(np.load(f"{self.path}/fig11_ksz_z.npz"))  # Mean stacked kSZ profiles for the different redshift bins
+        kSZ_mbins = dict(np.load(f"{self.path}/fig12_ksz_mass.npz"))  # kSZ stacked profiles for the different stellar mass bins, denoted by mass
+
+        if self.bin=='all':
+            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_fid['R'] *u.arcmin, kSZ_fid['DESIxACT'] *u.uK*u.arcmin**2, kSZ_fid['errors_DESIxACT'] *u.uK*u.arcmin**2
+
+        elif self.bin[0]=='z':
+            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_zbins['R'] *u.arcmin, kSZ_zbins[f'{self.bin}'] *u.uK*u.arcmin**2, kSZ_zbins[f'{self.bin}_error'] *u.uK*u.arcmin**2
+
+        elif self.bin[0]=='m':
+            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_mbins['R'] *u.arcmin, kSZ_mbins[f'{self.bin}'] *u.uK*u.arcmin**2, kSZ_mbins[f'{self.bin}_error'] *u.uK*u.arcmin**2
+
+        self.cormat = dict(np.load(f"{self.path}/fig18_cor.npz"))['cor']
+        self.TkSZ_cov = np.diag(self.TkSZ_err) @ self.cormat @ np.diag(self.TkSZ_err)
+        
+
 
 # TABLE II: Statistics of the DESI LRG Y1 sample kSZ and across various bins when splitting it by redshift (denoted as z followed by the bin number), stellar mass (denoted as mass followed by the bin number), and absolute magnitude for the three optical bands (denoted as Mag- followed by the color and bin number). For a given bin and total sample, we report the mean redshift ⟨z⟩, the median redshift Med(z), the mean stellar mass ⟨M⋆⟩ in units of solar masses (M⊙) and the number of galaxies N . We also include χ2 null from Eq. 9 with nine degrees of freedom, which quantifies the rejection of the null hypothesis, and the corresponding S/N (Eqs. 10). Finally, we included the amplitudes and uncertainties shown in Fig. 10. For the complete sample, we find S/N = 9.8.
+# III.B we split the DESI LRG Y1 overlapping with ACT into four spectroscopic redshift bins:(0.4, 0.6), (0.6, 0.8), (0.8, 0.95) and (0.95, 1.1)....Additionally, following [Hadzhiyska 2025], we split the stellar masses into four bins of log10(M∗/M⊙): (10.5, 11.2), (11.2, 11.4), (11.4, 11.6), and (11.6, 12.5)
 class Table2(ParamTable):
     def __init__(self, filename=f"{thispath}/Table2.csv"):
         self.df = pd.read_csv(filename)
@@ -100,128 +129,53 @@ class Fig20(BasePlots2):
         super().__init__(thispath)
 
 
-class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112j3512R
-    subs = {}  # subset of galaxy selection
-    info = {
-        }
 
 
-class TargetDataInfoTable(ParamTable):  # spectroscopic z bins (III.B.p6) + stellar mass bins (III.B.p7) + T2, per bin
-    def __init__(self, filename=f"{thispath}/target_data_info.csv"):
-        self.df = read_wide_table(filename)
 
 
-class TargetData(BaseTargetData, Studies.RiedGuachalla2025):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs
-    path = f"{datapath}/RiedGuachalla2025"  # Path to data downloaded from zenodo.org/records/15081008
-    subs = {
-        'bin': ['all', 'z_1', 'z_2', 'z_3', 'z_4', 'mass_1', 'mass_2', 'mass_3', 'mass_4'],  # redshift/mass subsample
-    }
+# class TargetData(BaseTargetData):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs
+#     path = f"{DATA_PATH}/RiedGuachalla2025"  # Path to data downloaded from zenodo.org/records/15081008
+#     subs = {
+#         'bin': ['all', 'z_1', 'z_2', 'z_3', 'z_4', 'mass_1', 'mass_2', 'mass_3', 'mass_4'],  # redshift/mass subsample
+#     }
 
-    info = {
-        'area': 4300 *u.deg**2,  # overlapping region of ACT and DESI [deg^2], F1 and III.B.p4
-        'logMhMean': 13.4 *u.dimensionless_unscaled,  # Msun/littleh, estimated mean halo mass of LRG [Msun/h], III.B.p5
-    }
 
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        row = TargetDataInfoTable().getparams(bin=self.bin).to_dict()
-        row['MsMean'] = row['MsMean']*1e11*u.Msun
-        for k, v in row.items(): setattr(self, k, v)
+#     def __init__(self, inputsdict={}, **inputvars):
+#         self.setup(inputsdict | inputvars)
+#         row = TargetDataInfoTable().getparams(bin=self.bin).to_dict()
+#         row['MsMean'] = row['MsMean']*1e11*u.Msun
+#         for k, v in row.items(): setattr(self, k, v)
         
-    def make_zdist(self, zMin=None, zMax=None, dz=None, zNum=None, **kwargs):
-        self.require(['bin'])  # require bin for file specification
-        self.allcat_zs = dict(np.load(f"{self.path}/fig2_hist_z.npz"))  # load redshifts of all galaxies in catalog
-        if self.bin[0]=='z': self.cat_zs = self.allcat_zs[f'{self.bin}']  # if zbin is specified, select for that subsample
-        else: self.cat_zs = np.concatenate([self.allcat_zs[f'z_{i}'] for i in range(1, 5)])  # otherwise, get all of them
+#     def make_zdist(self, zMin=None, zMax=None, dz=None, zNum=None, **kwargs):
+#         self.require(['bin'])  # require bin for file specification
+#         self.allcat_zs = dict(np.load(f"{self.path}/fig2_hist_z.npz"))  # load redshifts of all galaxies in catalog
+#         if self.bin[0]=='z': self.cat_zs = self.allcat_zs[f'{self.bin}']  # if zbin is specified, select for that subsample
+#         else: self.cat_zs = np.concatenate([self.allcat_zs[f'z_{i}'] for i in range(1, 5)])  # otherwise, get all of them
 
-        self.catdist('z', self.cat_zs, qMin=zMin, qMax=zMax, dq=dz, qNum=zNum, densspace=self.area)
+#         self.catdist('z', self.cat_zs, qMin=zMin, qMax=zMax, dq=dz, qNum=zNum, densspace=self.area)
         
-    def make_Msdist(self, halomodel, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None, **kwargs):
-        self.require(['bin'])  # require bin for file specification
-        self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
-        if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
-        else: self.cat_Ms = np.concatenate([self.allcat_Ms[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
-        self.cat_logMs = np.log10(self.cat_Ms)  # convert to log values
+#     def make_Msdist(self, halomodel, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None, **kwargs):
+#         self.require(['bin'])  # require bin for file specification
+#         self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
+#         if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
+#         else: self.cat_Ms = np.concatenate([self.allcat_Ms[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
+#         self.cat_logMs = np.log10(self.cat_Ms)  # convert to log values
         
-        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.zMax)-halomodel.Vcom(self.zMin))/(1+self.zMean)**3
+#         vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.zMax)-halomodel.Vcom(self.zMin))/(1+self.zMean)**3
         
-        self.catdist('logMs', self.cat_logMs, qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
+#         self.catdist('logMs', self.cat_logMs, qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
         
-    def make_Mhdist(self, halomodel, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None, **kwargs):
-        self.require(['bin'])  # require bin for file specification
-        self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
-        if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
-        else: self.cat_Ms = np.concatenate([self.allcat_Ms[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
-        self.cat_logMs = np.log10(self.cat_Ms)  # convert to log values
+#     def make_Mhdist(self, halomodel, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None, **kwargs):
+#         self.require(['bin'])  # require bin for file specification
+#         self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
+#         if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
+#         else: self.cat_Ms = np.concatenate([self.allcat_Ms[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
+#         self.cat_logMs = np.log10(self.cat_Ms)  # convert to log values
         
-        # Get function to convert stellar masses to halo masses
-        self.cat_logMh = SHMRs.Gao2023({'model':'Psat'}).HSMR(self.cat_logMs)()  # Use SHMR of Gao 2023 
-        # TODO: 1. is the Psat model the best to use?, 2. think this converts to virial mass
+#         # Get function to convert stellar masses to halo masses
+#         self.cat_logMh = SHMRs.Gao2023({'model':'Psat'}).HSMR(self.cat_logMs)()  # Use SHMR of Gao 2023 
+#         # TODO: 1. is the Psat model the best to use?, 2. think this converts to virial mass
         
-        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.zMax)-halomodel.Vcom(self.zMin))/(1+self.zMean)**3
+#         vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.zMax)-halomodel.Vcom(self.zMin))/(1+self.zMean)**3
 
-        self.catdist('logMh', self.cat_logMh, qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=vol)
-
-
-class Measurements(BaseMeasurement, Studies.RiedGuachalla2025):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs (arxiv.org/abs/2503.19870)
-    path = f"{datapath}/RiedGuachalla2025"  # Path to data downloaded from zenodo.org/records/15081008
-    subs = {
-        'bin': ['all', 'z_1', 'z_2', 'z_3', 'z_4', 'mass_1', 'mass_2', 'mass_3', 'mass_4'],  # redshift/mass bin
-    }
-
-    def __init__(self, inputsdict, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.require(['bin'])
-
-        self.get_meas()  # get the measurements
-
-    def get_meas(self):
-        # TODO: Add more of the plots as options
-        
-        kSZ_fid = dict(np.load(f"{self.path}/fig8_fiducial.npz")) # The measured stacked kSZ in μK arcmin2 for varying CAP filters with radius R
-        kSZ_zbins = dict(np.load(f"{self.path}/fig11_ksz_z.npz"))  # Mean stacked kSZ profiles for the different redshift bins
-        kSZ_mbins = dict(np.load(f"{self.path}/fig12_ksz_mass.npz"))  # kSZ stacked profiles for the different stellar mass bins, denoted by mass
-
-        if self.bin=='all':
-            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_fid['R'] *u.arcmin, kSZ_fid['DESIxACT'] *u.uK*u.arcmin**2, kSZ_fid['errors_DESIxACT'] *u.uK*u.arcmin**2
-
-        elif self.bin[0]=='z':
-            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_zbins['R'] *u.arcmin, kSZ_zbins[f'{self.bin}'] *u.uK*u.arcmin**2, kSZ_zbins[f'{self.bin}_error'] *u.uK*u.arcmin**2
-
-        elif self.bin[0]=='m':
-            self.R, self.TkSZ_data, self.TkSZ_err = kSZ_mbins['R'] *u.arcmin, kSZ_mbins[f'{self.bin}'] *u.uK*u.arcmin**2, kSZ_mbins[f'{self.bin}_error'] *u.uK*u.arcmin**2
-
-        self.cormat = dict(np.load(f"{self.path}/fig18_cor.npz"))['cor']
-        self.TkSZ_cov = np.diag(self.TkSZ_err) @ self.cormat @ np.diag(self.TkSZ_err)
-
-
-class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112j3512R
-    def Fig2(self, width=6, height=5):
-        return self.plot(filename='Fig2', width=width, height=height,
-            xlabel=r'$z$', ylabel=r'Number',
-            xlim=(0.365, 1.135), ylim=(0, 35e3), xscale='linear', yscale='linear')
-
-    def Fig3(self, width=6, height=5):
-        return self.plot(filename='Fig3', width=width, height=height,
-            xlabel=r'Stellar Mass $M_* \ [M_\odot]$', ylabel=r'Number',
-            xlim=(2.6e10, 3.5e12), ylim=(5.5e-1, 1.5e5), xscale='log', yscale='log')
-        
-    def Fig8(self, width=10, height=3.5):
-        return self.plot(filename=['Fig8a','Fig8b'], nrow=1, ncol=2, width=width, height=height,
-            xlabel=r'$R \ [\text{arcmin}]$', ylabel=r'$T_\text{kSZ} \ [\mu \text{K arcmin}^2]$',
-            xlim=(0.525, 6.525), ylim=(0.1, 20), xscale='linear', yscale='log')
-        
-    def Fig11(self, width=5, height=3.5):
-        return self.plot(filename='Fig11', width=width, height=height,
-            xlabel=r'$R \ [\text{arcmin}]$', ylabel=r'$T_\text{kSZ} \ [\mu \text{K arcmin}^2]$',
-            xlim=(0.75, 6.4), ylim=(0.045, 35), xscale='linear', yscale='log')
-        
-    def Fig12(self, width=5, height=3.5):
-        return self.plot(filename='Fig12', width=width, height=height,
-            xlabel=r'$R \ [\text{arcmin}]$', ylabel=r'$T_\text{kSZ} \ [\mu \text{K arcmin}^2]$',
-            xlim=(0.75, 6.4), ylim=(0.065, 28), xscale='linear', yscale='log')
-
-    def Fig20(self, width=6, height=4.5):
-        return self.plot(filename='Fig20', width=width, height=height,
-            xlabel=r'$z$', ylabel=r'Number',
-            xlim=(0.1, 1.15), ylim=(0, 60e3), xscale='linear', yscale='linear')
+#         self.catdist('logMh', self.cat_logMh, qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=vol)

@@ -18,6 +18,9 @@ import importlib
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
+    # def __init__(self, inputdict={}, **inputvars):
+    #     for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
+
 # Plot Styling, this is all optional and can be overridden by the user in their own scripts
 plt.style.use('dark_background')
 plt.rcParams.update({
@@ -30,9 +33,9 @@ plt.rcParams.update({
 # Root directory of CAPPIBARAS itself, derived from this file's location
 CAPPIBARAS_PATH = Path(__file__).resolve().parent
 
-# Machine-local paths (DATA_PATH, STACKING_PATH, SOLIKET_PATH, OUTPUT_PATH) live in
+# Machine-local paths (DATA_PATH, SOLIKET_PATH, OUTPUT_PATH) live in
 # config_local.py, which is gitignored so each checkout can set its own without churn.
-from config_local import DATA_PATH, STACKING_PATH, SOLIKET_PATH, OUTPUT_PATH
+from config_local import DATA_PATH, SOLIKET_PATH, OUTPUT_PATH
 
 
 __all__ = [
@@ -54,5 +57,4 @@ __all__ = [
     "DATA_PATH",
     "SOLIKET_PATH",
     "OUTPUT_PATH",
-    "STACKING_PATH",
 ]

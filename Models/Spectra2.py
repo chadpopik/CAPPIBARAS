@@ -36,14 +36,14 @@ class Popik2026(BaseSpectra, Studies.Popik2026):
         # dndlogm[:, (targets.logM<12) | (targets.logM>16)] = 0
         infac = dndlogm*targets.dNdz[:, None]  # combined mass/z distributions
 
-        ngal = lambda p: np.trapz((Nc(p)+Ns(p))*dndlogm, logM)  # total galaxy number
+        ngal = lambda p: np.trapezoid((Nc(p)+Ns(p))*dndlogm, logM)  # total galaxy number
         Hg = lambda p: (Nc(p)*nc(p) + Ns(p)*ns(p))/ngal(p)[None, :, None]  # HOD cross-spectra function
         # Hg = lambda p: (Nc(p)[None, None, :] + Ns(p)[None, None, :])/ngal(p)[:, None]  # HOD cross-spectra function
-        Hg_norm = lambda p: Hg(p)/np.trapz(np.trapz(Hg(p)*infac, logM), zs)[:, None, None]  # normalized galaxy distribution
+        Hg_norm = lambda p: Hg(p)/np.trapezoid(np.trapezoid(Hg(p)*infac, logM), zs)[:, None, None]  # normalized galaxy distribution
         intfac0 = Hg_norm({})*infac  # combine default HOD galaxy dist into integrand factor
         intfac = lambda p: Hg_norm(p)*infac if p!={} else intfac0  # recalculate integrand factor if HOD galaxy dist is being fit
     
-        aveprof = lambda prof, p: np.trapz(np.trapz(self.FFT3D(prof)*intfac(p), logM), zs) # take mass/redshift average
+        aveprof = lambda prof, p: np.trapezoid(np.trapezoid(self.FFT3D(prof)*intfac(p), logM), zs) # take mass/redshift average
 
         return lambda prof, p={}: self.IFFT1D(aveprof(prof, p))*prof.unit
     
@@ -61,13 +61,13 @@ class Popik2026(BaseSpectra, Studies.Popik2026):
         # dndlogm[:, (targets.logM<12) | (targets.logM>16)] = 0
         infac = dndlogm*targets.dNdz[:, None]  # combined mass/z distributions
 
-        ngal = lambda p: np.trapz((Nc(p)+Ns(p))*dndlogm, logM)  # total galaxy number
+        ngal = lambda p: np.trapezoid((Nc(p)+Ns(p))*dndlogm, logM)  # total galaxy number
         Hg = lambda p: (Nc(p) + Ns(p))/ngal(p)[:, None]  # HOD cross-spectra function
         # Hg = lambda p: (Nc(p)[None, None, :] + Ns(p)[None, None, :])/ngal(p)[:, None]  # HOD cross-spectra function
-        Hg_norm = lambda p: Hg(p)/np.trapz(np.trapz(Hg(p)*infac, logM), zs)  # normalized galaxy distribution
+        Hg_norm = lambda p: Hg(p)/np.trapezoid(np.trapezoid(Hg(p)*infac, logM), zs)  # normalized galaxy distribution
         intfac0 = Hg_norm({})*infac  # combine default HOD galaxy dist into integrand factor
         intfac = lambda p: Hg_norm(p)*infac if p!={} else intfac0  # recalculate integrand factor if HOD galaxy dist is being fit
     
-        return lambda prof, p={}: np.trapz(np.trapz(prof*intfac(p), logM), zs) # take mass/redshift average
+        return lambda prof, p={}: np.trapezoid(np.trapezoid(prof*intfac(p), logM), zs) # take mass/redshift average
     
     

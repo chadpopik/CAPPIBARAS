@@ -6,18 +6,12 @@ arxiv.org/pdf/2203.12583
 """
 
 
-import numpy as np
-import pandas as pd
+from config import *
 
-import astropy.units as u
-import astropy.constants as c
 from scipy.special import erf
 
-import sys,os
 from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
-
-
 
 
 class Cosmology():
@@ -27,7 +21,6 @@ class Cosmology():
     # 1. In our analysis, we work in units of M /h for masses and we adopt the M200chalo mass definition everywhere, i.e., the mass enclosed within the spherical region whose density is 200 times the critical density of the universe, and the corresponding mass-dependent radius r200c, which encloses mass M200c
     
     
-
     # subs = {'sample':['Blue', 'Green', 'Red'],}
 
     # info = {
@@ -58,7 +51,6 @@ class HaloModel():
     # B1. dn/(dM ) is the differential number of halos per unit mass and volume, defined by the halo mass function (HMF), where in our analysis we use the Tinker et al. analytical fitting fuction [39]
     
     # In class_sz, we set the mass bounds of the integral to Mmin = 7 × 108 M /hand Mmax = 3.5 × 1015 M /h and the redshift bounds to zmin = 0.005 and zmax = 4, the latter dictated by the upper redshift limit of the unWISE galaxy samples that we analyze.
-    
     
     
 class HOD():
@@ -286,13 +278,13 @@ class Spectra(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galaxies
     def C1h_ij(self, zs, logMs, **kwargs):  # Eq. 4
         self.require(['dndlogM'])
         intfactor = self.dndlogM(zs, logMs)*self.d2VdzdOmega(zs)
-        return lambda u_i, u_j: np.trapz(np.trapz(intfactor*u_i*u_j, logMs), zs)
+        return lambda u_i, u_j: np.trapezoid(np.trapezoid(intfactor*u_i*u_j, logMs), zs)
 
     def C2h_ij(self, ks, zs, logMsi, logMsj, **kwargs):  # Eq. 5
         self.require(['Plin', 'dndlogM', 'bh', 'ells'])
         Plin_k = self.k_to_ell(self.ells, ks[:, :, 0], zs[:, 0])(self.Plin(ks, zs)[:, :, 0])[:, :, None]
         intfac_i, intfac_j = Plin_k*self.d2VdzdOmega(zs)*self.dndlogM(zs, logMsi)*self.bh(zs, logMsi), self.dndlogM(zs, logMsj)*self.bh(zs, logMsj)
-        return lambda u_i, u_j: np.trapz(np.trapz(intfac_i*u_i, logMsi)*np.trapz(intfac_j*u_j, logMsj), zs)
+        return lambda u_i, u_j: np.trapezoid(np.trapezoid(intfac_i*u_i, logMsi)*np.trapezoid(intfac_j*u_j, logMsj), zs)
 
     def u_g(self, ks, zs, logMs, **kwargs):  # Eq. 11
         Wg, Nc, Ns, ugl, ngal = self.W_g(zs), self.Nc(logMs), self.Nc(logMs), self.ugl(ks, zs, logMs), self.ngal(zs, logMs)
@@ -300,11 +292,11 @@ class Spectra(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galaxies
     
     def ngal(self, zs, logMs, **kwargs):  # Eq. 12
         Nc, Ns, dndlogm = self.Nc(logMs), self.Nc(logMs), self.dndlogM(zs, logMs)
-        return lambda p: np.trapz((Nc+Ns)*dndlogm, logMs)
+        return lambda p: np.trapezoid((Nc+Ns)*dndlogm, logMs)
     
     def W_g(self, zs):  # Eq 13 & 14
         self.require(['dNdz', 'H', 'chi'])
-        phig = self.dNdz/np.trapz(self.dNdz, zs)
+        phig = self.dNdz/np.trapezoid(self.dNdz, zs)
         return (self.H(zs)/c.c*phig/self.chi(zs)).decompose()
 
     def C1h_gg(self, ks, zs, logMs):  # Eq. 15

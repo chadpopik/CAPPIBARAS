@@ -6,6 +6,7 @@ arxiv.org/pdf/2307.01258
 """
 
 
+from config import *
 class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2024PhRvD.109f3530C
     subs={}
     info={'area': 12200

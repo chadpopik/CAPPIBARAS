@@ -5,18 +5,14 @@ ui.adsabs.harvard.edu/abs/2025PhRvD.112l3507H
 arxiv.org/pdf/2507.14136
 """
 
-import numpy as np
-import pandas as pd
 
-import astropy.units as u
-import astropy.constants as c
+from config import *
+
 from scipy.special import erf
 
-import sys,os
 from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
 
-    
     
 def Cosmology():
     # = III.A As this analysis is performed at fixed cosmology, we employ the fiducial cosmology boxes which have cosmological parameters set to their Planck 2018 values: Ω𝑏 ℎ2 = 0.02237, Ω𝑐 ℎ2 = 0.12,ℎ = 0.6736, 𝐴𝑠 = 2.0830 × 10−9, 𝑛𝑠 = 0.9649, 𝑤0 = −1,𝑤𝑎 = 0.

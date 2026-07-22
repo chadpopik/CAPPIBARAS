@@ -6,15 +6,9 @@ arxiv.org/pdf/1607.02442
 """
 
 
-import sys,os
+from config import *
 from Models.Papers.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
-
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
-
 
 
 class Cosmology():

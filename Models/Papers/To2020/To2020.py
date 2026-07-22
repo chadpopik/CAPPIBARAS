@@ -6,6 +6,7 @@ arxiv.org/pdf/2010.01138
 """
 
 
+from config import *
 class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2021PhRvL.126n1301T
     subs = {}
     info = {

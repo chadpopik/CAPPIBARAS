@@ -6,14 +6,9 @@ arxiv.org/pdf/1401.7329
 """
 
 
-import sys,os
+from config import *
 from Models.Papers.PlotsTables import BasePlots2, ParamTable, splittable
 thispath = os.path.dirname(os.path.abspath(__file__))
-
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
 
 
 class Cosmology():
@@ -24,7 +19,6 @@ class Cosmology():
     sigma8=0.82
     ns=0.95
     
-
 
 class HaloModel():
     # Total masses are defined within radius enclosing a particular overdensity (500 or 200) with respect to the critical density at redshift of observation, which is indicated by a corresponding subscript (M500 or M200).
@@ -47,8 +41,6 @@ class SHMR():
         p = self.p0 | pdict | kwargs
         x = self.logM500-14.5
         return p['slope']*x+p['normalization']
-
-
 
 
 class Table3(ParamTable):

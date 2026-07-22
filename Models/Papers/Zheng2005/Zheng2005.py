@@ -6,23 +6,15 @@ arxiv.org/pdf/astro-ph/0408564
 """
 
 
-
-import sys,os
+from config import *
 from Models.Papers.PlotsTables import BasePlots2, ParamTable
 thispath = os.path.dirname(os.path.abspath(__file__))
 
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
 
 from scipy.special import erf
 
 from Models.Papers.Zehavi2005 import Zehavi2005
 
-
-
-    
 
 class Cosmology():
     pass
@@ -57,8 +49,6 @@ class HOD(): # Section 3.1. HOD for All Galaxies
         return np.where(10**self.logM>=p['M0'], ((10**self.logM-10**p['M0'])/10**p['logM1prime']), 0)**p['alpha']
 
 
-
-
 # Table 1. HOD Parameters for Galaxy Samples with Different Thresholds of Baryonic Mass
 # Note. — Number density and mass are in units of h3Mpc−3 and M⊙, respectively. Columns 3–5 are for the 3-parameter model and Columns 6–10 are for the 5-parameter model (see the text). For the 3-parameter model, Mmin is simply set to be the halo mass at which 〈N 〉M = 0.5, and M1 and α are obtained through a power-law fit to data points with 〈Nsat〉M > 0.1.
 class Table1():  
@@ -78,7 +68,6 @@ class Table1():
             else: print(f"Value {v} not in {np.unique(df[k].values)}")
         return df
 
-    
     
 #Fig. 1.— Mean occupation number and scatter as a function of halo mass, separated into central and satellite galaxies. Predictions are shown for the  ̄ng = 0.02h3 Mpc−3 samples from the SPH simulation (left panels) and from the SA model (right panels). Lower panels plot the mean occupation numbers of central, satellite, and all galaxies. In the upper panels, circles show 〈N (N − 1)〉1/2/〈N 〉, indicating the width of the probability distribution, for all galaxies (filled circles) and satellite galaxies (open circles). For Poisson P (N |M ), this ratio would be one (dotted line). This figure can be compared to Fig. 4 of K04.
 class Fig1(BasePlots2):

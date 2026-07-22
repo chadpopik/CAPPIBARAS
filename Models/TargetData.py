@@ -21,7 +21,7 @@ import Models.Studies as Studies
 import Models.HaloModels as HaloModels
 import Models.SHMRs as SHMRs
 
-from config import DATA_PATH, STACKING_PATH
+from config import DATA_PATH
 
 datapath = DATA_PATH
 
@@ -58,7 +58,7 @@ class BaseTargetData:
 
     def distave(self, q, qdist, qint=None):
         qint = qint if qint is not None else q
-        return np.trapz(q*qdist, qint)/np.trapz(qdist, qint)
+        return np.trapezoid(q*qdist, qint)/np.trapezoid(qdist, qint)
 
     
     
@@ -358,7 +358,7 @@ class Liu2025(BaseTargetData, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked o
         'logMhMean': { # rough mean halo mass taken from Yuan 2023, III.A.p5
             'z1':13.40, 'z2':13.40, 'z3':13.24, 'z4':13.24},  
         'zMean': {  # mean redshift, T1
-            'z1':0.470, 'z2':0.628, '3':0.791, 'z4':0.924},
+            'z1':0.470, 'z2':0.628, 'z3':0.791, 'z4':0.924},
         'nGal': {'units': u.deg**-2, #  mean number density, T1
             'z1':81.9, 'z2':148.1, 'z3':162.4, 'z4':148.3},
         'NGal_unmasked': { # objects in catalog, T1
@@ -401,7 +401,7 @@ class Liu2025(BaseTargetData, Studies.Liu2025):  # ACT DR6 (&DR5) maps stacked o
         self.n_z = self.dndz*self.dz
         self.N_z = self.dNdz*self.dz
 
-    def make_Mhdist(self, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None, halomodel=None):
+    def make_Mhdist(self, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None, halomodel=None, **kwargs):
         self.logMhMin = 12
         self.logMhMax = 14
         self.catdist('logMh', np.zeros([100]), qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=1)
@@ -523,7 +523,7 @@ class White2022(BaseTargetData, Studies.White2022):  # DESI LS DR9 LRGs correlat
 
 
 class Popik2026(BaseTargetData, Studies.Popik2026):  # TODO: In progress
-    path = f"{STACKING_PATH}/Results"
+    path = f"{DATA_PATH}/Results"
     subs = {
     'zbin': ['z1', 'z2', 'z3', 'z4'],
     'deproj' : ['Base', 'cib', 'cib_cibdBeta', 'cib_cibdBeta_cibdT', 'cib_cibdT'],
@@ -619,7 +619,7 @@ class Gao2023(BaseTargetData, Studies.Gao2023):  # DESI 1% LRGs and ELGs (Gao+ 2
         self.dNdzdlogMs = dNinterp(np.column_stack([zgrid.ravel(), logMsgrid.ravel()])).reshape(len(self.z), len(self.logMs)) / u.dex
         
         self.dNdogMs_z = self.dNdzdlogMs *self.dz
-        self.N_z = np.trapz(self.dNdogMs_z, self.logMs)
+        self.N_z = np.trapezoid(self.dNdogMs_z, self.logMs)
         self.n_z = self.N_z / self.area
         self.dNdz = self.N_z / self.dz
         self.dndz = self.dNdz / self.area
@@ -631,7 +631,7 @@ class Gao2023(BaseTargetData, Studies.Gao2023):  # DESI 1% LRGs and ELGs (Gao+ 2
     #     return self.dndlogmstar_h3*hh**3
     
     # def dNdz(self, **cosmopars):
-    #     return np.trapz(self.dndlogmstar(**cosmopars), self.logmstar)*self.volumes(**cosmopars)/(self.z[1]-self.z[0])
+    #     return np.trapezoid(self.dndlogmstar(**cosmopars), self.logmstar)*self.volumes(**cosmopars)/(self.z[1]-self.z[0])
 
 
 class Kou2023(BaseTargetData, Studies.Kou2023):
@@ -800,5 +800,5 @@ class More2015(BaseTargetData, Studies.More2015):
     
     
         # TODO: handle this stuff
-        # norm_fac = self.dNdz[:,None]/np.trapz(self.dNdlogmhalo, self.logmhalos)*(self.zs[1]-self.zs[0])  # ensures same zcount as dNdz
+        # norm_fac = self.dNdz[:,None]/np.trapezoid(self.dNdlogmhalo, self.logmhalos)*(self.zs[1]-self.zs[0])  # ensures same zcount as dNdz
         # self.dndlogmhalo = self.dNdlogmhalo*norm_fac/self.volumes()[:, None]  # create number dist [dex^-1]

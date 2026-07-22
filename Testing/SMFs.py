@@ -43,7 +43,7 @@ class BaseSMF:
             logmhalo = np.linspace(SHMR(logmstar.min())(), SHMR(logmstar.max())(), logmstar.size)  # equally space halo bins
         mh_from_ms = SHMR(logmstar)()  # Calculate corresponding halo masses from stellar masses
         dndlogmstar_interp = np.array([np.interp(logmhalo, mh_from_ms, dndlogmstar[i]) for i in range(zs.size)])  # interpolate to desired halo masses
-        conv_fac = np.nan_to_num((np.trapz(dndlogmstar, logmstar)/np.trapz(dndlogmstar_interp, logmhalo)), nan=0.0)
+        conv_fac = np.nan_to_num((np.trapezoid(dndlogmstar, logmstar)/np.trapezoid(dndlogmstar_interp, logmhalo)), nan=0.0)
         dndlogmhalo = dndlogmstar_interp*conv_fac[:, None]
         return logmhalo, dndlogmhalo
 
@@ -131,7 +131,7 @@ class RiedGuachalla2025(BaseSMF):  # ACT DR6 maps stacked on DESI Y1 LRGs (Ried-
         self.dNdlogmhalo = np.histogram(logmhalos, bins=logmhalobins)[0]/dlogmhalo
         
     def dndlogmhalo(self, **cpars):
-        norm_fac = self.dNdz()[:,None]/np.trapz(self.dNdlogmhalo, self.logmhalo)*(self.z[1]-self.z[0])
+        norm_fac = self.dNdz()[:,None]/np.trapezoid(self.dNdlogmhalo, self.logmhalo)*(self.z[1]-self.z[0])
         return self.dNdlogmhalo * norm_fac/self.volumes(zs=self.z, **cpars)[:, None]
 
 
@@ -194,7 +194,7 @@ class Liu2025(BaseSMF): # ACT DR6 maps stacked on DESI LRGs for cross-correlatio
     def dndlogmhalo(self, **cosmopars):
         desi1p = DESI1P({'sample':'LRG'})        # Stealing SMF from DESI 1% LRG values, same with SHMR
         zs_1p, logmstar_1p, dndlogmstar_1p = desi1p.z, desi1p.logmstar, desi1p.dndlogmstar(**cosmopars)
-        nz_1p = np.trapz(dndlogmstar_1p, logmstar_1p)  # zdist of DESI 1%
+        nz_1p = np.trapezoid(dndlogmstar_1p, logmstar_1p)  # zdist of DESI 1%
         nz_XCorr = self.dNdz() * (self.z[1]-self.z[0]) /self.volumes(**cosmopars) # get zdist from XCorrLRGs
         zfac = nz_XCorr/np.interp(self.z, zs_1p, nz_1p)  # normalization factor to match zdist
         
@@ -319,7 +319,7 @@ class Gao2023(BaseSMF):  # DESI 1% LRGs and ELGs (Gao+ 2023, arxiv.org/abs/2306.
         return self.dndlogmstar_h3*hh**3
     
     def dNdz(self, **cosmopars):
-        return np.trapz(self.dndlogmstar(**cosmopars), self.logmstar)*self.volumes(**cosmopars)/(self.z[1]-self.z[0])
+        return np.trapezoid(self.dndlogmstar(**cosmopars), self.logmstar)*self.volumes(**cosmopars)/(self.z[1]-self.z[0])
 
 
 class SDSSBOSS(BaseSMF):  # (Ahn+ 2013, arxiv.org/abs/1307.7735, Alam+ 2015, https://arxiv.org/abs/1501.00963)    
@@ -383,17 +383,17 @@ class SDSSBOSS(BaseSMF):  # (Ahn+ 2013, arxiv.org/abs/1307.7735, Alam+ 2015, htt
 # # Plot the distributions
 # fig, axs = plt.subplots(1, 2, figsize=(15, 5), layout='constrained')
 # axs[0].plot(halodist.z, halodist.dNdz())
-# axs[1].plot(halodist.logmhalo, np.trapz(halodist.dndlogmhalo(), halodist.z, axis=0))
+# axs[1].plot(halodist.logmhalo, np.trapezoid(halodist.dndlogmhalo(), halodist.z, axis=0))
 
 # axs[0].set(xlabel=r'$z$', ylabel=r'$\frac{dN}{dz}$')
 # axs[1].set(xlabel=r'$\log M_\text{halo}$', ylabel=r'$\frac{dn}{d\log M_\text{halo}}$', yscale='log')
 # plt.show()
 
 # # Show info about the distribution based on the paper and our numbers
-# ntot0 = np.trapz(halodist.dNdz(), halodist.z)
-# zave0 = np.trapz(halodist.dNdz()*halodist.z, halodist.z)/ntot0
-# dndzdlogmhalo_norm0 = halodist.dndlogmhalo()/np.trapz(np.trapz(halodist.dndlogmhalo(), halodist.logmhalo), halodist.z)
-# logmave0 = np.trapz(np.trapz(halodist.logmhalo*dndzdlogmhalo_norm0, halodist.logmhalo), halodist.z)
+# ntot0 = np.trapezoid(halodist.dNdz(), halodist.z)
+# zave0 = np.trapezoid(halodist.dNdz()*halodist.z, halodist.z)/ntot0
+# dndzdlogmhalo_norm0 = halodist.dndlogmhalo()/np.trapezoid(np.trapezoid(halodist.dndlogmhalo(), halodist.logmhalo), halodist.z)
+# logmave0 = np.trapezoid(np.trapezoid(halodist.logmhalo*dndzdlogmhalo_norm0, halodist.logmhalo), halodist.z)
 # print(f'ntot={ntot0:.2f}, zave={zave0:.2f}, logmave={logmave0:.2f}')
 # print(halodist.info)
 
@@ -405,9 +405,9 @@ class SDSSBOSS(BaseSMF):  # (Ahn+ 2013, arxiv.org/abs/1307.7735, Alam+ 2015, htt
 # dNdz = np.interp(zs, halodist.z, halodist.dNdz())
 
 # # Construct an averaging function from the HMF from data
-# dndzdlogmhalo_norm = dndlogmhalo_smf/np.trapz(np.trapz(dndlogmhalo_smf, logmhalos), zs)
-# aveprof_dist = lambda prof: np.trapz(np.trapz(prof*dndzdlogmhalo_norm, logmhalos), zs)
+# dndzdlogmhalo_norm = dndlogmhalo_smf/np.trapezoid(np.trapezoid(dndlogmhalo_smf, logmhalos), zs)
+# aveprof_dist = lambda prof: np.trapezoid(np.trapezoid(prof*dndzdlogmhalo_norm, logmhalos), zs)
 # logmave = aveprof_dist(logmhalos)
-# zave = np.trapz(zs*dNdz, zs)/np.trapz(dNdz, zs)
-# ntot = np.trapz(dNdz, zs)
+# zave = np.trapezoid(zs*dNdz, zs)/np.trapezoid(dNdz, zs)
+# ntot = np.trapezoid(dNdz, zs)
 # print(f"ntot={ntot:.2f}, zave={zave:.2f}, logmave={logmave:.2f}")

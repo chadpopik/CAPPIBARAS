@@ -5,7 +5,8 @@ ui.adsabs.harvard.edu/abs/2025PhRvD.112h3509H
 arxiv.org/pdf/2407.07152
 """
 
-import os
+
+from config import *
 from Models.Papers.PlotsTables import ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
 

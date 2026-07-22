@@ -3,19 +3,14 @@ Likelihood for SZ model
 
 """
 
+from config import *
 
-import time
-import sys
-import numpy as np
-import astropy.units as u
 from typing import Optional, Sequence, Dict, Any
 
 from Models import TargetData, MapData, HaloModels, FFTs, Projections, Profiles, SHMRs, HODs, Dust, Measurements, Spectra2
 
 from cobaya.yaml import yaml_load_file
-from cobaya.theory import Theory
 
-from config import SOLIKET_PATH
 sys.path.append(str(SOLIKET_PATH))
 from soliket.gaussian import GaussianData, GaussianLikelihood
 
@@ -76,8 +71,8 @@ class SZLikelihood(GaussianLikelihood):
         self.profile = getattr(Profiles, self.Profile['name'])(self.Profile['spefs'],rhoc=self.halomodel.rhoc, r200c=self.halomodel.rdel('200c'), dndlogm=self.halomodel.dndlogm, bh=self.halomodel.bh, Plin=self.halomodel.Plin, **self.cosmopars)
 
         if VERBOSE: print("Setting up Basic Average")
-        dndzdlogmhalo_norm = self.targetdata.dndlogMh*self.targetdata.dndz[:, None]/np.trapz(np.trapz(self.targetdata.dndlogMh, self.targetdata.logMh)*self.targetdata.dndz, self.targetdata.z)
-        self.ave_smf = lambda prof: np.trapz(np.trapz(prof*dndzdlogmhalo_norm, self.targetdata.logMh), self.targetdata.z)
+        dndzdlogmhalo_norm = self.targetdata.dndlogMh*self.targetdata.dndz[:, None]/np.trapezoid(np.trapezoid(self.targetdata.dndlogMh, self.targetdata.logMh)*self.targetdata.dndz, self.targetdata.z)
+        self.ave_smf = lambda prof: np.trapezoid(np.trapezoid(prof*dndzdlogmhalo_norm, self.targetdata.logMh), self.targetdata.z)
 
         if VERBOSE: print("Setting up HOD Average")
         self.hod = getattr(HODs, self.HOD['name'])(self.HOD['spefs'])  # Import HOD Model
@@ -242,8 +237,8 @@ class KSZLikelihood(SZLikelihood):
 
 #     def _init_model(self):
 #                 # Distribution weighted averaging
-#         dndzdlogmhalo_norm = self.dndlogmhalo_smf/np.trapz(np.trapz(self.dndlogmhalo_smf, self.logmhalos), self.zs)
-#         self.ave_smf = lambda prof: np.trapz(np.trapz(prof*dndzdlogmhalo_norm, self.logmhalos), self.zs)
+#         dndzdlogmhalo_norm = self.dndlogmhalo_smf/np.trapezoid(np.trapezoid(self.dndlogmhalo_smf, self.logmhalos), self.zs)
+#         self.ave_smf = lambda prof: np.trapezoid(np.trapezoid(prof*dndzdlogmhalo_norm, self.logmhalos), self.zs)
         
         
         # self.fft = FFTs.mcfit_package(self.rs)
@@ -339,11 +334,11 @@ class KSZLikelihood(SZLikelihood):
     #     self.logmhalos = self.halodist.logmhalo
     #     self.dndlogmhalo_smf = self.halodist.dndlogmhalo(**self.cpars)
     #     self.dNdz = self.halodist.dNdz(**self.cpars)
-    #     self.zave = np.trapz(self.zs*self.dNdz, self.zs)/np.trapz(self.dNdz, self.zs)
+    #     self.zave = np.trapezoid(self.zs*self.dNdz, self.zs)/np.trapezoid(self.dNdz, self.zs)
 
     #     # Distribution weighted averaging
-    #     dndzdlogmhalo_norm = self.dndlogmhalo_smf/np.trapz(np.trapz(self.dndlogmhalo_smf, self.logmhalos), self.zs)
-    #     self.ave_smf = lambda prof: np.trapz(np.trapz(prof*dndzdlogmhalo_norm, self.logmhalos), self.zs)
+    #     dndzdlogmhalo_norm = self.dndlogmhalo_smf/np.trapezoid(np.trapezoid(self.dndlogmhalo_smf, self.logmhalos), self.zs)
+    #     self.ave_smf = lambda prof: np.trapezoid(np.trapezoid(prof*dndzdlogmhalo_norm, self.logmhalos), self.zs)
 
     #     # Setup projection and get r values
     #     self.meas = getattr(Data, self.measurement['name'])(self.measurement['spefs'])  # Import Measurement

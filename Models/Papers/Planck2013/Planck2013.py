@@ -6,8 +6,8 @@ ui.adsabs.harvard.edu/abs/2013A%26A...550A.131P
 arxiv.org/pdf/1207.4061
 """
 
-import os
-import pandas as pd
+
+from config import *
 from Models.Papers.PlotsTables import ParamTable
 thispath = os.path.dirname(os.path.abspath(__file__))
 

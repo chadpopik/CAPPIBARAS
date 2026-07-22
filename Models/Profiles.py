@@ -321,7 +321,7 @@ class Moser2021(BaseProfile, Studies.Moser2021):  # TODO in progress
         windfunc = lambda k: np.where(k*0.7 > 1/50, 1, 0)  # two-halo window function, [k]=1/Mpc
         prefac = self.bh(zs, logMs)*self.Plin(ks, zs)*windfunc(ks)  # collect factors outside int
         intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
-        P2h = lambda prof1h: prefac*(np.trapz(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
+        P2h = lambda prof1h: prefac*(np.trapezoid(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
         return lambda prof1h: IFFT3D(P2h(prof1h)) *prof1h.unit  # IFFT to real space and return its units destroyed by the FFT
 
     def prof2h(self, rs, zs, logMs):  # linear two-halo calculation, Section II.C Eq 17
@@ -405,7 +405,7 @@ class Vikram2017(BaseProfile, Studies.Vikram2017):  # TODO in progress
 
         prefac = self.bh(zs, logMs)*self.Plin(ks, zs)  # collect factors outside int
         intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
-        P2h = lambda prof1h: prefac*(np.trapz(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
+        P2h = lambda prof1h: prefac*(np.trapezoid(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
         return lambda prof1h: IFFT3D(P2h(prof1h)) *prof1h.unit  # IFFT to real space and return its units destroyed by the FFT
     
     # def twohalo(self, rs, zs, logMs, logMs_2h):  # Eq 8
@@ -422,7 +422,7 @@ class Vikram2017(BaseProfile, Studies.Vikram2017):  # TODO in progress
 
     #     prefac = self.bh(zs, logMs)*self.Plin(ks, zs)  # collect factors outside int
     #     intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
-    #     P2h = lambda prof1h: prefac*(np.trapz(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
+    #     P2h = lambda prof1h: prefac*(np.trapezoid(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
     #     return lambda prof1hmod, p={}: IFFT3D(P2h(prof1hmod(rsnew, zs, logMs_2h)(p)))[Npad:] *prof1hmod(0, 0, 0)().unit  # IFFT to real space and return its units destroyed by the FFT
 
 

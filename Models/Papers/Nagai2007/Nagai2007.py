@@ -5,18 +5,13 @@ arxiv.org/pdf/astro-ph/0703661
 ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
 """
 
-import sys,os
+
+from config import *
 thispath = os.path.dirname(os.path.abspath(__file__))
 
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
 
 from Models.Papers.PlotsTables import BasePlots2, ParamTable
 from Models.HaloModels import pyccl_model
-
-
 
 
 class Cosmology(pyccl_model):  
@@ -33,8 +28,6 @@ class Cosmology(pyccl_model):
         for key, value in (self.definedparams | inputdict | inputvars).items(): setattr(self, key, value)
 
 
-
-
 class HaloModel():
     # 2. The masses are reported at the radius r500 enclosing overdensities with respect to the critical density at the redshift of the output.
     MassDef = '500c'
@@ -46,10 +39,6 @@ class HaloModel():
         return ((10**self.logM500c*u.Msun/(4/3*np.pi*self.rho_crit(self.z)))**(1/3)).to(u.Mpc)
 
     
-    
-
-
-
 class ClusterProfile():
     def __init__(self, inputdict={}, **inputvars):
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
@@ -69,9 +58,6 @@ class ClusterProfile():
         x = self.r/rs
         
         return p['P0'] / (x**p['gamma'] * (1+x**p['alpha'])**((p['beta']-p['gamma'])/p['alpha']))
-    
-    
-    
     
     
 # TABLE A1 Best-fit parameters of the pressure profile.

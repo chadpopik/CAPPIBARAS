@@ -5,18 +5,13 @@ ui.adsabs.harvard.edu/abs/2021PhRvD.103f3513S
 arxiv.org/pdf/2009.05557
 """
 
-import sys,os
+
+from config import *
 thispath = os.path.dirname(os.path.abspath(__file__))
 
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
 
 from Models.Papers.PlotsTables import BasePlots2, ParamTable, read_wide_table
 from Models.HaloModels import pyccl_model
-
-
 
 
     # }

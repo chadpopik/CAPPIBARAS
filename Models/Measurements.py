@@ -15,7 +15,7 @@ import h5py, json, tarfile
 import Models.Studies as Studies
 import Models.HaloModels as HaloModels
 
-from config import DATA_PATH, STACKING_PATH
+from config import DATA_PATH
 
 
 datapath = DATA_PATH
@@ -36,7 +36,7 @@ class BaseMeasurement:
 #     path = f"{datapath}/Maus2025"  # Path to data from zenodo.org/records/17636841
 
 class Popik2026(BaseMeasurement, Studies.Popik2026):  # TODO: In progress
-    path = f"{STACKING_PATH}/Results"
+    path = f"{DATA_PATH}/Results"
     subs = {
     'zbin': ['z1', 'z2', 'z3', 'z4'],
     'deproj' : ['Base', 'cib', 'cib_cibdBeta', 'cib_cibdBeta_cibdT', 'cib_cibdT'],

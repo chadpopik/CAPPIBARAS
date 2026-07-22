@@ -5,19 +5,14 @@ ui.adsabs.harvard.edu/abs/2024MNRAS.530..947Y
 arxiv.org/pdf/2306.06314
 """
 
-import numpy as np
-import pandas as pd
 
-import astropy.units as u
-import astropy.constants as c
+from config import *
+
 from scipy.special import erf
 
-import sys,os
 from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
 
-
-        
 
     #     'mdef': '200c',  # M not clear, maybe same as zheng 2005/2007? or cmass?
     #     'MhMin': 1.3e11,  # Msun/h
@@ -64,9 +59,6 @@ class HOD():
         return self.Nsat_LRG(pdict, **kwargs) if "LRG" in self.Tracer else self.Nsat_QSO(pdict, **kwargs)
 
 
-
-
-
 class Table3_4(ParamTable):
     # Table 3. LRG and QSO marginalized posteriors, with different models and different measurements. The error bars are 1𝜎 uncertainties. We also display several derived parameters, specifically the marginalized satellite fraction 𝑓sat, the sample completeness 𝑓ic, the average halo mass per galaxy log 𝑀h, and the linear bias𝑏lin. Units of mass are given in ℎ−1 𝑀⊙ .
     # Table 4. The results for the fits to high-z LRG sample with two redshift bin:0.8 < 𝑧 < 0.95 and 0.95 < 𝑧 < 1.1. We show the mean±1𝜎 error for HOD and derived parameters. We also list the average comoving number density in units of 10−4 (ℎ−1Mpc) −3. Masses are in units of ℎ−1 𝑀⊙ .
@@ -74,7 +66,6 @@ class Table3_4(ParamTable):
         dfraw = pd.read_csv(filename)
         self.df, self.df_errlow, self.df_errhigh = splittable(dfraw)
 
-    
     
 # Figure 1. The DESI One-Percent Survey LRG and QSO mean number density as a function of redshift. The dashed vertical lines show the fiducial LRG redshift bin edges of 𝑧 = 0.6, 𝑧 = 0.8, and the maximum redshift we consider for the QSO sample 𝑧 = 2.1.
 class Fig1(BasePlots2):

@@ -6,14 +6,9 @@ arxiv.org/pdf/2306.06317
 """
 
 
-import sys,os
+from config import *
 from Models.Papers.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
-
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
 
 
 class Cosmology():
@@ -128,7 +123,7 @@ class TargetData(BaseTargetData, Studies.Gao2023):  # DESI 1% LRGs and ELGs (Gao
         self.dNdzdlogMs = dNinterp(np.column_stack([zgrid.ravel(), logMsgrid.ravel()])).reshape(len(self.z), len(self.logMs)) / u.dex
         
         self.dNdogMs_z = self.dNdzdlogMs *self.dz
-        self.N_z = np.trapz(self.dNdogMs_z, self.logMs)
+        self.N_z = np.trapezoid(self.dNdogMs_z, self.logMs)
         self.n_z = self.N_z / self.area
         self.dNdz = self.N_z / self.dz
         self.dndz = self.dNdz / self.area

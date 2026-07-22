@@ -6,11 +6,10 @@ ui.adsabs.harvard.edu/abs/2025PhRvD.112h3561L
 arxiv.org/pdf/2502.08850
 """
 
-import os
-import pandas as pd
+
+from config import *
 from Models.Papers.PlotsTables import ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
-
 
 
     # def Fig2(self, width=6, height=5):

@@ -5,14 +5,11 @@ ui.adsabs.harvard.edu/abs/2015ApJ...806....2M
 arxiv.org/pdf/1407.1856
 """
 
-import numpy as np
-import pandas as pd
 
-import astropy.units as u
-import astropy.constants as c
+from config import *
+
 from scipy.special import erf
 
-import sys,os
 from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
 
@@ -27,7 +24,6 @@ thispath = os.path.dirname(os.path.abspath(__file__))
     #     "R_c": {"MA": 0.98, "MB": 1.01, "MC": 1.02},  # normalization of the concentration mass relation with respect to the one obtained from simulations
     #     "psi": {"MA": 0.93, "MB": 0.93, "MC": 0.94},  # nuisance parameters
     # }
-    
     
     
 class Cosmology():

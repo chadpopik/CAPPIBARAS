@@ -7,6 +7,7 @@ arxiv.org/pdf/1909.09102
 """
 
 
+from config import *
 class Studies(BaseStudy):  # arxiv.org/abs/1909.09102
     subs={'sample':['2MPZ','WIxSC-1','WIxSC-2','WIxSC-3','WIxSC-4','WIxSC-5'],}
     info={}

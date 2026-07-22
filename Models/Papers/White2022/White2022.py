@@ -5,10 +5,10 @@ ui.adsabs.harvard.edu/abs/2022JCAP...02..007W
 arxiv.org/pdf/2111.09898
 """
 
-import os
+
+from config import *
 from Models.Papers.PlotsTables import ParamTable, read_wide_table
 thispath = os.path.dirname(os.path.abspath(__file__))
-
 
 
     # subs = {'zbin' : ['z1', 'z2', 'z3', 'z4'],} # photometric redshift subsmaple

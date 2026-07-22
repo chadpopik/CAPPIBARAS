@@ -5,12 +5,9 @@ ui.adsabs.harvard.edu/abs/2005ApJ...630....1Z
 arxiv.org/pdf/astro-ph/0408569
 """
 
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import astropy.constants as c
 
-import sys,os
+from config import *
+
 from Models.Papers.PlotsTables import BasePlots2
 thispath = os.path.dirname(os.path.abspath(__file__))
 
@@ -36,7 +33,6 @@ class Table3():  # Best-fit HOD Parameters for Luminosity-Threshold Samples
 
 class Cosmology():
     Om=0.3  # Section 4.1
-
 
 
 # Section 4.1
@@ -67,7 +63,6 @@ class HOD(Cosmology):
         return 1
     
     
-    
 # HOD fits to the projected correlation function of the Mr < −20 sample, which has the greatest sensitivity to limiting redshift (Fig. 9). In the left panel, open circles show the measuredwp(rp) for zmax = 0.10, and the dashed curve shows the predic
 class Fig15(BasePlots2):
     subplots = [[
@@ -79,7 +74,6 @@ class Fig15(BasePlots2):
     def __init__(self):
         super().__init__(thispath)
     
-
 
 class Studies(BaseStudy):  # The Luminosity and Color Dependence of the Galaxy Correlation Function, ui.adsabs.harvard.edu/abs/2005ApJ...630....1Z
     subs = {}
