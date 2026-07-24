@@ -14,18 +14,6 @@ from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_w
 thispath = os.path.dirname(os.path.abspath(__file__))
 
 
-    # info = {
-    #     # Model definitions, Section 3.1pLast
-    #     'mdef': '200m',  # M200b, 200 times overdense wrt background matter density
-    #     'HMFModel':'Tinker08' ,'BiasModel': 'Tinker10', 'ConcModel':'Maccio08',
-        
-    #     # Free model parameters, Table 1
-    #     "M_stellar_11": {"MA": 0, "MB": 0, "MC": 0},  # describes the average stellar mass of galaxies, [10^11 h^(-2) Msun]
-    #     "R_c": {"MA": 0.98, "MB": 1.01, "MC": 1.02},  # normalization of the concentration mass relation with respect to the one obtained from simulations
-    #     "psi": {"MA": 0.93, "MB": 0.93, "MC": 0.94},  # nuisance parameters
-    # }
-    
-    
 class Cosmology():
     def __init__(self, inputdict={}, **inputvars):
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
@@ -95,24 +83,8 @@ class StudiesInfoTable(ParamTable):  # Free cosmological/model parameters + samp
         self.df = read_wide_table(filename)
 
 
-class Studies(BaseStudy):  # The Weak Lensing Signal and the Clustering of BOSS Galaxies. II. Astrophysical and Cosmological Constraints, ui.adsabs.harvard.edu/abs/2015ApJ...806....2M
-    subs = {'mbin': ['MA', 'MB', 'MC']}
-    info = {
-        # Model definitions, Section 3.1pLast
-        'mdef': '200m',  # M200b, 200 times overdense wrt background matter density
-        'HMFModel':'Tinker08' ,'BiasModel': 'Tinker10', 'ConcModel':'Maccio08',
-    }
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        row = StudiesInfoTable().getparams(mbin=self.mbin).to_dict()
-        row['Ob0h2'] = row['100*Ob0h2']/100
-        for k, v in row.items(): setattr(self, k, v)
 
 
-class TargetData(BaseTargetData, Studies.More2015):
-    path = None
-    subs = {''}
 
 
 class HODParamsTable(ParamTable):  # Best-fit parameters, Table 1
@@ -120,44 +92,3 @@ class HODParamsTable(ParamTable):  # Best-fit parameters, Table 1
         self.df = read_wide_table(filename)
 
 
-class HODs(BaseHOD, Studies.More2015):  # BOSS DR11, arxiv.org/abs/1407.1856
-    models = {'mbin': ['MA', 'MB', 'MC']}
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
-        self.p0 = HODParamsTable().getparams(mbin=self.mbin).to_dict()
-        
-    def finc(self, logM, alpha_inc, logM_inc, written=True):  # Eq 5
-        if written:
-            return np.clip((1+alpha_inc*(logM-logM_inc)), 0, 1)
-        else:
-            return 2*np.clip((1+alpha_inc*(logM-logM_inc))/2, 0, 1)
-
-    def Ncen(self, logM):  # Eq 3
-        func = lambda p: self.finc(logM=logM-np.log10(self.h**2), alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'], written=False)/2 * Zheng2005().Nc(logM-np.log10(self.h**0), logMmin=p['logMmin'], sigmalogM=p['sigma^2']**0.5)
-        return lambda p={}: func(self.p0 | p)
-
-    def Nsat(self, logM):  # Eq 4
-        func = lambda p: Zheng2005().Ns(M=10**logM/self.h**2, M0=p['kappa']*10**p['logMmin'], M1=10**p['logM1'], alpha=p['alpha']) * self.Ncen(logM)(p)
-        return lambda p={}: func(self.p0 | p)
-
-    def nc(self, k, z, logM):  # Eq 9 (transform of Eq 11)
-        self.require('r200m')
-        rs = self.r200m(z, logM)  # 
-        func = lambda p: 1-p['p_off']+p['p_off'] * np.exp(-1/2 * k**2 * (rs*p['R_off'])**2)
-        return lambda p={}: func(self.p0 | p)
-
-    def ns(self, k, z, logM):  # TODO: add
-        pass
-
-
-class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2015ApJ...806....2M
-    def Fig2(self, width=6, height=6):
-        return self.plot(filename='Fig2', width=width, height=height,
-            xlabel=r'$M\ [h^{-1} M_\odot]$', ylabel=r'$\langle N\rangle_M$',
-            xlim=(1e12, 3.1e15), ylim=(1e-1, 1e1), xscale='log', yscale='log')
-
-    def Fig4(self, width=12, height=4):
-        return self.plot(filename=['Fig4a','Fig4b','Fig4c'], nrow=1, ncol=3, width=width, height=height,
-            xlabel=r'$M \ [h^{-1}M_\odot]$', ylabel=r'$\langle N\rangle_M$',
-            xlim=(3.2e11, 3.1e15), ylim=(1e-2, 2.8e2), xscale='log', yscale='log')

@@ -52,37 +52,7 @@ class Table1_2_3(ParamTable):
         self.df, self.df_errlow, self.df_errhigh = splittable(dfraw)
 
 
-class Studies(BaseStudy):  # Probing cosmic velocities with the pairwise kinematic Sunyaev-Zel'dovich signal in DESI Bright Galaxy Sample DR1 and ACT DR6, ui.adsabs.harvard.edu/abs/2025arXiv251014135H
-    subs = {'mbin': ['M1', 'M2', 'M3', 'M4', 'M5', 'M6'],
-    }
-
-    info = Planck2018.info | { # says it uses Planck2018 cosmology
-        "MassDef": 'vir',
-        "logMsMin": {"M1": 11.861, "M2": 11.918, "M3": 11.831, "M4": 11.750, "M5": 11.947, "M6": 12.183},
-        "fsat": {"M1": 0.123, "M2": 0.147, "M3": 0.206, "M4": 0.295, "M5": 0.333, "M6": 0.343},
-        "logMhMean": {"M1": 13.135, "M2": 13.184, "M3": 13.266, "M4": 13.310, "M5": 13.370, "M6": 13.456},
-        "blin": {"M1": 1.155, "M2": 1.190,  "M3": 1.258, "M4": 1.314, "M5": 1.384, "M6": 1.475},
-        
-    }
-
-
 class ParamsTable(ParamTable):  # characteristic HOD parameters, per mass bin
     def __init__(self, filename=f"{thispath}/params.csv"):
         self.df = read_wide_table(filename)
 
-
-class HODs(BaseHOD, Studies.Hadzhiyska2025B):  #
-    models = {'mbin': ['M1', 'M2', 'M3', 'M4', 'M5', 'M6']}
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
-        self.p0 = ParamsTable().getparams(mbin=self.mbin).to_dict()
-
-    def Ncen(self, logM):  # Eq 36
-        func = lambda p: Zheng2005().Nc(logM-np.log10(self.h), logMmin=p['logMcut'], sigmalogM=p['sigma_logM'])
-        return lambda p={}: func(self.p0 | p)
-
-    def Nsat(self, logM):  # Eq 37
-        func = lambda p: Zheng2005().Ns(10**logM/self.h, M0=p['kappa']*10**p['logMcut'], M1=10**p['logM1'], alpha=p['alpha']) * self.Ncen(logM)(p)
-        return lambda p={}: func(self.p0 | p)

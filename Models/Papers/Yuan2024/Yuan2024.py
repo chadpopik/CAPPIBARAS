@@ -123,67 +123,9 @@ class StudiesInfoTable(ParamTable):  # satellite fraction, halo mass, bias, z-ra
         self.df = read_wide_table(filename)
 
 
-class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2024MNRAS.530..947Y
-    subs = {'zbin': ['LRG1', 'LRG2', 'QSO', 'LRG3', 'LRG4']}
-    info = {
-        # fixed cosmo params, 1.p7
-        'Oc0h2': 0.1200, 'Ob0h2': 0.02237, 'sigma8': 0.811355, 'ns': 0.9649, 'h': 0.6736, 'w0':-1, 'wa':0,
-        'mdef': '200c',  # M not clear, maybe same as zheng 2005/2007? or cmass?
-        'MhMin': 1.3e11,  # Msun/h
-    }
-    info['MhMin'] = cycle(info['MhMin'], lambda M, h=info['h']: M*u.Msun/h)
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        row = StudiesInfoTable().getparams(zbin=self.zbin).to_dict()
-        row['logMhMean'] = np.log10(10**row['logMhMean']/self.h)
-        for k, v in row.items(): setattr(self, k, v)
-
 
 class HODParamsTable(ParamTable):  # best-fit HOD parameters, Tables 3 & 4
     def __init__(self, filename=f"{thispath}/hod_params.csv"):
         super().__init__(filename)
 
 
-class HODs(BaseHOD, Studies.Yuan2023):  # DESI 1% LRGs and QSO using ABACUSHOD
-    models = {'model':['Base', 'Ext'],  # model, Zheng07+fic or with added velocity bias
-            'sample': ['LRG1', 'LRG2', 'QSO', 'LRG3', 'LRG4'],  # sample of galaxies
-            }
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
-        row = HODParamsTable().getparams(model=self.model, sample=self.sample).to_dict()
-        self.p0 = {k: v for k, v in row.items() if pd.notna(v)}
-
-    def Ncen(self, logM):  # Eq 4
-        func = lambda p: Zheng2005().Nc(logM-np.log10(self.h), logMmin=p['logM_cut'], sigmalogM=np.sqrt(2)*p['sigma']) * p['f_ic']
-        return lambda p={}: func(self.p0 | p)
-
-    def Nsat(self, logM):
-        self.require(['sample'])
-        func1 = lambda p: Zheng2005().Ns(10**logM/self.h, M0=p['kappa']*10**p['logM_cut'], M1 = 10**p['logM_1'], alpha=p['alpha'])
-        if self.sample[:3]=='LRG': func = lambda p: func1(p) * self.Ncen(logM)(p)  # Eq 5
-        elif self.sample[:3]=='QSO': func = func1 # Eq 6
-        return lambda p={}: func(self.p0 | p)
-
-
-class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2024MNRAS.530..947Y
-    def Fig1(self, width=6, height=3.5):
-        return self.plot(filename='Fig1', width=width, height=height,
-            xlabel=r'$z$', ylabel=r'$n(z) \ [h^3 \text{Mpc}^{-3}]$',
-            xlim=(0.4, 2.3), ylim=(3e-6, 2e-3), yscale='log')
-
-    def Fig7(self, width=14, height=6):
-        return self.plot(filename=['Fig7a','Fig7b'], nrow=1, ncol=2, width=width, height=height,
-            xlabel=r'$M_h [h^{-1} M_\odot]$', ylabel=r'$N_\text{gal}$',
-            xlim=(1e12, 1e15), ylim=(1e-2, 1e1), xscale='log', yscale='log')
-
-    def Fig10(self, width=6, height=5):
-        return self.plot(filename='Fig10', width=width, height=height,
-            xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N^{(c+s)}_\text{gal}$',
-            xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')
-
-    def Fig14(self, width=6, height=5):
-        return self.plot(filename='Fig14', width=width, height=height,
-            xlabel=r'$M_h \ [h^{-1} M_\odot]$', ylabel=r'$N_\text{gal}$',
-            xlim=(1e12, 1e15), ylim=(3e-2, 1e1), xscale='log', yscale='log')

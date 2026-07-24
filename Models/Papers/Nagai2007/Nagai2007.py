@@ -102,62 +102,8 @@ class FigA1(BasePlots2):
         super().__init__(thispath)
 
 
-class Studies(BaseStudy):  # Effects of Galaxy Formation on Thermodynamics of the Intracluster Medium, ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
-    subs = {}
-    info = {
-        # Cosmological Parameters, 2p1/2p3/3p2
-        'Om0':0.3, 'Ob0':0.04286, 'h':0.7, 'sigma8':0.9,
-        'Ol0':0.7, 'Fb':0.175,
-        'MassDef':'500c', 'Concentration': 'Constant', # Mass definition, S2p3/Eq11
-        # right after eq 1/2/3
-        'mu':0.59, 'mu_e':'1.14'
-    }
-
 
 class ParamsTable(ParamTable):  # Table A1
     def __init__(self, filename=f"{thispath}/params.csv"):
         super().__init__(filename)
 
-
-class Profiles(BaseProfile, Studies.Nagai2007):  # Pressure Profile from GADGET-2 made hydro sims
-    models = {
-        'Run': ['Obs', 'CSF', 'NR'],  # Observed/cooling+SF sims/Non-rad sims
-        'Sample':['Rel', 'Unrel'],  # relaxed or unrelaxed sample
-    }
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
-        self.p0 = ParamsTable().getparams(Run=self.Run, Sample=self.Sample).to_dict()
-
-    def P500(self, z, logM500c, units='cosmo'):  # Eq 3
-        val = 1.45e-11*u.erg/u.cm**3 * (10**logM500c/1e15)**(2/3) * (self.H(z)/self.H0)**(8/3)
-        return val.to(self.units('pres', units))
-
-    def PGNFW(self, x, gamma, alpha, beta, P0):  # Eq A1
-        return P0 / (x**gamma * (1+x**alpha)**((beta-gamma)/alpha))
-
-    def Pressure(self, r, z, logM500c, units='cosmo'):
-        self.require(list(self.models.keys()))
-        r, z, logM500c = self.setdim(r, z, logM500c)  # set proper dimensions
-        P500 = self.P500(z, logM500c, units)
-        x = r*u.Mpc/(self.r500c(z, logM500c))
-        PGNFW = lambda p: self.PGNFW(x=x*p['c500'], gamma=p['gamma'], alpha=p['alpha'], beta=p['beta'], P0=p['P0'])
-        return lambda p={}: P500*PGNFW(self.p0 | p)
-
-
-class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
-    def Fig1d(self, width=5.5, height=5):
-        return self.plot(filename='Fig1d', width=width, height=height,
-            xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
-            xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 3.8e2), xscale='log', yscale='log')
-
-    def Fig2d(self, width=5.5, height=5):
-        return self.plot(filename='Fig2d', width=width, height=height,
-            xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
-            xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 1.9e2), xscale='log', yscale='log')
-
-    def FigA1(self, width=5.5, height=5):
-        return self.plot(filename='FigA1', width=width, height=height,
-            xlabel=r'$r/r_{500}$', ylabel=r'$P(r)/P_{500}$',
-            xlim=(4.5e-2, 2.3), ylim=(2.4e-3, 1.9e2), xscale='log', yscale='log')

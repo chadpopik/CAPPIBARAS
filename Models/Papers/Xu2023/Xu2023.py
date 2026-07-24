@@ -13,9 +13,6 @@ from Models.Papers.PlotsTables import BasePlots2, ParamTable, splittable
 thispath = os.path.dirname(os.path.abspath(__file__))
 
 
-    # subs = {'sample': ['Main', 'LOWZ', 'CMASS'],
-    #         'form': ['BP13', 'DP']}
-
 
 # Section 3.1. Fixed cosmological parameters.
 class Cosmology():
@@ -100,53 +97,6 @@ class Fig13(BasePlots2):
         super().__init__(thispath)
 
 
-class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2023ApJ...944..200X
-    subs = {'sample': ['Main', 'LOWZ', 'CMASS'],
-            'form': ['BP13', 'DP']}
-    info = {
-        # Fixed cosmo parameters, Section 3.1
-        'Om0':0.268, 'Ol0':0.732, 'sigma8':0.831, 'h':0.71,
-        # Mass definition, Eq 8 
-        'mdef': 'vir',  # virial mass of the halo at the time when the galaxy was last the central dominant object
-    }
-
-
 class ParamsTable(ParamTable):  # best-fit SHMR parameters
     def __init__(self, filename=f"{thispath}/params.csv"):
         super().__init__(filename)
-
-
-class SHMRs(BaseSHMR, Studies.Xu2023):  # SDSS DR7 Main and SDSSIII BOSS DR12 LOWZ & CMASS
-    models = {'sample': ['Main', 'LOWZ', 'CMASS'],  # galaxy sample
-            'form': ['BP13', 'DP'],  # form of SHMR
-            }
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
-        row = ParamsTable().getparams(form=self.form, sample=self.sample).to_dict()
-        self.p0 = {k: v for k, v in row.items() if pd.notna(v)}
-
-    def SHMR(self, logMh):
-        self.require(['form', 'sample'])
-        if self.form=='BP13': return self.SHMR_BP13(logMh)
-        elif self.form=='DP': return self.SHMR_DP(logMh)
-
-    def SHMR_BP13(self, logMh):
-        func = lambda p: self.Behroozi(logMh-np.log10(self.h), logM1=p['logM0'], logeps=p['logeps'], alpha=-p['beta'], delta=p['delta'], gamma=p['alpha'])
-        return lambda p={}: func(self.p0 | p)
-
-    def SHMR_DP(self, logMh):
-        func = lambda p: self.DoublePowerLaw(logMh-np.log10(self.h), logM1=p['logM0'], N=10**p['logk'], beta=p['beta'], gamma=-p['alpha'])
-        return lambda p={}: func(self.p0 | p)
-
-
-class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2023ApJ...944..200X
-    def Fig9(self, width=8, height=6):
-        return self.plot(filename='Fig9', width=width, height=height,
-            xlabel=r'$M_h \ [M_\odot]$', ylabel=r'$M_* / M_h$',
-            xlim=(1e10, 1e15), ylim=(1e-4, 1e-1), xscale='log', yscale='log')
-
-    def Fig7(self, width=6, height=6):
-        return self.plot(filename='Fig7', width=width, height=height,
-            xlabel=r'$M_h \ [h^{-1} \ M_\odot]$', ylabel=r'$M_* \ [M_\odot]$',
-            xlim=(1e10, 1e15), ylim=(1e6, 1e12), xscale='log', yscale='log')

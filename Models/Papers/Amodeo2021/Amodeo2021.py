@@ -12,6 +12,7 @@ thispath = os.path.dirname(os.path.abspath(__file__))
 
 
 
+
 class Cosmology():
     # IIA. τgal refers to the optical depth of the galaxy group considered, and vr = 1.06 × 10−3c is the RMS of the peculiar velocities, projected along the line of sight, where the magnitude adopted is for the median redshift of the
     v_rms = 1.06e-3
@@ -96,7 +97,7 @@ class HaloProfiles(HaloModel):
 
 
 # Appendix B: Dust emission
-class Dust(Cosmology):
+class Dust_new(Cosmology):
     z0 = 0.55 # redshift of the dust emitters, II.A.p1
     wavelength0 = 350*u.um
     wavelength0 = (c.c/wavelength0).to(u.GHz) # rest-frame frequency at which we normalize the dust emission, assumed from matching Fig11 I(v) plots
@@ -138,8 +139,8 @@ class Dust(Cosmology):
         x = (c.h * nu / (c.k_B * self.T_CMB*u.K)).decompose().value
         fnu = x / np.tanh(x / 2.0) - 4.0
         return lambda p={}: self.dust_uKarcmin(R, nu)(self.p0 | p) / (fnu*self.T_CMB*1e6)
-
-
+    
+    
 # Best-fit dust model parameters (Eq. B1), fit to Herschel-only (Hr) and ACT+Herschel (ACTHr) data, estimated from Fig. 11a.
 class DustParams(ParamTable):
     def __init__(self, filename=f"{thispath}/DustParams.csv"):
@@ -219,189 +220,61 @@ class Fig11(BasePlots2):
 
     def __init__(self):
         super().__init__(thispath)
-
-
-
-
-
-# class TargetData(BaseTargetData, Studies.Amodeo2021):  # Inference on BOSS DR10 stacked ACT DR5 (arxiv.org/abs/2009.05558)
-#     path = f"{datapath}/Amodeo2021/"  # path to data, taken from plots using webplotdigitizer and various repos
-#     subs = {'prof': ['Amodeo', 'Battaglia', 'TNG']}
-    
-#     info = { # galaxy catalog detailed, II.Ap1/Ap4/Figure2
-#         'MsMean': 3e11 *u.Msun, 'MhMean': 3.3e13 *u.Msun, # mean stellar and halo mass
-#         'zMin':0.4, 'zMax':0.7, 'zMed': 0.55,  # min/max/median redshift
-#     }
-
-#     def __init__(self, inputsdict={}, **inputvars):
-#         self.setup(inputsdict | inputvars)
-
-#     def get_dNdlogmhalo(self, dlogmhalo=0.05, dlogmstar=0.05):
-#         massdist = np.loadtxt(f'{self.path}/mass_distrib.txt')        
-#         self.dNdlogMh, self.logMh, Mhalobins = self.dNdq_cat(np.log10(massdist), dlogmhalo)  # Get 1D hist for z
-
-#         massdiststar = SHMRs.Kravstov2018({'mdef':'200c', 'scatter':'S'}).HSMR(np.log10(massdist))()  # steal default SHMR
-#         self.dNdlogMs, self.logMs, Msbins = self.dNdq_cat(massdiststar, dlogmstar)
-
-
-# class Measurements(BaseMeasurement, Studies.Amodeo2021):  # Inference on BOSS DR10 stacked ACT DR5 (arxiv.org/abs/2009.05558)
-#     path = f"{datapath}/Amodeo2021/"  # path to data, taken from plots using webplotdigitizer and various repos
-#     subs = {'prof': ['Amodeo', 'Battaglia', 'TNG'],
-#                 'units': ['cosmo', 'cgs']}
-
-#     def __init__(self, inputsdict, **inputvars):
-#         self.setup(inputsdict | inputvars)
-#         self.require(['model', 'units'])
-
-#         self.get_meas()
-
-#     def get_meas(self):        
-#         with h5py.File(f"{self.path}/Amodeo2021_wpd.h5", "r") as f:
-#             self.rs_rho = f[f'rs_rho_{self.prof}'][()]
-#             self.rs_pth = f[f'rs_pth_{self.prof}'][()]
-#             self.rho = f[f'rho_{self.prof}_{self.units}'][()]
-#             self.pth = f[f'pth_{self.prof}_{self.units}'][()]
         
-#         cmass2h = np.loadtxt(f'{self.path}/twohalo_cmass_average.txt').T
-#         self.rs_2hCMASS = cmass2h[0]*u.Mpc/0.7  # [Mpc/h] -> [Mpc]
-#         self.rho_2hCMASS = cmass2h[1]*u.g/u.cm**3
-#         self.pth_2hCMASS = cmass2h[2]*u.g/u.cm/u.s**2
-
-#         if self.units=='cosmo':
-#             self.rho = (self.rho *u.Msun/u.kpc**3).to(u.Msun/u.Mpc**3)
-#             self.pth = (self.pth *u.Msun/u.kpc/u.s**2).to(u.Msun/u.Mpc/u.s**2)
-#             self.rho_2hCMASS = self.rho_2hCMASS.to(u.Msun/u.Mpc**3)
-#             self.pth_2hCMASS = self.pth_2hCMASS.to(u.Msun/u.Mpc/u.s**2)
-
-#         elif self.units=='cgs':
-#             self.rho = self.rho *u.g/u.cm**3
-#             self.pth = self.pth *u.g/u.cm/u.s**2
-
-
-# class Profiles(BaseProfile, Studies.Amodeo2021):  # ACT DR5 y map and SDSS BOSS CMASS DR10, arxiv.org/abs/2009.05558 TODO: in progress
-#     models = {'model': ['GNFW', 'OBB'],}  # pres/dens profile model
-#     params = {
-#         # best-fit GNFW params, T2
-#         'logrho0': {'GNFW': 2.6},  # density log amplitude
-#         'xc_k': {'GNFW': 0.6},     # density core radius
-#         'beta_k': {'GNFW': 2.6},   # density outer slope
-#         'A2h_k': {'GNFW': 1.1},    # density 2h amplitude
-#         'P0': {'GNFW': 2.0},       # pressure amplitude
-#         'alpha_t': {'GNFW': 0.8},  # pressure intermediate slope
-#         'beta_t': {'GNFW': 2.6},   # pressure outer slope
-#         'A2h_t': {'GNFW': 0.7},    # pressure 2h amplitude
-#         # Fixed GNFW params
-#         'gamma_t': -0.3,  # fixed GNFW pres params, Section II.Cp3
-#         'xc_t_A0': 0.497, 'xc_t_alpham': -0.00865, 'xc_t_alphaz':0.731,
-#         'gamma_k': -0.2,  # fixed GNFW dens params, Section II.Cp2
-#         # 'alpha_k_A0': 0.88, 'alpha_k_alpham': -0.03, 'alpha_k_alphaz':0.19,
-#         'alpha_k':1,
-#     }
-#     def __init__(self, inputsdict={}, **inputvars):
-#         self.setup(inputsdict | inputvars, model=True)
-
-#     def pGNFW(self, x, rho0, xc, gamma, alpha, beta):  # Eq 16
-#         return rho0 * (x/xc)**gamma * (1+(x/xc)**alpha)**(-(beta-gamma)/alpha)
-
-#     def pc(self, z, units='cosmo'):
-#         return self.Fb*self.rhoc(z).to(self.units('dens', units))  # prefactor and units
-    
-#     def Density1h(self, r, z, logM200c, units='cosmo'):  # one-halo density component, II.C.eq16
-#         self.require(['model'])
-#         r, z, logM200c = self.setdim(r, z, logM200c)  # set proper dimensions [nr, nz, nM]
-#         pc = self.pc(z, units)
-#         x = r*u.Mpc/self.r200c(z, logM200c)
-#         pGNFW = lambda p: self.pGNFW(x, gamma=p['gamma_k'], alpha=p['alpha_k'], rho0=10**p['logrho0'], xc=p['xc_k'], beta=p['beta_k'])
-#         return lambda p={}: pc*pGNFW(self.p0 | p)
-
-#     def PGNFW(self, x, P0, xc, gamma, alpha, beta):  # Eq 17
-#         return P0 * (x/xc)**gamma * (1+(x/xc)**alpha)**(-beta)
-    
-#     def P200c(self, z, logM200c, units='cosmo'): 
-#         P200c = c.G*(10**logM200c*u.Msun)*200*self.rhoc(z)/(2*self.r200c(z, logM200c))
-#         return self.Fb*P200c.to(self.units('pres', units))
-    
-#     def Pressure1h(self, r, z, logM200c, units='cosmo'):  # one-halo density component, II.C.eq16
-#         self.require(['model'])
-#         r, z, logM200c = self.setdim(r, z, logM200c)  # set proper dimensions [nr, nz, nM]
-#         P200c = self.P200c(z, logM200c, units)
-#         x = r*u.Mpc/self.r200c(z, logM200c)
-#         xc = Battaglia2011().PL(z, logM200c, A0=self.p0['xc_t_A0'], alpham=self.p0['xc_t_alpham'], alphaz=self.p0['xc_t_alphaz'])
-#         PGNFW = lambda p: self.PGNFW(x, gamma=p['gamma_t'], alpha=p['alpha_t'], P0=p['P0'], xc=xc, beta=p['beta_t'])
-#         return lambda p={}: P200c*PGNFW(self.p0 | p)
-
-#     def prof2h(self, r, z, logM200c):  # linear two-halo calculation, Section II.C Eq 17
-#         dndlogm = lambda z, logM200c: self.dndlogm(z, logM200c+np.log10(self.h)) * self.h**4
-#         bh = lambda z, logM200c: self.bh(z, logM200c+np.log10(self.h))
-#         Plin = lambda k, z: np.where(k*self.h > 1/50, 1, 0) * self.Plin(k*self.h, z) / self.h**3
         
-#         # dndlogm = lambda z, logM200c: self.dndlogm(z, logM200c)
-#         # bh = lambda z, logM200c: self.bh(z, logM200c)
-#         # Plin = lambda k, z: np.where(k > 1/50, 1, 0) * self.Plin(k, z)
         
-#         V17 = Vikram2017(dndlogm=dndlogm, bh=bh, Plin=Plin)
-#         logM200c_2h = np.linspace(10-np.log10(self.h), 15-np.log10(self.h), 50)
-#         lin2h = V17.twohalo(r, z, logM200c, logM200c_2h)  # linear two-halo calculation
-#         return lambda prof, p={}: lin2h(prof(r, z, logM200c_2h)(p))
+        
+"""Everything below this line is old implementation which I'll be updating"""
 
-#     def Density2h(self, r, z, logM200c, units='cosmo'):  # two-halo density component
-#         B16 = Battaglia2016({'model':'AGN'}, rhoc=self.rhoc, r200c=self.r200c, **self.info)
-#         ptypo = {'beta_A0': B16.p0['beta_A0']-2*B16.p0['gamma']}
-#         Density1h = lambda r, z, logM200c: lambda p: B16.Density(r, z, logM200c, units)(ptypo)
-#         return self.prof2h(r, z, logM200c)(Density1h).to(self.units('dens', units))
+from Models.Studies import BaseStudy
+class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2021PhRvD.103f3514A
+    subs = {}
+    info = {
+        # cosmological parameters, Ip10, IIA.Ap4/p5
+        'Om0': 0.25, 'Ob0': 0.044, 'OL0': 0.75, 'h': 0.7,  
+        'v_rms': 1.06e-3, 'XH':0.76,   # RMS of peculiar velocites [v/c] and hydrogen mass fraction
+        'T_CMB': 2.725*u.K,  # mop-c-gt, mopc.py
+        # Model implementation, Ip10, Appendix A p2
+        'MassDef': 'fof', 'MassFunc':'sheth99', 'HaloBias':'sheth01',
+    }
 
-#     def Pressure2h(self, r, z, logM200c, units='cosmo'):  # two-halo pressure component
-#         B11 = Battaglia2011(rhoc=self.rhoc, r200c=self.r200c, **self.info)
-#         return self.prof2h(r, z, logM200c)(B11.Pressure).to(self.units('pres', units))
-
-#     def Pressure(self, r, z, logM200c, units='cosmo'):
-#         P1h, P2h_lin = self.Pressure1h(r, z, logM200c, units), self.Pressure2h(r, z, logM200c, units)
-#         P2h = lambda p: p['A2h_t']*P2h_lin
-#         return lambda p={}: P1h(self.p0 | p) + P2h(self.p0 | p)
+from Models.Dust import BaseDust
+class Dust(BaseDust, Study):  # arxiv.org/abs/2009.05558
+    models = {'fitdata': ['Hr', 'ACTHr'],}  # Fit to Hershel or Act and Hershel
+    params = {
+        # Best-fit dust params, all estimated from Fig11a, # TODO: get more accurate
+        'A_dust': {'Hr': 0.326, 'ACTHr': 0.363},  # amplitude of dust emission [kJy/sr]
+        'T_dust': {'Hr': 20.7,  'ACTHr': 16.9},   # Dust temperature [K]
+        'beta_dust':{'Hr': 1.13, 'ACTHr': 1.13},  # Dust spectral index
+        'c_0': {'Hr': 5.00,'ACTHr': 6.046},  # Polynomial coefficient on x^0
+        'c_1': {'Hr': -1.48, 'ACTHr': -1.88}, # Polynomial coefficient on x^1
+        'c_2': {'Hr': 0.113, 'ACTHr': 0.148}, # Polynomial coefficient on x^2
+        # Fixed dust params
+        'z0': 0.55,  # redshift of the dust emitters, II.A.p1
+        'nu0': ((c.c/(350*u.um)).to(u.GHz)).value,  # rest-frame frequency at which we normalize the dust emission, assumed from matching Fig11 I(v) plots
+    }
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+        self.require(['fitdata'])
     
-#     def Density(self, r, z, logM200c, units='cosmo'):
-#         p1h, p2h_lin = self.Density1h(r, z, logM200c, units), self.Density2h(r, z, logM200c, units)
-#         p2h = lambda p: p['A2h_k']*p2h_lin
-#         return lambda p={}: p1h(self.p0 | p) + p2h(self.p0 | p)
+    # Polynominal dust fit to stacked profiles I(nu) [in jr/sr]
+    def dustpoly(self, R, nu, **kwargs):
+        x = lambda nu, p: ((nu)*c.h/c.k_B/(p['T_dust']*u.K)).decompose()
+        planck = lambda p: (np.exp(x(self.p0['nu0']*u.GHz, p))-1)/(np.exp(x(nu*(1+self.p0['z0']), p))-1)  # Planck function part
+        amp = lambda p: p['A_dust']*u.kJy/u.sr*(nu*(1+self.p0['z0'])/(self.p0['nu0']*u.GHz))**(p['beta_dust']+3)  # Amplitude part
+        poly = lambda p: p['c_0']+p['c_1']*R+p['c_2']*R**2  # Polynomial part
+        dustfunc = lambda p: amp(p)*planck(p)*poly(p)  # Combine
+        return lambda p={}: dustfunc(self.p0 | p)
 
-
-# class Dust(BaseDust, Studies.Amodeo2021):  # arxiv.org/abs/2009.05558
-#     models = {'fitdata': ['Hr', 'ACTHr'],}  # Fit to Hershel or Act and Hershel
-#     params = {
-#         # Best-fit dust params, all estimated from Fig11a, # TODO: get more accurate
-#         'A_dust': {'Hr': 0.326, 'ACTHr': 0.363},  # amplitude of dust emission [kJy/sr]
-#         'T_dust': {'Hr': 20.7,  'ACTHr': 16.9},   # Dust temperature [K]
-#         'beta_dust':{'Hr': 1.13, 'ACTHr': 1.13},  # Dust spectral index
-#         'c_0': {'Hr': 5.00,'ACTHr': 6.046},  # Polynomial coefficient on x^0
-#         'c_1': {'Hr': -1.48, 'ACTHr': -1.88}, # Polynomial coefficient on x^1
-#         'c_2': {'Hr': 0.113, 'ACTHr': 0.148}, # Polynomial coefficient on x^2
-#         # Fixed dust params
-#         'z0': 0.55,  # redshift of the dust emitters, II.A.p1
-#         'nu0': ((c.c/(350*u.um)).to(u.GHz)).value,  # rest-frame frequency at which we normalize the dust emission, assumed from matching Fig11 I(v) plots
-#     }
-#     def __init__(self, inputsdict={}, **inputvars):
-#         self.setup(inputsdict | inputvars, model=True)
-#         self.require(['fitdata'])
+    # Conversion of polynomial fit to uK arcmin^2
+    def dust_uKarcmin(self, R, nu, **kwargs):
+        x = ((nu)*c.h/c.k_B/(self.T_CMB*u.K)).decompose().value
+        dB_dT = ((2*c.h*(nu)**3/c.c**2)).to(u.kJy) * x/self.T_CMB * np.exp(x)/(np.exp(x)-1)**2  # Planck function for unit conversion to K
+        dustprof = lambda p: self.dustpoly(R, nu)(p)/dB_dT*1e6 * np.pi*R**2  # Also multipy by area of disc
+        return lambda p={}: dustprof(self.p0 | p).value
     
-#     # Polynominal dust fit to stacked profiles I(nu) [in jr/sr]
-#     def dustpoly(self, R, nu, **kwargs):
-#         x = lambda nu, p: ((nu)*c.h/c.k_B/(p['T_dust']*u.K)).decompose()
-#         planck = lambda p: (np.exp(x(self.p0['nu0']*u.GHz, p))-1)/(np.exp(x(nu*(1+self.p0['z0']), p))-1)  # Planck function part
-#         amp = lambda p: p['A_dust']*u.kJy/u.sr*(nu*(1+self.p0['z0'])/(self.p0['nu0']*u.GHz))**(p['beta_dust']+3)  # Amplitude part
-#         poly = lambda p: p['c_0']+p['c_1']*R+p['c_2']*R**2  # Polynomial part
-#         dustfunc = lambda p: amp(p)*planck(p)*poly(p)  # Combine
-#         return lambda p={}: dustfunc(self.p0 | p)
-
-#     # Conversion of polynomial fit to uK arcmin^2
-#     def dust_uKarcmin(self, R, nu, **kwargs):
-#         x = ((nu)*c.h/c.k_B/(self.T_CMB*u.K)).decompose().value
-#         dB_dT = ((2*c.h*(nu)**3/c.c**2)).to(u.kJy) * x/self.T_CMB * np.exp(x)/(np.exp(x)-1)**2  # Planck function for unit conversion to K
-#         dustprof = lambda p: self.dustpoly(R, nu)(p)/dB_dT*1e6 * np.pi*R**2  # Also multipy by area of disc
-#         return lambda p={}: dustprof(self.p0 | p).value
-    
-#     # Conversion of polynomial fit to uK arcmin^2, TODO 2
-#     def dust_y(self, R, nu, **kwargs):
-#         x = (c.h * nu / (c.k_B * self.T_CMB*u.K)).decompose().value
-#         fnu = x / np.tanh(x / 2.0) - 4.0
-#         return lambda p={}: self.dust_uKarcmin(R, nu)(self.p0 | p) / (fnu*self.T_CMB*1e6)
-
+    # Conversion of polynomial fit to uK arcmin^2, TODO 2
+    def dust_y(self, R, nu, **kwargs):
+        x = (c.h * nu / (c.k_B * self.T_CMB*u.K)).decompose().value
+        fnu = x / np.tanh(x / 2.0) - 4.0
+        return lambda p={}: self.dust_uKarcmin(R, nu)(self.p0 | p) / (fnu*self.T_CMB*1e6)

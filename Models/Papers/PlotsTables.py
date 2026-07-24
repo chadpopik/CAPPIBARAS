@@ -150,7 +150,7 @@ def splittable(df):
     for col in df.columns:  # skip the parameter-name column
         vals, ups, downs = [], [], []
 
-        for s in df[col].astype(str).str.strip():
+        for s in df[col].map(lambda v: str(v).strip()):  # .astype(str) alone is a no-op on pandas' native str dtype, leaving NaN as a float
             s = s.replace('−', '-')  # normalize unicode minus (U+2212) to ASCII, incl. as a leading sign
             m = pat.fullmatch(s)
             m_pm = pat_pm.fullmatch(s) if not m else None

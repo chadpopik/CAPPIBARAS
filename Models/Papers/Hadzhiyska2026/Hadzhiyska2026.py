@@ -15,14 +15,6 @@ thispath = os.path.dirname(os.path.abspath(__file__))
 
 from Models.Papers.Hadzhiyska2025B import Hadzhiyska2025B
 
-
-    # info = Planck2018.info | { # says it uses Planck2018 cosmology
-    #     "MassDef": 'vir',
-
-        
-    # }
-
-
 class Cosmology():
     pass
 
@@ -65,47 +57,4 @@ class Fig2(BasePlots2):
         super().__init__(thispath)
 
 
-class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2025arXiv251014135H
-    subs={}
-    info = {
-        'area': 12200,  # NOTE: area value not given, assumed
-        'h': 0.7,  # NOTE: h value not paper, assumed
-    }
-    info['area'] = info['area']*u.deg**2
 
-
-class TargetData(BaseTargetData, Studies.Hadzhiyska2026):
-    path = f"{datapath}/Hadzhiyska2026"  # location of data, provided by Jenna
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        file = "BGS_BRIGHT_full_noveto_vac_marvin_BGS_ACT_DR6_fixedTh2.10_delta_Ts"
-        self.dfdata = pd.read_csv(f"{self.path}/{file}.csv")
-
-    def make_zdist(self, zMin=None, zMax=None, dz=None, zNum=None, logMsMin=None):
-        zscat = self.dfdata.z if logMsMin is None else self.dfdata[self.dfdata.logm>logMsMin].z  # for recreating the plot
-        self.catdist('z', zscat, qMin=zMin, qMax=zMax, dq=dz, qNum=zNum, densspace=self.area)
-        
-    def make_Msdist(self, halomodel, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None):
-        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.dfdata.z.max())-halomodel.Vcom(self.dfdata.z.min()))/(1+self.dfdata.z.mean())**3
-
-        self.catdist('logMs', self.dfdata['logm'], qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
-        
-    def make_Mhdist(self, halomodel, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None):
-        catlogMhs = SHMRs.Gao2023(model='Auto').HSMR(self.dfdata['logm'])()
-        
-        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.dfdata.z.max())-halomodel.Vcom(self.dfdata.z.min()))/(1+self.dfdata.z.mean())**3
-
-        self.catdist('logMh', catlogMhs, qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=vol)
-
-
-class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2025arXiv251014135H
-    def Fig2a(self, width=5, height=4):
-        return self.plot(filename='Fig2a', width=width, height=height,
-            xlabel=r'$\log (M/M_\odot)$', ylabel=r'$N_\text{gal}$',
-            xlim=(9.9, 12.15), ylim=(-0.6e3, 12.7e3), xscale='linear', yscale='linear')
-        
-    def Fig2b(self, width=5, height=4):
-        return self.plot(filename='Fig2b', width=width, height=height,
-            xlabel=r'$z$', ylabel=r'$N_\text{gal}$',
-            xlim=(0.06, 0.6), ylim=(-0.5e3, 11.25e3), xscale='linear', yscale='linear')

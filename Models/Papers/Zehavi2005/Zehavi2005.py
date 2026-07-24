@@ -75,20 +75,3 @@ class Fig15(BasePlots2):
         super().__init__(thispath)
     
 
-class Studies(BaseStudy):  # The Luminosity and Color Dependence of the Galaxy Correlation Function, ui.adsabs.harvard.edu/abs/2005ApJ...630....1Z
-    subs = {}
-    info = {
-        }
-
-
-class HODs(BaseHOD, Studies.Zehavi2005):  # virial
-    models = {}
-    params = {}
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars, model=True)
-
-    def Nc(self, logM, logMmin):
-        return np.heaviside(logM - logMmin, 1)
-
-    def Ns(self, M, M1, alpha):
-        return (M/M1)**alpha

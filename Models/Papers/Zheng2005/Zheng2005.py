@@ -105,59 +105,7 @@ class Fig3(BasePlots2):
         super().__init__(thispath)
 
 
-class Studies(BaseStudy):  # Theoretical Models of the Halo Occupation Distribution: Separating Central and Satellite Galaxies, ui.adsabs.harvard.edu/abs/2005ApJ...633..791Z
-    subs = {}
-    info = {'MassDef': 'vir',
-        }
-
-
 class HODParamsTable(ParamTable):  # best-fit HOD parameters, Table 1 (same data as Table1.csv above, kept string-typed for exact key matching)
     def __init__(self, filename=f"{thispath}/Table1.csv"):
         self.df = pd.read_csv(filename, dtype={'ngbar': str})
 
-
-class HODs(BaseHOD, Studies.Zheng2005):  # virial mass
-    models = {'model': ['SPH', 'SA'],  # simulation type
-              'nparams': ['3P', '5P'],  # number of parameters in model (Zehavi vs Zheng)
-              'ng': ['0.02', '0.01', '0.005', '0.0025'],  # number density in h^3 Mpc^-3
-    }
-
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
-        row = HODParamsTable().getparams(numParams=self.nparams, Model=self.model, ngbar=self.ng).to_dict()
-        self.p0 = {'logMmin': row['logMmin'], 'alpha': row['alpha']}
-        if self.nparams == '3P':
-            self.p0['logM1'] = row['logM1']
-        else:
-            self.p0['logM1'] = row['logM1prime']
-            self.p0['sigmalogM'] = row['sigmalogM']
-            self.p0['logM0'] = row['M0']
-        
-    def Nc(self, logM, logMmin, sigmalogM):  # Eq 1
-        return (1/2) * (1+erf((logM-logMmin)/sigmalogM))
-
-    def Ns(self, M, M0, M1, alpha):  # Eq 3
-        return np.where(M>=M0, ((M-M0)/M1), 0)**alpha
-
-    def Ncen(self, logM):
-        if self.nparams=='3P': func = lambda p: Zehavi2005().Nc(logM, logMmin=p['logMmin'])
-        elif self.nparams=='5P': func = lambda p: self.Nc(logM, logMmin=p['logMmin'], sigmalogM=p['sigmalogM'])
-        return lambda p={}: func(self.p0 | p)
-    
-    def Nsat(self, logM):
-        if self.nparams=='3P': func = lambda p: Zehavi2005().Ns(10**logM, M1=10**p['logM1'], alpha=p['alpha'])
-        elif self.nparams=='5P': func = lambda p: self.Ns(10**logM, M0=10**p['logM0'], M1=10**p['logM1'], alpha=p['alpha'])
-        return lambda p={}: func(self.p0 | p)
-
-
-class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2005ApJ...633..791Z
-    def Fig1(self, width=10, height=4):
-        return self.plot(filename=['Fig1c','Fig1d'], nrow=1, ncol=2, width=width, height=height,
-            xlabel=r'$M (M_\odot)$', ylabel=r'$\langle N \rangle$',
-            xlim=(3.15e10, 1e15), ylim=(3.1e-2, 50), xscale='log', yscale='log')
-        
-    def Fig3(self, width=8, height=6):
-        return self.plot(filename=['Fig3a','Fig3b','Fig3c','Fig3d'], nrow=2, ncol=2, width=width, height=height,
-            xlabel=r'$M (M_\odot)$', ylabel=r'$\langle N \rangle$',
-            xlim=(1e11, 1e15), ylim=(3.1e-2, 4.9e1), xscale='log', yscale='log')

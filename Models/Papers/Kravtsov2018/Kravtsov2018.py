@@ -194,13 +194,6 @@ class Fig17(BasePlots2):
         super().__init__(thispath)
 
 
-class Studies(BaseStudy):  # Stellar Mass—Halo Mass Relation and Star Formation Efficiency in High-Mass Halos, ui.adsabs.harvard.edu/abs/2018AstL...44....8K
-    subs = {}
-    info = {
-        # fixed cosmo params, Section 1pLast
-        'Om0':0.27, 'Ob0':0.0469, 'h':0.7, 'sigma8': 0.82, 'ns':0.95,
-    }
-
 
 class SHMR_B13_Params(ParamTable):  # best fit SHMR params, Table 3
     def __init__(self, filename=f"{thispath}/shmr_b13_params.csv"):
@@ -209,94 +202,3 @@ class SHMR_B13_Params(ParamTable):  # best fit SHMR params, Table 3
 class SHMR_PL_Params(ParamTable):  # best fit SHMR params, Table 3
     def __init__(self, filename=f"{thispath}/shmr_pl_params.csv"):
         super().__init__(filename)
-
-
-class SHMRs(BaseSHMR, Studies.Kravtsov2018):  # SDSS DR8 & G13
-    models = {
-            'model': ['B13', 'PL'],
-            'type': ['BGC', 'sat', 'tot'],
-            'data': ['K18', 'K18G13'],
-            'mdef': ["200c", "500c", "200m", "vir"],
-            'scatter': ['B', 'S']}
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
-        self.require(['model'])
-        if self.model=='B13':
-            self.SHMR = self.SHMR_B13
-            self.p0 = SHMR_B13_Params().getparams(scatter=self.scatter, mdef=self.mdef).to_dict()
-        elif self.model=='PL':
-            self.SHMR = self.SHMR_PL
-            self.p0 = SHMR_PL_Params().getparams(type=self.type, data=self.data).to_dict()
-        
-    def SHMR_PL(self, logMh):  # Eq A3/A4
-        self.require(['type', 'data'])
-        func = lambda p: p['slope']*(logMh-14.5)-p['norm']
-        return lambda p={}: func(self.p0 | p)
-
-    def SHMR_B13(self, logMh):  # Eq A3/A4
-        self.require(['mdef', 'scatter'])
-        func = lambda p: self.Behroozi(logMh, logM1=p['logM1'], logeps=p['logeps'], alpha=-p['alpha'], delta=p['delta'], gamma=p['gamma'])
-        return lambda p={}: func(self.p0 | p)
-
-
-class Plots(BasePlots):  # ui.adsabs.harvard.edu/abs/2018AstL...44....8K
-    def Fig4(self, width=4, height=4):
-        return self.plot(filename='Fig4', width=width, height=height,
-            xlabel=r'$M_{500} \ [M_\odot]$', ylabel=r'$M_{*, \text{BCG}} \ [M_\odot]$',
-            xlim=(1.8e13, 2e15), ylim=(5e10, 2.5e13), xscale='log', yscale='log')
-
-    def Fig7(self, width=6, height=6):
-        return self.plot(filename='Fig7', width=width, height=height,
-            xlabel=r'$M_{500} \ [M_\odot]$', ylabel=r'$M_{*, \text{tot}}(<r_{500}) \ [M_\odot]$',
-            xlim=(3.2e13, 2e15), ylim=(3.1e11, 6.2e13), xscale='log', yscale='log')
-
-    def Fig8(self, width=6, height=6):
-        return self.plot(filename='Fig8', width=width, height=height,
-            xlabel=r'$M_{500} \ [M_\odot]$', ylabel=r'$M_{*, \text{sat}}(<r_{500}) \ [M_\odot]$',
-            xlim=(3.2e13, 2e15), ylim=(3.1e11, 6.2e13), xscale='log', yscale='log')
-
-    def Fig9(self, width=6, height=6):
-        return self.plot(filename='Fig9', width=width, height=height,
-            xlabel=r'$M_{500} \ [M_\odot]$', ylabel=r'$M_{*, \text{BCG}}/(M_{*, \text{BCG}}+M_{*, \text{sat}})$',
-            xlim=(2e13, 2e15), ylim=(0, 1), xscale='log')
-
-    def Fig10(self, width=6, height=6):
-        return self.plot(filename='Fig10', width=width, height=height,
-            xlabel=r'$M_{200} \ [M_\odot]$', ylabel=r'$M_{*, \text{cen}} \ [M_\odot]$',
-            xlim=(1e10, 4e15), ylim=(1e8, 2e13), xscale='log', yscale='log')
-
-    def Fig11(self, width=6, height=6):
-        return self.plot(filename='Fig11', width=width, height=height,
-            xlabel=r'$M_{200} \ [M_\odot]$', ylabel=r'$M_{*, \text{cen}}/M_{200}/(\Omega_b/\Omega_m)$',
-            xlim=(1e10, 4e15), ylim=(1e-3, 1.55), xscale='log', yscale='log')
-
-    def Fig12(self, width=6, height=6):
-        return self.plot(filename='Fig12', width=width, height=height,
-            xlabel=r'$M_{200} \ [M_\odot]$', ylabel=r'$M_{*, \text{tot}}/M_{200}/(\Omega_b/\Omega_m)$',
-            xlim=(1e10, 4e15), ylim=(3.1e-3, 1), xscale='log', yscale='log')
-
-    def Fig13(self, width=6, height=6):
-        return self.plot(filename='Fig13', width=width, height=height,
-            xlabel=r'$M_{200} \ [M_\odot]$', ylabel=r'$M_{*, \text{cen}}/M_{200}/(\Omega_b/\Omega_m)$',
-            xlim=(1e10, 1e15), ylim=(1e-3, 1.55), xscale='log', yscale='log')
-
-    def Fig14(self, width=6, height=6):
-        return self.plot(filename='Fig14', width=width, height=height,
-            xlabel=r'$M_{200} \ [M_\odot]$', ylabel=r'$M_{*, \text{tot}}/M_{200}/(\Omega_b/\Omega_m)$',
-            xlim=(1e10, 1e15), ylim=(3.1e-3, 1), xscale='log', yscale='log')
-
-    def Fig15(self, width=15, height=5):
-        return self.plot(filename=['Fig15a','Fig15b','Fig15c'], nrow=1, ncol=3, width=width, height=height,
-            xlabel=r'$M_{500} \ [M_\odot]$', ylabel=r'$M_*/M_{500}/(\Omega_b/\Omega_m)$',
-            xlim=(1.3e11, 1.6e15), ylim=(3e-3, 1), xscale='log', yscale='log')
-
-    def Fig16(self, width=6, height=6):
-        return self.plot(filename='Fig16', width=width, height=height,
-            xlabel=r'$M_{500} \ [M_\odot]$', ylabel=r'$M_{*, \text{BCG}} \ [M_\odot]$',
-            xlim=(1.8e13, 2e15), ylim=(2.5e10, 2.5e13), xscale='log', yscale='log')
-
-    def Fig17(self, width=6, height=6):
-        return self.plot(filename='Fig17', width=width, height=height,
-            xlabel=r'$M_{200} \ [M_\odot]$', ylabel=r'$M_* \ [M_\odot]$',
-            xlim=(1e9, 2e15), ylim=(1e7, 5e12), xscale='log', yscale='log')
