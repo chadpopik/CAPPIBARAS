@@ -7,8 +7,8 @@ arxiv.org/pdf/0910.1234
 
 
 from config import *
-from Models.Papers.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
-thispath = os.path.dirname(os.path.abspath(__file__))
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Arnaud2010")
 
 
 class Cosmology():
@@ -40,3 +40,56 @@ class Fig8(BasePlots2):
 class ParamsTable(ParamTable):  # Eq 12, best-fit parameter sets
     def __init__(self, filename=f"{thispath}/params.csv"):
         self.df = read_wide_table(filename)
+        
+        
+        
+        
+"""Everything below this line is old implementation which I'm trying to phase out"""
+
+from Models.Studies import BaseStudy
+class Study(BaseStudy):  # The universal galaxy cluster pressure profile from a representative sample of nearby systems (REXCESS) and the YSZ - M500 relation, ui.adsabs.harvard.edu/abs/2010A%26A...517A..92A
+    subs = {}
+    info = {
+        # Cosmological Parameters, 1p-1
+        'h':0.7, 'Om0':0.3, 'Ol0':0.7, 'Concentration': 'Constant', 'MassDef':'500c',
+    }
+    
+    
+from Models.Profiles import BaseProfile
+class HaloProfiles(BaseProfile, Study):  # Pressure Profile fit to REXCESS cluseters with XMM-Newton data
+    models = {'model': ['norm', 'ST', 'coolcore', 'disturbed'],}  # different best-fit parameter sets
+    params = {  # Eq 12
+        'alpha': {'norm': 1.0510, 'ST': 1.0620, 'coolcore': 1.2223, 'disturbed': 0.7736},  # intermediate slope
+        'beta': {'norm': 5.4905, 'ST': 5.4807, 'coolcore': 5.49, 'disturbed': 5.49},  # outer slope
+        'gamma': {'norm': 0.3081, 'ST': 0.3292, 'coolcore': 0.7736, 'disturbed': 0.3798},  # central slope
+        'P0': {'norm': 8.403, 'ST': 8.130, 'coolcore': 3.249, 'disturbed': 3.202},  # units of h^(-3/2)
+        'c500': {'norm': 1.177, 'ST': 1.156, 'coolcore': 1.128, 'disturbed': 1.083},  # R500/rs
+        # fixed params
+        'alpha_P': 0.12,  # mass dependence
+        }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+        self.h70 = self.h*100/70
+
+    def P500(self, z, logM500c, units='cosmo'):  # Eq 5
+        val = 1.65e-3 * (self.H(z)/self.H0)**(8/3) * (10**logM500c/(3e14/self.h70))**(2/3) *self.h70**2 *u.keV/u.cm**3
+        return val.to(self.units('pres', units))
+    
+    def PGNFW(self, x, gamma, alpha, beta, P0, c500):  # Eq 11
+        return P0 / ((x*c500)**gamma * (1+(x*c500)**alpha)**((beta-gamma)/alpha))
+
+    def alphaPp(self, x, alpha_P):  # Eq 13
+        return 0.10-(alpha_P+0.10)*(x/0.5)**3/(1+x/0.5)**3
+    
+    def mdep(self, x, logM500c, alphaPprime=False):  # mass dependence factor, Eq 13?
+        alphaPp = lambda p: self.alphaPp(x, p) if alphaPprime else 0
+        return lambda p: (10**logM500c/(3e14/self.h70))**(p['alpha_P']+alphaPp(p))
+    
+    def Pressure(self, r, z, logM500c, units='cosmo', alphaPprime=False):  # Eq 4/8/10/13
+        r, z, logM500c = self.setdim(r, z, logM500c)  # set proper dimensions
+        P500 = self.P500(z, logM500c, units)
+        x = r*u.Mpc/(self.r500c(z, logM500c))
+        PGNFW = lambda p: self.PGNFW(x, gamma=p['gamma'], alpha=p['alpha'], beta=p['beta'], P0=p['P0']*self.h70**(-3/2), c500=p['c500'])
+        mdep = self.mdep(x, logM500c, alphaPprime)
+        return lambda p={}: P500*mdep(self.p0 | p)*PGNFW(self.p0 | p)

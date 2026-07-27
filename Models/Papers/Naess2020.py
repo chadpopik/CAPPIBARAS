@@ -7,13 +7,21 @@ arxiv.org/pdf/2007.07290
 
 
 from config import *
-class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2020JCAP...12..046N
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, splittable
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Naess2020")
+
+
+
+
+"""Old implementation being phased out"""
+
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2020JCAP...12..046N
     subs={}
     info={}
 
-
-class Measurements(BaseMeasurement, Studies.Naess2020):  # ACT DR5 (Naess 2020, arxiv.org/abs/2007.07290)
-    path = f"{datapath}/ACTDR5"  # Path to data downloaded from lambda.gsfc.nasa.gov/product/act/actpol_dr5_aux_prod_get.html
+class Measurements(Study):  # ACT DR5 (Naess 2020, arxiv.org/abs/2007.07290)
+    path = f"{DATA_PATH}/ACTDR5"  # Path to data downloaded from lambda.gsfc.nasa.gov/product/act/actpol_dr5_aux_prod_get.html
     # NERSC_path = "/global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary"  # location of data in NERSC
     
     subs = {'freq': ['090', '150', '220']}
@@ -28,8 +36,8 @@ class Measurements(BaseMeasurement, Studies.Naess2020):  # ACT DR5 (Naess 2020, 
         self.resp_ells, self.resp_data = np.genfromtxt(self.respfile).T[0:2]
 
 
-class MapData(BaseMapData, Studies.Naess2020):  # ACT DR5
-    path = f"{datapath}/ACTDR5"  # Path to data downloaded from lambda.gsfc.nasa.gov/product/act/actpol_dr5_aux_prod_get.html
+class MapData(Study):  # ACT DR5
+    path = f"{DATA_PATH}/ACTDR5"  # Path to data downloaded from lambda.gsfc.nasa.gov/product/act/actpol_dr5_aux_prod_get.html
     # NERSC_path = "/global/cfs/projectdirs/act/data/act_dr5/s08s18_coadd/auxilliary"  # location of data in NERSC
     
     subs = {'freq': ['090', '150', '220']}

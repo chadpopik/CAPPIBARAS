@@ -7,8 +7,8 @@ arxiv.org/pdf/1401.7329
 
 
 from config import *
-from Models.Papers.PlotsTables import BasePlots2, ParamTable, splittable
-thispath = os.path.dirname(os.path.abspath(__file__))
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, splittable
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Kravtsov2018")
 
 
 class Cosmology():
@@ -25,7 +25,7 @@ class HaloModel():
     pass
 
 
-class SHMR():
+class SHMR_new():
     def __init__(self, inputdict={}, **inputvars):
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
 
@@ -202,3 +202,71 @@ class SHMR_B13_Params(ParamTable):  # best fit SHMR params, Table 3
 class SHMR_PL_Params(ParamTable):  # best fit SHMR params, Table 3
     def __init__(self, filename=f"{thispath}/shmr_pl_params.csv"):
         super().__init__(filename)
+
+
+
+
+
+"""Old implementation being phased out"""
+
+from Models.Studies import BaseStudy
+class Study(BaseStudy):  # Stellar Mass—Halo Mass Relation and Star Formation Efficiency in High-Mass Halos, ui.adsabs.harvard.edu/abs/2018AstL...44....8K
+    subs = {}
+    info = {
+        # fixed cosmo params, Section 1pLast
+        'Om0':0.27, 'Ob0':0.0469, 'h':0.7, 'sigma8': 0.82, 'ns':0.95,
+    }
+    
+from Models.SHMRs import BaseSHMR
+class SHMR(BaseSHMR, Study):  # SDSS DR8 & G13 
+    models = {
+            'model': ['B13', 'PL'],
+            'type': ['BGC', 'sat', 'tot'],
+            'data': ['K18', 'K18G13'],
+            'mdef': ["200c", "500c", "200m", "vir"],
+            'scatter': ['B', 'S']}
+    params={
+        # best fit SHMR params, Table 3
+        "logM1": {
+            "B": {"200c": 11.39, "500c": 11.32, "200m": 11.45, "vir": 11.43},
+            "S": {"200c": 11.35, "500c": 11.28, "200m": 11.41, "vir": 11.39},},
+        "logeps": {
+            "B": {"200c": -1.618, "500c": -1.527, "200m": -1.702, "vir": -1.663},
+            "S": {"200c": -1.642, "500c": -1.556, "200m": -1.720, "vir": -1.685},},
+        "alpha": {
+            "B": {"200c": 1.795, "500c": 1.856, "200m": 1.736, "vir": 1.750},
+            "S": {"200c": 1.779, "500c": 1.835, "200m": 1.727, "vir": 1.740},},
+        "delta": {
+            "B": {"200c": 4.345, "500c": 4.376, "200m": 4.273, "vir": 4.290},
+            "S": {"200c": 4.394, "500c": 4.437, "200m": 4.305, "vir": 4.335},},
+        "gamma": {
+            "B": {"200c": 0.619, "500c": 0.644, "200m": 0.613, "vir": 0.595},
+            "S": {"200c": 0.547, "500c": 0.567, "200m": 0.544, "vir": 0.531},},
+        "slope": {
+            "BCG": {"K18": 0.39, "K18G13": 0.33},
+            "sat": {"K18": 0.87, "K18G13": 0.75},
+            "tot": {"K18": 0.69, "K18G13": 0.59}},
+        "norm": {
+            "BCG": {"K18": 12.15, "K18G13": 12.24},
+            "sat": {"K18": 12.42, "K18G13": 12.52},
+            "tot": {"K18": 12.63, "K18G13": 12.71}},
+        "scat": {
+            "BCG": {"K18": 0.21, "K18G13": 0.17},
+            "sat": {"K18": 0.10, "K18G13": 0.10},
+            "tot": {"K18": 0.09, "K18G13": 0.11}},
+    }
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+        self.require(['model'])
+        if self.model=='B13': self.SHMR = self.SHMR_B13
+        elif self.model=='PL': self.SHMR = self.SHMR_PL
+        
+    def SHMR_PL(self, logMh):  # Eq A3/A4
+        self.require(['type', 'data'])
+        func = lambda p: p['slope']*(logMh-14.5)-p['norm']
+        return lambda p={}: func(self.p0 | p)
+
+    def SHMR_B13(self, logMh):  # Eq A3/A4
+        self.require(['mdef', 'scatter'])
+        func = lambda p: self.Behroozi(logMh, logM1=p['logM1'], logeps=p['logeps'], alpha=-p['alpha'], delta=p['delta'], gamma=p['gamma'])
+        return lambda p={}: func(self.p0 | p)

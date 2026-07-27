@@ -119,7 +119,7 @@ class BaseSpectra:
 
 
 
-class Kusiak2022(BaseSpectra, HODs.Kusiak2022, Data.Kusiak2022):  # unWISE galaxies and Planck lensing (Kusiak+ 2023, arxiv.org/abs/2203.12583)
+class Kusiak2022(BaseSpectra, HODs.Kusiak2022, TargetData.Kusiak2022):  # unWISE galaxies and Planck lensing (Kusiak+ 2023, arxiv.org/abs/2203.12583)
 
     def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)        

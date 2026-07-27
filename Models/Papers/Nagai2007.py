@@ -7,10 +7,10 @@ ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
 
 
 from config import *
-thispath = os.path.dirname(os.path.abspath(__file__))
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, splittable
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Nagai2007")
 
 
-from Models.Papers.PlotsTables import BasePlots2, ParamTable
 from Models.HaloModels import pyccl_model
 
 
@@ -106,4 +106,53 @@ class FigA1(BasePlots2):
 class ParamsTable(ParamTable):  # Table A1
     def __init__(self, filename=f"{thispath}/params.csv"):
         super().__init__(filename)
+        
+        
+        
+        
 
+"""Old implementation being phased out"""
+
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):  # Effects of Galaxy Formation on Thermodynamics of the Intracluster Medium, ui.adsabs.harvard.edu/abs/2007ApJ...668....1N
+    subs = {}
+    info = {
+        # Cosmological Parameters, 2p1/2p3/3p2
+        'Om0':0.3, 'Ob0':0.04286, 'h':0.7, 'sigma8':0.9,
+        'Ol0':0.7, 'Fb':0.175,
+        'MassDef':'500c', 'Concentration': 'Constant', # Mass definition, S2p3/Eq11
+        # right after eq 1/2/3
+        'mu':0.59, 'mu_e':'1.14'
+    }
+    
+from Models.Profiles import BaseProfile
+class HaloProfile(BaseProfile, Study):  # Pressure Profile from GADGET-2 made hydro sims
+    models = {
+        'Run': ['Obs', 'CSF', 'NR'],  # Observed/cooling+SF sims/Non-rad sims
+        'Sample':['Rel', 'Unrel'],  # relaxed or unrelaxed sample
+    }
+    params = {  # Table A1
+        'alpha': {'Obs': {'Rel':1.3}, 'CSF': {'Rel':1.3, 'Unrel': 1.4}, 'NR': {'Rel':1.1, 'Unrel': 1.4}},  # slope at r~r_s
+        'beta': {'Obs': {'Rel':4.3}, 'CSF': {'Rel':4.3, 'Unrel': 4.3}, 'NR': {'Rel':4.3, 'Unrel': 4.3}},  # slope at r>>r_s
+        'gamma': {'Obs': {'Rel':0.7}, 'CSF': {'Rel':1.1, 'Unrel': 1.0}, 'NR': {'Rel':0.3, 'Unrel': 0.9}},  # slope at r<<r_s
+        'P0': {'Obs': {'Rel':3.3}, 'CSF': {'Rel':3.3, 'Unrel': 2}, 'NR': {'Rel':38.0, 'Unrel': 3.0}},  # pressure amplitude
+        'c500': {'Obs': {'Rel':1.8}, 'CSF': {'Rel':1.8, 'Unrel': 1.5}, 'NR': {'Rel':3.0, 'Unrel': 1.5}},  # concentration
+    }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+
+    def P500(self, z, logM500c, units='cosmo'):  # Eq 3
+        val = 1.45e-11*u.erg/u.cm**3 * (10**logM500c/1e15)**(2/3) * (self.H(z)/self.H0)**(8/3)
+        return val.to(self.units('pres', units))
+
+    def PGNFW(self, x, gamma, alpha, beta, P0):  # Eq A1
+        return P0 / (x**gamma * (1+x**alpha)**((beta-gamma)/alpha))
+
+    def Pressure(self, r, z, logM500c, units='cosmo'):
+        self.require(list(self.models.keys()))
+        r, z, logM500c = self.setdim(r, z, logM500c)  # set proper dimensions
+        P500 = self.P500(z, logM500c, units)
+        x = r*u.Mpc/(self.r500c(z, logM500c))
+        PGNFW = lambda p: self.PGNFW(x=x*p['c500'], gamma=p['gamma'], alpha=p['alpha'], beta=p['beta'], P0=p['P0'])
+        return lambda p={}: P500*PGNFW(self.p0 | p)

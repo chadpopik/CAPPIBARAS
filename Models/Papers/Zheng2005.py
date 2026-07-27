@@ -7,13 +7,13 @@ arxiv.org/pdf/astro-ph/0408564
 
 
 from config import *
-from Models.Papers.PlotsTables import BasePlots2, ParamTable
-thispath = os.path.dirname(os.path.abspath(__file__))
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Zheng2005")
 
 
 from scipy.special import erf
 
-from Models.Papers.Zehavi2005 import Zehavi2005
+from Models.Papers import Zehavi2005
 
 
 class Cosmology():
@@ -22,7 +22,7 @@ class Cosmology():
 class HaloModel():
     pass
 
-class HOD(): # Section 3.1. HOD for All Galaxies
+class HOD_new(): # Section 3.1. HOD for All Galaxies
     MassDef = "virial"
     def __init__(self, inputdict={}, **inputvars):
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
@@ -109,3 +109,64 @@ class HODParamsTable(ParamTable):  # best-fit HOD parameters, Table 1 (same data
     def __init__(self, filename=f"{thispath}/Table1.csv"):
         self.df = pd.read_csv(filename, dtype={'ngbar': str})
 
+
+
+
+"""Old implementation being phased out"""
+
+
+
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):  # Theoretical Models of the Halo Occupation Distribution: Separating Central and Satellite Galaxies, ui.adsabs.harvard.edu/abs/2005ApJ...633..791Z
+    subs = {}
+    info = {'MassDef': 'vir',
+        }
+    
+from Models.HODs import BaseHOD
+class HOD(BaseHOD, Study):  # virial mass
+    models = {'model': ['SPH', 'SA'],  # simulation type
+              'nparams': ['3P', '5P'],  # number of parameters in model (Zehavi vs Zheng)
+              'ng': ['0.02', '0.01', '0.005', '0.0025'],  # number density in h^3 Mpc^-3
+    }
+    params = {  # best-fit HOD parameters, Table 1
+        "logMmin": {  # characteristic minimum mass of halos that can host such central galaxies
+            "3P": {"SPH": {"0.02": 11.67, "0.01": 12.04, "0.005": 12.38, "0.0025": 12.68},
+                   "SA":  {"0.02": 11.77, "0.01": 12.03, "0.005": 12.34, "0.0025": 12.58},},
+            "5P": {"SPH": {"0.02": 11.68, "0.01": 12.07, "0.005": 12.36, "0.0025": 12.69},
+                   "SA":  {"0.02": 11.73, "0.01": 12.02, "0.005": 12.36, "0.0025": 12.60},},},
+        "logM1": {
+            "3P": {"SPH": {"0.02": 12.96, "0.01": 13.26, "0.005": 13.55, "0.0025": 13.85},
+                   "SA":  {"0.02": 12.96, "0.01": 13.30, "0.005": 13.64, "0.0025": 13.91},},
+            "5P": {"SPH": {"0.02": 13.00, "0.01": 13.19, "0.005": 13.45, "0.0025": 13.82},
+                   "SA":  {"0.02": 12.87, "0.01": 13.32, "0.005": 13.62, "0.0025": 13.86},},},
+        "alpha": {
+            "3P": {"SPH": {"0.02": 0.97, "0.01": 1.03, "0.005": 1.18, "0.0025": 1.24},
+                   "SA":  {"0.02": 1.04, "0.01": 1.02, "0.005": 1.09, "0.0025": 1.16},},
+            "5P": {"SPH": {"0.02": 1.02, "0.01": 0.94, "0.005": 1.00, "0.0025": 1.08},
+                   "SA":  {"0.02": 0.96, "0.01": 1.07, "0.005": 1.04, "0.0025": 1.03},},},
+        "sigmalogM": { # characteristic transition width
+            "5P": {"SPH": {"0.02": 0.15, "0.01": 0.18, "0.005": 0.15, "0.0025": 0.15},
+                   "SA":  {"0.02": 0.32, "0.01": 0.26, "0.005": 0.42, "0.0025": 0.28},},},
+        "logM0": {  # truncation mass for satellites
+            "5P": {"SPH": {"0.02": 11.86, "0.01": 12.28, "0.005": 12.63, "0.0025": 12.94},
+                   "SA":  {"0.02": 12.09, "0.01": 12.28, "0.005": 12.28, "0.0025": 12.77},},},
+    }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+        
+    def Nc(self, logM, logMmin, sigmalogM):  # Eq 1
+        return (1/2) * (1+erf((logM-logMmin)/sigmalogM))
+
+    def Ns(self, M, M0, M1, alpha):  # Eq 3
+        return np.where(M>=M0, ((M-M0)/M1), 0)**alpha
+
+    def Ncen(self, logM):
+        if self.nparams=='3P': func = lambda p: Zehavi2005.HOD().Nc(logM, logMmin=p['logMmin'])
+        elif self.nparams=='5P': func = lambda p: self.Nc(logM, logMmin=p['logMmin'], sigmalogM=p['sigmalogM'])
+        return lambda p={}: func(self.p0 | p)
+
+    def Nsat(self, logM):
+        if self.nparams=='3P': func = lambda p: Zehavi2005.HOD().Ns(10**logM, M1=10**p['logM1'], alpha=p['alpha'])
+        elif self.nparams=='5P': func = lambda p: self.Ns(10**logM, M0=10**p['logM0'], M1=10**p['logM1'], alpha=p['alpha'])
+        return lambda p={}: func(self.p0 | p)

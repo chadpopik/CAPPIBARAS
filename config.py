@@ -9,6 +9,7 @@ import pandas as pd
 import time
 import sys
 import os
+import json
 import h5py
 import astropy
 import astropy.units as u
@@ -52,6 +53,7 @@ __all__ = [
     "Path",
     "cm",
     "h5py",
+    "json",
     "importlib",
     "CAPPIBARAS_PATH",
     "DATA_PATH",

@@ -1,24 +1,30 @@
 
 
 from config import *
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Moore2026")
 
-from Models.Papers.PlotsTables import ParamTable
-thispath = os.path.dirname(os.path.abspath(__file__))
 
-
-class Studies(BaseStudy):
-    subs={}
-    info = {'area': 16700*u.deg**2,  # assuming the same as XCorr LRGs
-            }
 
 
 class TargetDataInfoTable(ParamTable):  # per sample/bin best-fit values (LMin/LMax/MhMin/MhMax/MsMean/LMean/zMean/N/Nf150/logMsMin/logMsMean/lambdaMin/lambdaMean/logMhMean)
     def __init__(self, filename=f"{thispath}/target_data_info.csv"):
         super().__init__(filename)
+        
+
+"""Old implementation being phased out"""
+
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):
+    subs={}
+    info = {'area': 16700*u.deg**2,  # assuming the same as XCorr LRGs
+            }
 
 
-class TargetData(BaseTargetData, Studies.Moore2026):
-    path = f"{datapath}/Moore2026"  # location of data, provided by Jenna
+from Models.TargetData import BaseTargetData
+from Models.Papers import Hadzhiyska2026, Gao2023, To2020
+class TargetData(BaseTargetData, Study):
+    path = f"{DATA_PATH}/Moore2026"  # location of data, provided by Jenna
     subs = {'masstype': ['M200c', 'Mvir'], # Mass type (column names)
             'sample': ['LRG', 'BGS', 'optical'],
             'bin': ['L36', 'L48', 'L60', 'L79', 'L98', 'L36D', 'L48D', 'L60D', 'L79D',
@@ -46,7 +52,7 @@ class TargetData(BaseTargetData, Studies.Moore2026):
         if self.radio=='incl':
             sampfiles = {
                 'LRG': f"{self.path}/ACT_DR6_DESI_Y1Iron_LRGs_valid", # LRG sample from Yu-Lin's paper
-                'BGS': f"{Hadzhiyska2026.path}/BGS_BRIGHT_full_noveto_vac_marvin_BGS_ACT_DR6_fixedTh2.10_delta_Ts", # BGS sample for Boryana's paper
+                'BGS': f"{Hadzhiyska2026.TargetData.path}/BGS_BRIGHT_full_noveto_vac_marvin_BGS_ACT_DR6_fixedTh2.10_delta_Ts", # BGS sample for Boryana's paper
                 'optical': f"{self.path}/iskay_RM_ls10_iron_v1_CGz_cat_310525",  # Optical sample from Yun-Hsuin
                         }
             self.dfdata = pd.read_csv(f"{sampfiles[self.sample]}.csv")  # import datafarme
@@ -83,18 +89,18 @@ class TargetData(BaseTargetData, Studies.Moore2026):
             masses = np.log10(self.dfdata[self.masstype])
             
         elif self.sample=='BGS':
-            masses = SHMRs.Gao2023(model='Auto').HSMR(self.dfdata['logm'])()
-            
+            masses = Gao2023.SHMR(model='Auto').HSMR(self.dfdata['logm'])()
+
         elif self.sample=='optical':
-            masses = np.log10(SHMRs.To2020(h=0.7).RHMR(self.dfdata['lum'])())
+            masses = np.log10(To2020.SHMRs(h=0.7).RHMR(self.dfdata['lum'])())
         
         vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.dfdata.z.max())-halomodel.Vcom(self.dfdata.z.min()))/(1+self.dfdata.z.mean())**3
 
         self.catdist('logMh', masses, qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=vol)
 
 
-class Measurements(BaseMeasurement, Studies.Moore2026):
-    path = f"{datapath}/Moore2026"
+class Measurements(Study):
+    path = f"{DATA_PATH}/Moore2026"
     # subs = {'sample': ['BGS', 'LRG_deprojected', 'optical', 'LRG_raw'], # Boryana BGS sample, Yun-Hsuin's optical sample, LRG
     #         'deproj': ['_f090', '_f150', '_ILC', '_ILC_CIB_deproj', '_ILC_dB_deproj'], # deprojection method
     #         'richbin': ['all', '10', '20'], # richness bin, only for optical

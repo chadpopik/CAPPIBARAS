@@ -7,13 +7,23 @@ arxiv.org/pdf/2201.12591
 
 
 from config import *
-class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2023ApJ...953..188C
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Chen2023")
+
+
+
+
+
+"""Old implementation I'm phasing out"""
+
+from Models.Studies import BaseStudy
+class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2023ApJ...953..188C
     subs = {}
     info = {
         }
 
-
-class Profiles(BaseProfile, Studies.Chen2023):  # https://arxiv.org/pdf/2201.12591
+from Models.Profiles import BaseProfile
+class HaloProfiles(BaseProfile, Study):  # https://arxiv.org/pdf/2201.12591
     models = {}
     params = {
         # fixed

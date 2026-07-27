@@ -8,8 +8,8 @@ arxiv.org/pdf/astro-ph/0408569
 
 from config import *
 
-from Models.Papers.PlotsTables import BasePlots2
-thispath = os.path.dirname(os.path.abspath(__file__))
+from Models.Papers.Figures.PlotsTables import BasePlots2
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Zehavi2005")
 
 
 class Table3():  # Best-fit HOD Parameters for Luminosity-Threshold Samples
@@ -36,7 +36,7 @@ class Cosmology():
 
 
 # Section 4.1
-class HOD(Cosmology):
+class HOD_new(Cosmology):
     MassDef = "virial"
     def __init__(self, inputdict={}, **inputvars):
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
@@ -75,3 +75,28 @@ class Fig15(BasePlots2):
         super().__init__(thispath)
     
 
+
+
+
+"""Old implementation being phased out"""
+
+
+
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):  # The Luminosity and Color Dependence of the Galaxy Correlation Function, ui.adsabs.harvard.edu/abs/2005ApJ...630....1Z
+    subs = {}
+    info = {
+        }
+    
+from Models.HODs import BaseHOD
+class HOD(BaseHOD, Study):  # virial
+    models = {}
+    params = {}
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+
+    def Nc(self, logM, logMmin):
+        return np.heaviside(logM - logMmin, 1)
+
+    def Ns(self, M, M1, alpha):
+        return (M/M1)**alpha

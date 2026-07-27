@@ -197,3 +197,6 @@ class ParamTable():
             elif v in df[k].values: df = df.set_index(k).loc[v]
             else: print(f"Value {v} not in {np.unique(df[k].values)}")
         return df
+    
+    
+    

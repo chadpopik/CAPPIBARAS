@@ -7,11 +7,11 @@ arxiv.org/pdf/2211.07502
 
 
 from config import *
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Kou2023")
 
 from scipy.special import erf
 
-from Models.Papers.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
-thispath = os.path.dirname(os.path.abspath(__file__))
 
 
 # 5.1 We recall that we fixed the cosmological parameters, for which we take the values from Planck Collaboration et al. (2020a) (TT, TE, EE+lowE+lensing+BAO): H0 =67.66 km s−1 Mpc−1, Ωbh2 = 0.2242, Ωch2 = 0.11933, τ =0.0561, ns = 0.9665, and σ8 = 0.8102.
@@ -61,7 +61,7 @@ class Data():
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
 
 
-class HOD():
+class HOD_new():
     def __init__(self, inputdict={}, **inputvars):
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
         
@@ -157,8 +157,131 @@ class StudiesInfoTable(ParamTable):  # per-mass-bin best-fit values referenced i
 
 
 
-
 class HODParamsTable(ParamTable):  # best fit HOD parameters
     def __init__(self, filename=f"{thispath}/hod_params.csv"):
         self.df = read_wide_table(filename)
 
+
+
+
+"""Old implementation I'm phasing out"""
+
+
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2023A%26A...675A.149K
+    subs = {'mbin':['M1', "M2", "M3", "M4"],}
+    info = {
+        # best fit HOD parameters
+        "A": {"M1": 0.981, "M2": 0.965, "M3": 0.956, "M4": 0.961},  # cross-correlation amplitude
+        "beta_m": {"M1": 4.97, "M2": 5.91, "M3": 4.16, "M4": 10},  # matter density profile
+        
+        # fixed cosmological parameters
+        'h':0.6766, 'Ob0h2':0.02242, 'Oc0h2':0.11933, 'tau':0.0561, 'ns':0.9665, 'sigma8':0.8102, # 5.1p3
+        'mdef': '200m',  # region in which the average density is ∆ = 200 times the cosmic mean density
+        'MassFunc': 'Tinker08', 'Concentration':'Dolag04',
+        'zlims': [0.47, 0.59],  # redshift range of selected galaxies
+        'zmed': 0.53,  # median redshift
+        'logMsMin': {'M1': 10.8, 'M2': 11.1, 'M3': 11.25, 'M4': 11.4},  # minimum stellar mass of selected
+        'c0': 9.59, 'alpha_c': -0.102,  # concentration parameters, Eq47
+    }
+    
+    def conc(self, z, logM):  # Eq 47
+        return self.c0/(1+z) * (10**logM/(10**14))**self.alpha_c
+    
+from Models.HODs import BaseHOD
+from Models.Papers import Zheng2005, More2015
+from Models import HaloModels
+class HOD(BaseHOD, Study):  # Kou 2023, arxiv.org/abs/2211.07502
+    models = {'mbin':['M1', "M2", "M3", "M4"],
+}
+    params = {
+        # best fit HOD parameters
+        "logM_min": {"M1": 13.47, "M2": 13.58, "M3": 13.84, "M4": 14.20},  # minimum halo mass for a central galaxy/halos contain 0.5 central galaxies on average
+        "sigma_logM": {"M1": 0.76, "M2": 0.78, "M3": 0.86, "M4": 0.959},  # changes the number of galaxies in low-mass halos
+        "logM_1": {"M1": 14.119, "M2": 14.140, "M3": 14.171, "M4": 14.100},  # controls the number of galaxies at high halo mass
+        "beta_s": {"M1": 4.38, "M2": 4.71, "M3": 5.31, "M4": 6.35},  # satellite galaxy profile
+        "alpha_inc": {"M1": 0.51, "M2": 0.42, "M3": 0.39, "M4": 0.33},  # included to account for galaxy incompleteness at the low stellar mass end
+        "logM_inc": {"M1": 13.39, "M2": 13.42, "M3": 13.69, "M4": 13.96},  # included to account for galaxy incompleteness at the low stellar mass end
+    }
+    # uses m200m
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+
+    def Ncen(self, logM):  # Eq 19, 21
+        finc = lambda p: More2015.HOD().finc(logM, alpha_inc=p['alpha_inc'], logM_inc=p['logM_inc'])
+        func = lambda p: Zheng2005.HOD().Nc(logM, logMmin=p['logM_min'], sigmalogM=p['sigma_logM'])*finc(p)
+        return lambda p={}: func(self.p0 | p)
+
+    def Nsat(self, logM):  # Eq 20
+        func = lambda p: Zheng2005.HOD().Ns(10**logM, M0=10**p['logM_min'], M1=10**p['logM_1'], alpha=1) * self.Ncen(logM)(p)
+        return lambda p={}: func(self.p0 | p)
+
+    def ns_r(self, rs, zs, logMs): #
+        self.require(['r200m'])  # needs radius definition
+        GNFW_func = lambda p: self.GNFW_r(rs, zs, logMs, self.r200m, self.conc)(beta=p['beta_s'])
+        func = lambda p: GNFW_func(p)/np.trapezoid(GNFW_func(p)*4*np.pi*rs**2, rs, axis=0)
+        return lambda p={}: func(self.p0 | p)
+
+    def ns(self, ks, zs, logMs):  # Default satellite distribution (FFT of NFW)
+        self.require(['c200m', 'r200m'])
+        fft = HaloModels.mcfit_package(ks=ks)
+        NFW = self.ns_r(fft.rs, zs, logMs)
+        return lambda p={}: fft.FFT3D(NFW(p))
+
+
+
+        # rs, zs, logMs = self.setdim(rs, zs, logMs)
+        # xs = rs*u.Mpc/(self.r200m(zs, logMs)/self.c200m(zs, logMs))  # scaled radius
+        # NFW = 1 / (xs * (1+xs)**2)
+        # NFW_int = np.trapezoid(NFW, xs, axis=0)
+        # print(np.trapezoid(NFW, xs, axis=0), np.trapezoid(NFW, rs, axis=0))
+        # return lambda p={}: NFW/NFW_int
+        
+class Measurement(Study):
+    path = f"{DATA_PATH}/Kou2023"  # path to data, taken from plots using webplotdigitizer
+    subs = {'mbin':['M1', "M2", "M3", "M4"]}
+
+    def __init__(self, inputsdict, **inputvars):
+        self.setup(inputsdict | inputvars)
+        self.require(['mbin'])
+            
+        self.get_meas()
+
+    def get_meas(self):
+        with h5py.File(f'{self.path}/Kou2023_wpd.h5', "r") as f:
+            self.Cgg_ell = f['dgg_ells'][()]
+            self.Cgy_ell = f['dgy_ells'][()]
+            self.Cgg_data = f[f'dgg_{self.mbin}'][()]/(self.Cgg_ell*(self.Cgg_ell+1))*2*np.pi
+            self.Cgy_data = f[f'dgy_{self.mbin}'][()]/(self.Cgy_ell*(self.Cgy_ell+1))*2*np.pi
+            
+from Models.Profiles import BaseProfile
+class HaloProfile(BaseProfile, Study):  # Planck 2018 and SDSS BOSS CMASS DR12
+    models = {'mbin':['M1', "M2", "M3", "M4"],}  # mass bin
+    params = {
+        # Best-fit parameters
+        "bh_m1": {"M1": 0.602, "M2": 0.623, "M3": 0.558, "M4": 0.550},  # hydrostatic bias
+        # Fixed parameters
+        'alpha_p': 0.12,  # Eq32
+        'P0':6.41, 'gamma':0.31, 'alpha':1.33, 'beta':4.13, 'c_Pe':1.81, # eq 48
+    }
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+
+    def Pe_del(self, xs):
+        xs, _, _ = self.setdim(xs, 1, 1)  # set proper dimensions [nr, nz, nM]
+        gnfw = lambda x, c, alpha, beta, gamma, P0: P0/((x*c)**gamma * (1+(x*c)**alpha)**((beta-gamma)/alpha))
+        return gnfw(xs, c=self.p0['c_Pe'], P0=self.p0['P0'], gamma=self.p0['gamma'], alpha=self.p0['alpha'], beta=self.p0['beta'])
+
+    def Pdel(self, zs, logMs, units='cosmo'):
+        self.require(['H'])
+        prefac = (1.65*(self.h/0.7)**2 * u.eV/u.cm**3 * (self.H(zs)/(self.H0))**(8/3)).to(self.units('pres', units))
+        infac = (10**logMs/(3e14*0.7/self.h))
+        Pdel = lambda p: prefac * (infac*p['bh_m1'])**(2/3+self.p0['alpha_p'])
+        return lambda p={}: Pdel(self.p0 | p)
+    
+    def Pe1h(self, rs, zs, logMs, units='cosmo'):
+        self.require(['r200m'])
+        Pdel = self.Pdel(zs, logMs, units)
+        logMs_ = lambda p: np.log10(p['bh_m1'])+logMs
+        Pe_del = lambda p: self.Pe_del(rs*u.Mpc/self.r200m(zs, logMs_(p)))
+        return lambda p={}: Pdel(self.p0 | p)*Pe_del(self.p0 | p)

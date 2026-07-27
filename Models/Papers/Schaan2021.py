@@ -7,11 +7,8 @@ arxiv.org/pdf/2009.05557
 
 
 from config import *
-thispath = os.path.dirname(os.path.abspath(__file__))
-
-
-from Models.Papers.PlotsTables import BasePlots2, ParamTable, read_wide_table
-from Models.HaloModels import pyccl_model
+from Models.Papers.Figures.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Schaan2021")
 
 
 class Cosmology():
@@ -102,3 +99,97 @@ class StudiesInfoTable(ParamTable):  # rms velocities, halo masses, redshifts, g
     def __init__(self, filename=f"{thispath}/studies_info.csv"):
         self.df = read_wide_table(filename)
 
+
+
+
+"""Old implementation being phased out"""
+
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2021PhRvD.103f3513S
+    subs = {
+        'sample' : ['cmass', 'lowz'],  # galaxy sample (CMASS M from DR12 not available for everything)
+    }
+    info = {
+        'T_CMB':2.726,  # CMB temp [K], Section F.1p8
+        'v_rms': {'lowz':320, 'cmass':313},  # rms velocity [km/s] at mean redshifts, Section F.1p8/F.2p1
+        'area': 6000,  # area of overlap between ACT and BOSS [deg^2], TODO 1: assumed
+        'mdef':'vir', 'MhMean': {'lowz':5e13, 'cmass':3e13},  # halo mass definition and mean halo masses, Figure 3
+        'MsMax': 5.5e11, 'MhMax': 1e14, # max stellar mass and halo mass, Section IV.Ep2
+        'zMin':0.4, 'zMax':0.7,  # redshift range, Section IIp1
+        'zMean': {'lowz':0.31, 'cmass':0.55},  # mean redshift, Figure 2 (says 0.55 everywhere else in the paper)
+        'Ngal_catalog':{'lowz':218905, 'cmass': 501844, 'CMASSm':777202},  # total galaxies in BOSS catalog, Section III.Ap2
+        'Ngal_overlap': {'lowz':151713, 'cmass': 325518, 'CMASSm':385137},  # galaxies in ACT BOSS overlap, Section III.Ap2
+        'Ngal_masked': {'lowz':145714, 'cmass': 312708, 'CMASSm':368701},  # galaxies in overlap after masking, Section III.Ap2
+        'Ngal': {'lowz':134702, 'cmass':311309, 'CMASSm':360084},  # final galaxy count after applying upper mass limit, Section III.Ap2
+        }
+
+    info['T_CMB'] = cycle(info['T_CMB'], lambda T: T *u.K)
+    info['area'] = cycle(info['area'], lambda a: a *u.deg**2)
+    info['MhMean'] = cycle(info['MhMean'], lambda M: M *u.Msun)
+    info['MsMax'] = cycle(info['MsMax'], lambda M: M *u.Msun)
+    info['MhMax'] = cycle(info['MhMax'], lambda M: M *u.Msun)
+    
+class Measurements(Study):  # ACT DR5 maps stacked on SDSS BOSS DR10 (Schaan+ 2021, arxiv.org/abs/2009.05557)
+    path = f"{DATA_PATH}/Schaan2021"  # path to data, shared by author
+    subs = {
+        'sample': ['cmass', 'lowz'],
+        'freq' : ['150', '090'],  # frequency band of obsevation [GHz]
+    }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+
+        self.get_meas()  # get measurement
+
+    def get_meas(self):
+        self.require(['sample', 'freq'])
+
+        measpath = f"{self.path}/{self.sample}_data_sharing_schaan21/f{self.freq}"  # each meas in different folder
+        if self.sample=='cmass':
+            self.R = np.genfromtxt(f"{measpath}/diskring_tsz_varweight_measured.txt").T[0] *u.arcmin
+            self.kSZ_data, self.kSZ_err = (np.genfromtxt(f"{measpath}/diskring_ksz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.tSZ_data, self.tSZ_err = (np.genfromtxt(f"{measpath}/diskring_tsz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.kSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_ksz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.tSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_tsz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+
+        elif self.sample=='lowz':
+            freqstr = str(int(self.freq))
+            self.R = np.genfromtxt(f"{measpath}/ksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T[0] *u.arcmin
+            self.kSZ_data = (np.genfromtxt(f"{measpath}/ksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.tSZ_data = (np.genfromtxt(f"{measpath}/tsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.kSZ_cov = (np.genfromtxt(f"{measpath}/covksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.tSZ_cov = (np.genfromtxt(f"{measpath}/covtsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+
+        for val in ['kSZ', 'tSZ']:  # get errors from covariance matrices
+            setattr(self, f'{val}_err', np.diag(getattr(self, f'{val}_cov'))**0.5) 
+
+        # Convert to y units
+
+        # convfac = 1/HaloModels.y_to_uK(np.float32(self.freq)*u.GHz, self.T_CMB)
+        # self.y_data = self.TtSZ_data*convfac
+        # self.y_cov = self.TtSZ_cov*convfac**2
+        
+        
+from Models.TargetData import BaseTargetData
+class TargetData(BaseTargetData, Study):  # ACT DR5 maps stacked on SDSS BOSS DR10
+    path = f"{DATA_PATH}/Schaan2021"  # path to data, shared by author
+    subs = {
+        'sample': ['cmass', 'lowz'],}
+    
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars)
+        
+        self.bigdata_cmass = np.loadtxt(f'{DATA_PATH}/Schaan2021/catalog.txt')
+          
+    def make_zdist(self, zMin=None, zMax=None, dz=None, zNum=None):
+        self.catdist('z', self.bigdata_cmass[:, 2], qMin=zMin, qMax=zMax, dq=dz, qNum=zNum, densspace=self.area)
+        
+    def make_Msdist(self, halomodel, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None):
+        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.dfdata.z.max())-halomodel.Vcom(self.dfdata.z.min()))/(1+self.dfdata.z.mean())**3
+
+        self.catdist('logMs', self.bigdata[:, 18], qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
+        
+    def make_Mhdist(self, halomodel, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None):        
+        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.dfdata.z.max())-halomodel.Vcom(self.dfdata.z.min()))/(1+self.dfdata.z.mean())**3
+
+        self.catdist('logMh', self.bigdata[:, 20], qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=vol)

@@ -8,13 +8,25 @@ arxiv.org/pdf/1909.09102
 
 
 from config import *
-class Studies(BaseStudy):  # arxiv.org/abs/1909.09102
+from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Koukoufilippas2020")
+
+
+
+
+
+
+
+
+"""Old implementation being phased out"""
+
+from Models.Studies import BaseStudy
+class Study(BaseStudy):  # arxiv.org/abs/1909.09102
     subs={'sample':['2MPZ','WIxSC-1','WIxSC-2','WIxSC-3','WIxSC-4','WIxSC-5'],}
     info={}
 
-
-class Measurements(BaseMeasurement, Studies.Koukoufilippas2020):  # arxiv.org/abs/1909.09102
-    path = f"{datapath}/Koukoufilippas2020"  # path to data, taken from plots using webplotdigitizer
+class Measurement(Study):  # arxiv.org/abs/1909.09102
+    path = f"{DATA_PATH}/Koukoufilippas2020"  # path to data, taken from plots using webplotdigitizer
     subs = {'sample':['2MPZ','WIxSC-1','WIxSC-2','WIxSC-3','WIxSC-4','WIxSC-5']}
 
     def __init__(self, inputsdict, **inputvars):

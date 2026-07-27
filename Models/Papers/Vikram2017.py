@@ -9,10 +9,11 @@ NOTE: using colossus as halo model wasn't specified
 
 
 from config import *
+from Models.Papers.Figures.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Vikram2017")
 import Models.HaloModels as HaloModels
-from Models.Papers.colossus import colossus_model
-from Models.Papers.PlotsTables import BasePlots2
-thispath = os.path.dirname(os.path.abspath(__file__))
+from Models.Codes.colossus import colossus_model
+from Models.Papers.Figures.PlotsTables import BasePlots2
 
 
 class Cosmology():
@@ -82,7 +83,7 @@ class HaloModel(Cosmology):
     
 
 
-class Profiles(HaloModel):
+class Profiles_new(HaloModel):
     def __init__(self, inputdict={}, **inputvars):
         super().__init__(inputdict, **inputvars)
 
@@ -137,23 +138,6 @@ class twohalo(HaloModel):
         return self.twohalo_prefac * np.trapezoid(self.twohalo_intfac*u_P, self.M200c_2h)
     
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class Fig3(BasePlots2):  # ui.adsabs.harvard.edu/abs/2017MNRAS.467.2315V
     subplots = [[
         dict(name='Fig3a', filename='Fig3a', figsize=(16/3, 5),
@@ -179,3 +163,72 @@ class Fig3(BasePlots2):  # ui.adsabs.harvard.edu/abs/2017MNRAS.467.2315V
 
     def __init__(self):
         super().__init__(thispath)
+        
+        
+
+
+"""Old implementation being phased out"""
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):  # A Measurement of the Galaxy Group-Thermal Sunyaev-Zel'dovich Effect Cross-Correlation Function, ui.adsabs.harvard.edu/abs/2017MNRAS.467.2315V
+    subs = {}
+    info = {
+        'ns':1, 'sigma8':0.8, 'Om0':0.27, 'Obl':0.73, 'Ob0':0.044, 'h':0.7,
+        'MassDef':'200c', 'MassFunc':'Sheth99', 'HaloBias':'Sheth01',
+    }
+    
+    
+from Models.Profiles import BaseProfile
+class Profiles(BaseProfile, Study):  # TODO in progress
+    models = {}  # only one model
+    params = { 
+    }
+
+    def __init__(self, inputsdict={}, **inputvars):
+        self.setup(inputsdict | inputvars, model=True)
+        
+        # B11 = Battaglia2011(inputsdict | inputvars, **self.info)
+        # self.P1h_del = B11.P_del
+        # self.P1h = B11.P
+        # self.P200c = B11.P200c
+
+    def twohalo(self, rs, zs, logMs, logMs_2h):  # Eq 8
+        self.require(['dndlogm', 'bh', 'Plin'])  # required functions
+        
+        fft = HaloModels.mcfit_package(rs=rs)  # setup FFT
+        ks, FFT3D, IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
+        ks, zs, logMs = np.array(ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)  # Assign proper dimensions [nr, nz, nm]
+
+        prefac = self.bh(zs, logMs)*self.Plin(ks, zs)  # collect factors outside int
+        intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
+        P2h = lambda prof1h: prefac*(np.trapezoid(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
+        return lambda prof1h: IFFT3D(P2h(prof1h)) *prof1h.unit  # IFFT to real space and return its units destroyed by the FFT
+    
+    # def twohalo(self, rs, zs, logMs, logMs_2h):  # Eq 8
+    #     self.require(['dndlogm', 'bh', 'Plin'])  # required functions
+        
+    #     Npad=1
+    #     dlogr = np.log(rs[1]/rs[0])
+    #     rspad = rs[0] * np.exp(-dlogr * np.arange(Npad, 0, -1))
+    #     print(rspad)
+    #     rsnew = np.concatenate([rspad, rs])
+    #     fft = HaloModels.mcfit_package(rs=rsnew)  # setup FFT
+    #     ks, FFT3D, IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
+    #     ks, zs, logMs = np.array(ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)  # Assign proper dimensions [nr, nz, nm]
+
+    #     prefac = self.bh(zs, logMs)*self.Plin(ks, zs)  # collect factors outside int
+    #     intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other
+    #     P2h = lambda prof1h: prefac*(np.trapezoid(FFT3D(prof1h)*intfac,logMs_2h*u.dex))[..., None]  # integrate of 2h mass range
+    #     return lambda prof1hmod, p={}: IFFT3D(P2h(prof1hmod(rsnew, zs, logMs_2h)(p)))[Npad:] *prof1hmod(0, 0, 0)().unit  # IFFT to real space and return its units destroyed by the FFT
+
+
+
+
+
+
+
+
+
+
+
+
+

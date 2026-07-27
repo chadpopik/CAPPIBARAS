@@ -7,13 +7,18 @@ arxiv.org/pdf/2010.01138
 
 
 from config import *
-class Studies(BaseStudy):  # ui.adsabs.harvard.edu/abs/2021PhRvL.126n1301T
+from Models.Papers.Figures.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "To2020")
+
+"""Old implementation being phased out"""
+from Models.Studies import BaseStudy, cycle
+class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2021PhRvL.126n1301T
     subs = {}
     info = {
         }
 
 
-class SHMRs(BaseSHMR, Studies.To2020):  # DES Y1 Clusters
+class SHMRs(Study):  # DES Y1 Clusters
     models = {}
     params = {
         'alpha1': 14.351,

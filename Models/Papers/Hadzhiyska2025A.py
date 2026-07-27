@@ -7,16 +7,9 @@ arxiv.org/pdf/2407.07152
 
 
 from config import *
-from Models.Papers.PlotsTables import ParamTable, read_wide_table
-thispath = os.path.dirname(os.path.abspath(__file__))
+from Models.Papers.Figures.PlotsTables import ParamTable, read_wide_table
+thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Hadzhiyska2025A")
 
-
-class Studies(BaseStudy):  # Missing baryons recovered: a measurement of the gas fraction in galaxies and groups with thekinematic Sunyaev-Zel’dovich effect and CMB lensing, ui.adsabs.harvard.edu/abs/2025PhRvD.112l3507H
-    subs = {
-    }
-
-    info = {'h': 0.6736, 'MassDef': 'vir'
-    }
 
 
 class ParamsTable(ParamTable):  # best fit HOD parameters
@@ -24,21 +17,62 @@ class ParamsTable(ParamTable):  # best fit HOD parameters
         self.df = read_wide_table(filename)
 
 
-class HODs(BaseHOD, Studies.Hadzhiyska2025A):  #
-    models = {'sample': ['Main_z1', 'Main_z2', 'Main_z3', 'Main_z4', 'Main_all', 'Ext_z1', 'Ext_z2', 'Ext_z3', 'Ext_z4', 'Ext_all', 'BGS'],
+
+
+"""Old implementation I'm phasing out"""
+
+from Models.Studies import BaseStudy
+class Study(BaseStudy):  # arxiv.org/abs/2407.07152
+    subs = {'zbin': ['z1', 'z2', 'z3', 'z4'],}
+    info={}
+    
+#     # info = {'ngal': {'ext_DR9_z1': 963631, 'ext_DR9_z2': 1658313, 'ext_DR10_z3': 1951646, 'ext_DR10_z4':1690171, 'ext_all':6850072},
+#     # # TODO: come back to this
+#     # }
+#     info = {'name':'Hadzhiyska 2025'}
+
+class Measurement(Study):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
+    path = f"{DATA_PATH}/Hadzhiyska2024"  # Path to data from zenodo.org/records/12633573
+    subs = {
+        'zbin': ['z1', 'z2', 'z3', 'z4'],  # photometric redshift bin
+        'DR':['all', 'DR9', 'DR10'],
+        'sample': ['main', 'extended', 'all'],
+        'zoutcut': ['nocut', 'cut'],
+        'corr': ['corrected', 'uncorrected'],
     }
 
-    def __init__(self, inputsdict={}, **inputvars):
+    def __init__(self, inputsdict, **inputvars):
         self.setup(inputsdict | inputvars)
-        self.check_inputs(inpdict=inputsdict | inputvars, optdict=self.models)
-        self.p0 = ParamsTable().getparams(sample=self.sample).to_dict()
+        self.require(['zbin', 'DR', 'sample', 'zoutcut', 'corr'])
 
-    def Ncen(self, logM):  # Eq 2
-        logM = logM-np.log10(self.h)
-        func = lambda p: Zheng2005().Nc(logM, logMmin=p['logMcut'], sigmalogM=2*p['sigma_logM'])
-        return lambda p={}: func(self.p0 | p)
+        simsload = np.load(f"{self.path}/Fig2_sim.npz")  # Stacked kSZ signal of Main sample, all z bins, and from TNG and Illustris models
+        self.R = simsload['theta_arcmins'] *u.arcmin
+        self.kSZ_Illustris1 = simsload['gas_illustris'] *u.uK*u.arcmin**2
+        self.kSZ_TNG300 = simsload['dm_tng']  *u.uK*u.arcmin**2
+        self.kSZ = simsload['signal']  *u.uK*u.arcmin**2
 
-    def Nsat(self, logM):  # Eq 3
-        logM = logM-np.log10(self.h)
-        func = lambda p: Zheng2005().Ns(logM, M0=p['kappa']*10**p['logMcut'], M1=10**p['logM1'], alpha=p['alpha']) * self.Ncen(logM)(p)
-        return lambda p={}: func(self.p0 | p)
+        samplestr = {'main': '', 'extended': 'extended_', 'all': ''}[self.sample]
+        corrstr = {'corrected':'corr', 'uncorrected':''}[self.corr]
+        zstr = {'nocut': '', 'cut': 'sigmaz0.05000_'}[self.zoutcut]
+        filename = f"{self.path}/Fig1_Fig8_{samplestr}dr10_allfoot_perbin_{zstr}dr6_{corrstr}pzbin{self.zbin[-1]}.npz"
+
+        self.kSZ_data = np.load(filename)['prof'] *u.uK*u.arcmin**2
+        self.kSZ_cov = np.load(filename)['cov'] *(u.uK*u.arcmin**2)**2
+        self.kSZ_err = np.diag(self.kSZ_cov)**0.5
+        
+        
+from Models.TargetData import BaseTargetData
+class TargetData(BaseTargetData, Study):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
+    path = f"{DATA_PATH}/Hadzhiyska2024"  # Path to data from zenodo.org/records/12633573
+    subs = {
+        'zbin': ['z1', 'z2', 'z3', 'z4'],  # photometric redshift bin
+        'DR':['all', 'DR9', 'DR10'],
+        'sample': ['main', 'extended', 'all'],
+        'zoutcut': ['nocut', 'cut'],
+        'corr': ['corrected', 'uncorrected'],
+    }
+
+    def __init__(self, inputsdict, **inputvars):
+        self.setup(inputsdict | inputvars)
+        self.require(['zbin', 'DR', 'sample', 'zoutcut', 'corr'])
+
