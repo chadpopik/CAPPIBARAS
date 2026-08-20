@@ -254,7 +254,7 @@ class Measurement(Study):
             self.Cgg_data = f[f'dgg_{self.mbin}'][()]/(self.Cgg_ell*(self.Cgg_ell+1))*2*np.pi
             self.Cgy_data = f[f'dgy_{self.mbin}'][()]/(self.Cgy_ell*(self.Cgy_ell+1))*2*np.pi
             
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 class HaloProfile(BaseProfile, Study):  # Planck 2018 and SDSS BOSS CMASS DR12
     models = {'mbin':['M1', "M2", "M3", "M4"],}  # mass bin
     params = {

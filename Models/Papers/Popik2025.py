@@ -10,6 +10,8 @@ from config import *
 from Models.Papers.Figures.PlotsTables import BasePlots2, splittable, ParamTable
 thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Popik2025")
 
+from Models.Codes import mopc
+
 
 
 
@@ -40,7 +42,7 @@ class Projection(BaseProjection):
         self.dLOS = np.geomspace(r_min, r_max, N_LOS)
 
         # FHT setup, defines angular scale (ell/R) logspaced array of length N_RRHT 
-        self.rht = FFTs.RadialFourierTransformHankel(lrange=[np.floor(AngDist/r_max), np.ceil(AngDist/r_min)], n=N_RRHT, pad=pad)
+        self.rht = mopc.RadialFourierTransformHankel(lrange=[np.floor(AngDist/r_max), np.ceil(AngDist/r_min)], n=N_RRHT, pad=pad)
 
         # Radial distance from the profile center as a function of line of sight and angular offset
         self.r3D = np.sqrt(self.dLOS**2 + (self.rht.r[:,None])**2*AngDist**2)  # r values for LOS integration

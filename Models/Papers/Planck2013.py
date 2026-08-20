@@ -60,7 +60,7 @@ class Study(BaseStudy):  # Planck intermediate results. V. Pressure profiles of 
     info = {'Om0':0.3, 'Ol0':0.7,'h':0.7,'MassDef':'500c',
         }
     
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 from Models.Papers import Arnaud2010
 class Planck2013(BaseProfile, Study): # In progress
     models = {'cluster':['All', 'cool', 'noncool'],

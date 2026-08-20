@@ -106,7 +106,7 @@ class HOD(BaseHOD, Study):  # arxiv.org/abs/2204.02418
         'M_a': {'MS': {'r': 5.8, 'b': 32}, 'KVG': {'r': 3.6, 'b': 20}},  # 1e13 Msol
         'f_a': {'MS': {'r': 1.49, 'b': 0.88}, 'KVG': {'r': 1.27, 'b': 0.83}},  # factor in difference of concentration used in NFW from halo matter profile to average number density of satellite galaxies
     }
-    def __init__(self, inputsdict, **inputvars):
+    def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars, model=True)
 
     def Ncen(self, logM):  # Eq 36

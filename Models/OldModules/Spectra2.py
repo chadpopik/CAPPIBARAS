@@ -3,7 +3,7 @@ import astropy.units as u
 import astropy.constants as c
 from scipy.interpolate import RegularGridInterpolator
 
-import Models.FFTs as FFTs
+import CAPPIBARAS.Models.OldModules.FFTs as FFTs
 import Models.Studies as Studies
 import Models.HODs as HODs
 import Models.TargetData as TargetData

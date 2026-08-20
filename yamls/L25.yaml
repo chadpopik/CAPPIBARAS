@@ -1,0 +1,79 @@
+likelihood:
+    y_L25_z1:
+        class: SOLikelihoods.SOLikelihood
+
+        Measurement: {name: 'Liu2025', 'zbin':'z1', 'ACTDR':'DR6', 'Beta':'fiducial', 'dp':'dBeta', 'TCIB':'10.7'}
+        TargetData: {name: 'Liu2025', 'zbin':'z1', zNum: 10, zMin: 0.3, zMax: 0.7, logMhNum: 20, logMhMin: 10, logMhMax: 15}
+
+        HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'z1'}
+
+    y_L25_z2:
+        class: SOLikelihoods.SOLikelihood
+
+        Measurement: {name: 'Liu2025', 'zbin':'z2', 'ACTDR':'DR6', 'Beta':'fiducial', 'dp':'dBeta', 'TCIB':'10.7'}
+        TargetData: {name: 'Liu2025', 'zbin':'z2', zNum: 10, zMin: 0.5, zMax: 0.9, logMhNum: 20, logMhMin: 10, logMhMax: 15}
+
+        HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'z2'}
+
+    y_L25_z3:
+        class: SOLikelihoods.SOLikelihood
+
+        Measurement: {name: 'Liu2025', 'zbin':'z3', 'ACTDR':'DR6', 'Beta':'fiducial', 'dp':'dBeta', 'TCIB':'10.7'}
+        TargetData: {name: 'Liu2025', 'zbin':'z3', zNum: 10, zMin: 0.7, zMax: 1.1, logMhNum: 20, logMhMin: 10, logMhMax: 15}
+
+        HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'z3'}
+
+    y_L25_z4:
+        class: SOLikelihoods.SOLikelihood
+
+        Measurement: {name: 'Liu2025', 'zbin':'z4', 'ACTDR':'DR6', 'Beta':'fiducial', 'dp':'dBeta', 'TCIB':'10.7'}
+        TargetData: {name: 'Liu2025', 'zbin':'z4', zNum: 10, zMin: 0.9, zMax: 1.3, logMhNum: 20, logMhMin: 10, logMhMax: 15}
+
+        HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'z4'}
+
+
+shared:  # Aspects that are shared between all likelihoods
+    Cosmology: {name: 'pyccl', 'h': 0.6736, 'Omega_m': 0.3137, 'Omega_b': 0.0493, 'sigma8':0.811355, 'n_s': 0.9649, 'T_CMB': 2.725, 'XH': 0.76}
+    HaloModel: {name: 'pyccl', 'MassDef':'200c', 'MassFunc':'Tinker08', 'HaloBias': 'Tinker10', 'Concentration':'Diemer15'}
+
+    MapData: {name: 'Coulton2024'}
+
+    Projection: {name: 'Popik2026'}
+    BeamConvolution: {name: 'Popik2026'}
+    CAP: {name: 'Popik2026'}
+
+    Spectra: {name: 'Popik2026'}
+
+    Pressure: {name: 'Popik2026'}  # Profile model
+
+
+params:
+    P0: {latex: '\P_0', # GNFW Amplitude
+        prior: {min: 0.1, max: 20},
+        ref: {dist: norm, loc: 3, scale: 2},
+    }
+    xc_P: {latex: 'x_{c, P}', # Core Radius
+        prior: {min: 0.1, max: 5},
+        ref: {dist: norm, loc: 0.5, scale: 0.2},
+        # value: 0.5,
+    }
+    gamma: {latex: '\gamma_P', # Inner Slope
+        prior: {min: -2, max: -0.01},
+        ref: {dist: norm, loc: -0.2, scale: 0.1},
+        # value: -0.2,
+    }
+    alpha: {latex: '\alpha_P', # Intermediate slope
+        prior: {min: 0.1, max: 5},
+        ref: {dist: norm, loc: 0.8, scale: 0.3},
+        # value: 0.8,
+    }
+    beta: {latex: '\beta_P', # Outer slope
+        prior: {min: 1, max: 10},
+        ref: {dist: norm, loc: 2, scale: 1},
+        # value: 2
+    }
+
+    A_2h_P: {latex: 'A_{2h, P}', # two-halo amplitude
+        prior: {min: 0.5, max: 20},
+        ref: {dist: norm, loc: 3, scale: 2},
+    }

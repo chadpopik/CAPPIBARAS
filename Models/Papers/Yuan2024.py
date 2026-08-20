@@ -12,52 +12,122 @@ thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "
 
 from scipy.special import erf
 
-
-
-
-    #     'mdef': '200c',  # M not clear, maybe same as zheng 2005/2007? or cmass?
-    #     'MhMin': 1.3e11,  # Msun/h
-    #     'zMin': {'LRG1': 0.6, 'LRG2': 0.8, 'QSO': 2.1, 'LRG3': 0.95, 'LRG4': 0.8},
-    #     'zMax': {'LRG1': 0.4, 'LRG2': 0.6, 'QSO': 0.8, 'LRG3': 0.8, 'LRG4': 0.95},
-    
-    
 class Cosmology():
     # 1. Throughout this paper, we adopt the Planck 2018 ΛCDM cosmology, specifically the mean estimates of the Planck TT,TE,EE+lowE+lensing likelihood chains: Ω𝑐 ℎ2 = 0.1200,Ω𝑏 ℎ2 = 0.02237, 𝜎8 = 0.811355, 𝑛𝑠 = 0.9649, ℎ = 0.6736,𝑤0 = −1 and 𝑤𝑎 = 0
-    Oc0h2 = 0.1200
-    Ob0h2 = 0.02237
-    sigma8 = 0.811355
-    ns = 0.9649
-    h = 0.6736
-    w0 = -1
-    wa = 0
+    cosmoparams = {
+        'Oc0h2': 0.1200,
+        'Ob0h2': 0.02237,
+        'sigma8': 0.811355,
+        'ns': 0.9649,
+        'h': 0.6736,
+        'w0': -1,
+        'wa': 0
+    }
+    def __init__(self, inputdict={}, **inputvars):
+        for key, value in (self.cosmoparams | inputdict | inputvars).items(): setattr(self, key, value)
+
+        self.Omega_b = getattr(self, "Omega_b", self.Ob0h2 / self.h**2)
+        self.Omega_c = getattr(self, "Omega_c", self.Oc0h2 / self.h**2)
+
 
 class HaloModel():
-    pass
-
-
-# 4.1 For a LRG sample, the HOD is well approximated by a vanilla model given by (originally shown in Zheng et al. 2007 and referred to as Zheng07 or vanilla later in the text):
-class HOD_new():
-    MassDef = '??????'
-    def __init__(self, inputdict={}, **inputvars):
+    MassDef = '200c' # NOTE: figure this out
+    Concentration = 'Diemer15' # NOTE: figure this out too
+    def __init__(self, cosmology=None, inputdict={}, **inputvars):
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
         
-        try: self.p0 = Table3_4().getparams(Tracer=self.Tracer,Model=self.Model).to_dict()
-        except: self.p0 = {}
-        
-    def Ncen(self, pdict={}, **kwargs): # Eq 4
-        p = self.p0 | pdict | kwargs
-        return (p['fic']/2) * (1+erf((self.logM-p['logMcut'])/(np.sqrt(2)*p['sigma'])))
+        self.cosmology = cosmology or Cosmology()
 
-    def Nsat_LRG(self, pdict={}, **kwargs):  # Eq 5
-        p = self.p0 | pdict | kwargs
-        return np.where(10**self.logM>=p['kappa']*10**p['logMcut'], ((10**self.logM-p['kappa']*10**p['logMcut'])/10**p['logM1']), 0)**p['alpha'] * self.Ncen(pdict, **kwargs)
+        from Models.Codes import pyccl
+        self.pyccl = pyccl.HaloModel(            
+            Omega_b=self.cosmology.Omega_b,
+            Omega_c=self.cosmology.Omega_c,
+            h=self.cosmology.h,
+            sigma8=self.cosmology.sigma8,
+            n_s=self.cosmology.ns,
+            MassDef=self.MassDef,
+            Concentration = self.Concentration)
+         
+    def NFW_real(self, r, z, Mh):
+        return self.pyccl.NFW_r(r=r, z=z, logM=np.log10(Mh/u.Msun))
     
-    def Nsat_QSO(self, pdict={}, **kwargs):  # Eq 5
+    def NFW_fourier(self, k, z, Mh):
+        return self.pyccl.NFW_k(k=k, z=z, logM=np.log10(Mh/u.Msun), trunc=True, normalized=True)
+
+
+class HOD():
+    MassDef = '??????' # NOTE: figure this out
+    def __init__(self, logMh, cosmology=None, halomodel=None, inputdict={}, **inputvars):
+        for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
+        
+        self.cosmology = cosmology or Cosmology()
+        self.halomodel = halomodel or HaloModel(self.cosmology)
+
+        """Table 1, Table 2: Units of mass are in ℎ−1 𝑀⊙"""
+        self.Mh = 10**logMh/self.cosmology.h*u.Msun
+        self.logMh = np.log10(self.Mh/u.Msun)
+        
+        if hasattr(self, "r"):
+            from Models.Codes import mcfit
+            fft = mcfit.FFT(rs=self.r)  # setup FFT
+            self.k, self.FFT3D, self.IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
+
+        if hasattr(self, "k"):
+            self.NFW = self.halomodel.NFW_k(k=self.k, z=self.z, logM=self.logMh)
+            self.NFW_norm = self.NFW/self.NFW[0,:, :]
+            self.dirac = np.ones_like(self.k)[:, None, None]
+        
+        table = Table3_4()
+        missing = False
+        for col in ("Tracer", "Model"):  # validate each against the values in its table column
+            options = table.df[col].dropna().unique().tolist()
+            value = getattr(self, col, None)
+            if value is None:
+                print(f"No {col} specified. Valid {col} options: {options}")
+                missing = True
+            elif value not in options:
+                print(f"{col} '{value}' is not a valid option. Valid {col} options: {options}")
+                missing = True
+
+        if missing:
+            self.p0 = {}
+        else:
+            try: self.p0 = table.getparams(Tracer=self.Tracer, Model=self.Model).to_dict()
+            except: self.p0 = {}
+        
+
+    """4.1 Baseline Model"""
+    """For a LRG sample, the HOD is well approximated by a vanilla model
+    given by (originally shown in Zheng et al. 2007 and referred to as Zheng07 or vanilla later in the text): [Eq 4 & 5]"""
+    def Ncen(self, pdict={}, **kwargs):
         p = self.p0 | pdict | kwargs
-        return np.where(10**self.logM>=p['kappa']*10**p['logMcut'], ((10**self.logM-p['kappa']*10**p['logMcut'])/10**p['logM1']), 0)**p['alpha']
+        return (p['fic']/2) * (1+erf((self.logMh-p['logMcut'])/(np.sqrt(2)*p['sigma'])))
+
+    def Nsat_LRG(self, pdict={}, **kwargs):
+        p = self.p0 | pdict | kwargs
+        Mcut, M1 = 10**p['logMcut']*u.Msun, 10**p['logM1']*u.Msun
+        return np.where(self.Mh>=p['kappa']*Mcut, ((self.Mh-p['kappa']*Mcut)/M1), 0)**p['alpha'] * self.Ncen(pdict, **kwargs)
+    
+    """Thus, for satellite QSOs, we have [Eq 6]"""
+    def Nsat_QSO(self, pdict={}, **kwargs):
+        p = self.p0 | pdict | kwargs
+        logMcut = 10**p['logMcut']*u.Msun
+        M1 = 10**p['logM1']*u.Msun
+        return np.where(self.Mh>=p['kappa']*logMcut, ((self.Mh-p['kappa']*logMcut)/M1), 0)**p['alpha']
     
     def Nsat(self, pdict={}, **kwargs):
         return self.Nsat_LRG(pdict, **kwargs) if "LRG" in self.Tracer else self.Nsat_QSO(pdict, **kwargs)
+    
+    # NOTE: placeholder, needs normalization
+    def ucen(self, pdict={}, **kwargs):
+        return self.dirac
+    
+    # NOTE: placeholder
+    def usat(self, pdict={}, **kwargs):
+        return self.NFW_norm
+        
+    
+    
 
 
 class Table3_4(ParamTable):
@@ -131,6 +201,8 @@ class HODParamsTable(ParamTable):  # best-fit HOD parameters, Tables 3 & 4
 
 
 
+
+
 """Old implementation being phased out"""
 
 
@@ -152,48 +224,3 @@ class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2024MNRAS.530..947Y
     }
     info['MhMin'] = cycle(info['MhMin'], lambda M, h=info['h']: M*u.Msun/h)
     info['logMhMean'] = cycle(info['logMhMean'], lambda p, h=info['h']: np.log10(10**p/h))
-    
-from Models.HODs import BaseHOD
-from Models.Papers import Zheng2005
-class HOD(BaseHOD, Study):  # DESI 1% LRGs and QSO using ABACUSHOD
-    models = {'model':['Base', 'Ext'],  # model, Zheng07+fic or with added velocity bias
-            'sample': ['LRG1', 'LRG2', 'QSO', 'LRG3', 'LRG4'],  # sample of galaxies
-            }
-    params = {
-        # best-fit HOD parameters, Tables 3 & 4
-        "logM_cut": {'Base': {"LRG1": 12.89, "LRG2": 12.78, "QSO": 12.67, "LRG3": 12.89, "LRG4": 12.68},
-                     'Ext': {"LRG1": 12.79, "LRG2": 12.64, "QSO": 12.2}},  # Msun/h
-        "logM_1": {  # roughly sets the typical halo mass that hosts one satellite galaxy, Msun/h
-            'Base': {"LRG1": 14.08, "LRG2": 13.94, "QSO": 15.00, "LRG3": 13.96, "LRG4": 13.60},
-            'Ext': {"LRG1": 13.88, "LRG2": 13.71, "QSO": 14.7}},
-        "sigma": {   # controls the steepness of the transition from 0 to 1 in the number of central galaxies
-            'Base': {"LRG1": 0.27, "LRG2": 0.23, "QSO": 0.58, "LRG3": 0.37, "LRG4": 0.53},
-            'Ext': {"LRG1": 0.21, "LRG2": 0.09, "QSO": 0.12}},
-        "alpha": {  # power law index on the number of satellite galaxies
-            'Base':{"LRG1": 1.20, "LRG2": 1.07, "QSO": 1.09, "LRG3": 0.91, "LRG4": 0.72},
-            'Ext':{"LRG1": 1.07, "LRG2": 1.18, "QSO": 0.8}},
-        "kappa": {  # xMcut gives the minimum halo mass to host a satellite galaxy
-            'Base': {"LRG1": 0.65, "LRG2": 0.55, "QSO": 0.74, "LRG3": 0.74, "LRG4": 0.51},
-            'Ext': {"LRG1": 1.4, "LRG2": 0.6, "QSO": 0.6}},
-        "f_ic": { # incompleteness parameter which is a downsampling factor controlling the overall number density of the mock galaxies
-            'Base': {"LRG1": 0.92, "LRG2": 0.89, "QSO": 0.041, "LRG3": 0.92, "LRG4": 0.19},
-            'Ext': {"LRG1": 0.70, "LRG2": 0.62, "QSO": 0.019}},
-    }
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars, model=True)
-
-    def Ncen(self, logM):  # Eq 4
-        func = lambda p: Zheng2005.HOD().Nc(logM-np.log10(self.h), logMmin=p['logM_cut'], sigmalogM=np.sqrt(2)*p['sigma']) * p['f_ic']
-        return lambda p={}: func(self.p0 | p)
-
-    def Nsat(self, logM):
-        self.require(['sample'])
-        func1 = lambda p: Zheng2005.HOD().Ns(10**logM/self.h, M0=p['kappa']*10**p['logM_cut'], M1 = 10**p['logM_1'], alpha=p['alpha'])
-        if self.sample[:3]=='LRG': func = lambda p: func1(p) * self.Ncen(logM)(p)  # Eq 5
-        elif self.sample[:3]=='QSO': func = func1 # Eq 6
-        return lambda p={}: func(self.p0 | p)
-
-    # def nc(self, ks, zs, logM):
-    #     return lambda p={}: 1  # TODO: add velocity bias
-
-    # def ns(self, ks, zs, logM):

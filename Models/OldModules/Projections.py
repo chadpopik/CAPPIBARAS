@@ -11,7 +11,7 @@ import numpy as np
 import astropy.units as u
 import astropy.constants as c
 from scipy.interpolate import interp1d  # Do we need this? can we just use normal numpy?
-import Models.FFTs as FFTs
+import CAPPIBARAS.Models.OldModules.FFTs as FFTs
 from scipy.interpolate import RegularGridInterpolator
 
 

@@ -36,6 +36,9 @@ CAPPIBARAS_PATH = Path(__file__).resolve().parent
 
 # Machine-local paths (DATA_PATH, SOLIKET_PATH, OUTPUT_PATH) live in
 # config_local.py, which is gitignored so each checkout can set its own without churn.
+# DATA_PATH: location of any and all data used in the forward model (catalogs, measurements, target distributions, etc)
+# SOLIKET_PATH: location of the SOLikeT package
+# OUTPUT_PATH: location to put the output of cobaya jobs
 from config_local import DATA_PATH, SOLIKET_PATH, OUTPUT_PATH
 
 

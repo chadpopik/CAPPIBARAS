@@ -65,7 +65,7 @@ class Study(BaseStudy):  # The tau of galaxy clusters, ui.adsabs.harvard.edu/abs
     
     
     
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 class HaloProfiles(BaseProfile, Study):  # Density Profile from GADGET-2 hydro sims
     models = {'model':['AGN', 'SH'],}  # AGN feedback vs shock heating sub-grid physics models
     params = {

@@ -31,7 +31,7 @@ class Study(BaseStudy):  # arxiv.org/abs/2407.07152
 #     # }
 #     info = {'name':'Hadzhiyska 2025'}
 
-class Measurement(Study):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
+class Measurements(Study):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)
     path = f"{DATA_PATH}/Hadzhiyska2024"  # Path to data from zenodo.org/records/12633573
     subs = {
         'zbin': ['z1', 'z2', 'z3', 'z4'],  # photometric redshift bin
@@ -41,7 +41,7 @@ class Measurement(Study):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LI
         'corr': ['corrected', 'uncorrected'],
     }
 
-    def __init__(self, inputsdict, **inputvars):
+    def __init__(self, inputsdict={}, **inputvars):
         self.setup(inputsdict | inputvars)
         self.require(['zbin', 'DR', 'sample', 'zoutcut', 'corr'])
 
@@ -54,12 +54,12 @@ class Measurement(Study):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LI
         samplestr = {'main': '', 'extended': 'extended_', 'all': ''}[self.sample]
         corrstr = {'corrected':'corr', 'uncorrected':''}[self.corr]
         zstr = {'nocut': '', 'cut': 'sigmaz0.05000_'}[self.zoutcut]
-        filename = f"{self.path}/Fig1_Fig8_{samplestr}dr10_allfoot_perbin_{zstr}dr6_{corrstr}pzbin{self.zbin[-1]}.npz"
+        filename = f"{self.path}/Fig1_Fig8_{samplestr}dr10_allfoot_perbin_{zstr}dr6_{corrstr}_pzbin{self.zbin[-1]}.npz"
 
-        self.kSZ_data = np.load(filename)['prof'] *u.uK*u.arcmin**2
-        self.kSZ_cov = np.load(filename)['cov'] *(u.uK*u.arcmin**2)**2
-        self.kSZ_err = np.diag(self.kSZ_cov)**0.5
-        
+        self.TkSZ_data = np.load(filename)['prof'] *u.uK*u.arcmin**2
+        self.TkSZ_cov = np.load(filename)['cov'] *(u.uK*u.arcmin**2)**2
+        self.TkSZ_err = np.diag(self.TkSZ_cov)**0.5
+
         
 from Models.TargetData import BaseTargetData
 class TargetData(BaseTargetData, Study):  # Stacked kSZ measurement of ACT DR6 and DESI LRGs LIS DR9/10 (arxiv.org/abs/2407.07152)

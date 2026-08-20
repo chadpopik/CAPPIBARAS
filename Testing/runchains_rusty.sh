@@ -1,5 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=cobayarun_test
+# Usage: sbatch -J <job_name> runchains_rusty.sh [yaml_base_name]
+#   e.g. sbatch -J RG25_run2 runchains_rusty.sh RG25
+#   uses yamls/RG25.yaml and names the job/run_dir RG25_run2.
+#   -J overrides the --job-name default below; the yaml arg is optional and
+#   falls back to runchains.py's own default when omitted.
+#SBATCH --job-name=RG25_all_fix_gamma_alpha_beta
 
 #SBATCH --output=/mnt/ceph/users/cpopik/CAPPIBARAS_runs/%x/%x_%j.out
 #SBATCH --error=/mnt/ceph/users/cpopik/CAPPIBARAS_runs/%x/%x_%j.err
@@ -40,4 +45,4 @@ queue_seconds=$(( $(date -d "$start_time" +%s) - $(date -d "$submit_time" +%s) )
     echo "Queue wait: ${queue_seconds} seconds"
 } >> "${run_dir}/queue_time.txt"
 
-srun python runchains.py
+srun python runchains.py "$1"

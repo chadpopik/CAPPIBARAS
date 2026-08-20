@@ -24,16 +24,7 @@ class Data():
 
 
 
-from Models.Studies import BaseStudy, cycle
-class Study(BaseStudy):  # The Eleventh and Twelfth Data Releases of the Sloan Digital Sky Survey: Final Data from SDSS-III, ui.adsabs.harvard.edu/abs/2015ApJS..219...12A
-    subs = {'DR': ['DR10', 'DR12']
-    }
-    info = {
-        'area': {'DR12': 9376, 'DR10': 6373.2},
-        }
 
-    info['area'] = cycle(info['area'], lambda a: a *u.deg**2)
-    
 # class SDSSBOSS(BaseTargetData, Studies.Ahn2013Alam2015):  # (Ahn+ 2013, arxiv.org/abs/1307.7735, Alam+ 2015, https://arxiv.org/abs/1501.00963)
 #     path = '/global/cfs/projectdirs/sdss/data/sdss'   # Path of the data in NERSC
 #     if not os.path.isdir(path): # Path through a URL if not in NERSC

@@ -1,2 +1,2 @@
-from .SOLikelihoods import TSZLikelihood
-from .SOLikelihoods import KSZLikelihood
+from .Testing.SOLikelihoods_old import TSZLikelihood
+from .Testing.SOLikelihoods_old import KSZLikelihood

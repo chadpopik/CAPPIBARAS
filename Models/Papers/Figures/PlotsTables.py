@@ -100,6 +100,25 @@ class BasePlots2():
         w, h = cell['figsize']
         return self._plot([cell], 1, 1, width or w, height or h)
 
+    def panel_on(self, ax, row, col=None):
+        """Like panel(), but draws the paper's background image onto an
+        existing ax (in place) instead of creating a new figure, so it can
+        be dropped into a subplot grid someone else already built. The
+        given ax keeps its own figure and grid position; only its axis
+        limits/labels/scale and the overlaid image are set. Returns the
+        (transparent, non-interactive) image axis stacked behind it."""
+        if col is None:
+            matches = [c for r in self.subplots for c in r if c.get('name') == row]
+            if not matches:
+                raise KeyError(f"no subplot named {row!r}")
+            cell = matches[0]
+        else:
+            cell = self.subplots[row][col]
+        ax2 = ax.figure.add_subplot(ax.get_subplotspec(), frameon=False)
+        self.axsetup(ax, ax2, cell['filename'], cell['xlabel'], cell['ylabel'],
+                     cell['xlim'], cell['ylim'], cell['xscale'], cell['yscale'])
+        return ax2
+
     def row(self, i, width=None, height=None):
         cells = self.subplots[i]
         w = width or sum(c['figsize'][0] for c in cells)

@@ -7,6 +7,7 @@ arxiv.org/pdf/2306.06317
 
 
 from config import *
+from scipy.interpolate import interp1d
 from Models.Papers.Figures.PlotsTables import BasePlots2, ParamTable, splittable, read_wide_table
 thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Gao2023")
 
@@ -25,20 +26,37 @@ class HaloModel():
     MassDef = 'vir'  # Current Virial Mass
 
 
-class SHMR_new():
-    def __init__(self, inputdict={}, **inputvars):
-        for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
+class SHMR():
+    # The mass of a host halo Mh is defined as its current Mvir that is the mass enclosed by a virialized spherical structure with an over-density ∆vir (z) (Gunn & Gott 1972; Bryan & Norman 1998).
+    MassDef = 'vir'
+    
+    def __init__(self, model, logMh=None, logMs=None, cosmology=Cosmology(), **kwargs):
+        self.__dict__.update(locals())
+        
         try: self.p0 = Table3().getparams(model=self.model).to_dict()
         except: self.p0 = {}
+        
+        if self.logMh is not None:
+            self.Mh = 10**self.logMh/self.h*u.Msun
+            self.logMh = np.log10(self.Mh/u.Msun)
+            
+        elif self.logMs is not None:
+            self.logMh = np.linspace(10, 16, 1000)  # Covers the range of halo masses for interpolation
+            self.Mh = 10**self.logMh*u.Msun
+            self.Ms = 10**self.logMs*u.Msun
+            
 
     # 3.2 We adopt a double power-law function (Wang et al. 2006; Wang & Jing 2010; Yang et al. 2012; Moster et al. 2013) to parameterize the⟨M∗|Mh⟩: Eq 6, where M0 divides the SHMR into two parts with different slopes α and β, and k is a normalization constant.
-    def log10Mstar(self, pdict={}, **kwargs):
+    def logMstar(self, pdict={}, **kwargs):
         p = self.p0 | pdict | kwargs
-        logMh = self.logMh - np.log10(Cosmology.h)  # Mh/h -> Mh
-        Mh, M0, k = 10**logMh, 10**p['log10M0'], 10**p['log10k']
-
-        Mstar = 2*k / ((Mh/M0)**(-p['beta']) + (Mh/M0)**(-p['alpha']))
+        M0, k = 10**p['log10M0']*u.Msun, 10**p['log10k']
+        Mstar = 2*k / ((self.Mh/M0)**(-p['alpha']) + (self.Mh/M0)**(-p['beta']))
         return np.log10(Mstar)
+    
+    def logMhalo(self, pdict={}, **kwargs):
+        logMstar_interp = self.logMstar(pdict, **kwargs)
+        return interp1d(logMstar_interp, self.logMh, bounds_error=False, fill_value='extrapolate', kind='linear')(self.logMs)
+
 
 
 # TABLE 3. Best-fit parameters of the SHMRs for different Psat models. Note—The first two columns represent the constant Psatmodel, and the third column denotes the halo mass-dependentPsat(Mh) model. The check marks in the first four rows indicate which observational quantities are used in the fit. The best-fit model parameters as well as 1σ uncertainties are shown in the remaining rows.
@@ -87,19 +105,9 @@ class Fig2(BasePlots2):
 """Old implementation I'm phasing out"""
 
 
-from Models.Studies import BaseStudy, cycle
-class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2023ApJ...954..207G
-    subs = {}
-    info = {        
-        # fixed cosmo info
-        'h':0.71, 'Om0':0.268, 'Ol0':0.732,
-        'mdef':'vir',  # Current Virial Mass
-        'area': 140,  # covering 20 separate ”rosette” areas, each of which is approximately 7 deg2.
-    }
-    info['area'] = cycle(info['area'], lambda a: a*u.deg**2)
 
 
-class SHMR(Study):  # DESI 1% (arxiv.org/abs/2306.06317)
+class SHMR_old():  # DESI 1% (arxiv.org/abs/2306.06317)
     models = {'model':["Auto", "Cross", "Psat"],}
     params = {
         # best-fit SHMR parameters, Table 3
@@ -125,10 +133,8 @@ class SHMR(Study):  # DESI 1% (arxiv.org/abs/2306.06317)
         return lambda p={}: func(self.p0 | p)
     
 
-from Models.TargetData import BaseTargetData
-from Models import HaloModels
 from scipy.interpolate import RegularGridInterpolator
-class TargetData(BaseTargetData, Study):  # DESI 1% LRGs and ELGs (Gao+ 2023, arxiv.org/abs/2306.06317)
+class TargetData():  # DESI 1% LRGs and ELGs (Gao+ 2023, arxiv.org/abs/2306.06317)
     path = f"{DATA_PATH}/Gao2023"
     subs = {'sample':['LRG', 'ELG']}  # Galaxy Sample
 

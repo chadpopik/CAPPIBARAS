@@ -93,7 +93,7 @@ class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2021ApJ...919....2M
     info = Amodeo2021.Study.info
 
 
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 from Models.Papers import Battaglia2012, Battaglia2016
 from Models import HaloModels
 class Moser2021(BaseProfile, Study):  # TODO in progress
@@ -194,7 +194,6 @@ class Moser2021(BaseProfile, Study):  # TODO in progress
         self.require(['dndlogm', 'bh', 'Plin'])  # required functions
         fft = HaloModels.mcfit_package(rs=rs)  # setup FFT
         ks, FFT3D, IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
-        ks, zs, logMs = np.array(ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)  # Assign proper dimensions [nr, nz, nm]
 
         windfunc = lambda k: np.where(k*0.7 > 1/50, 1, 0)  # two-halo window function, [k]=1/Mpc
         prefac = self.bh(zs, logMs)*self.Plin(ks, zs)*windfunc(ks)  # collect factors outside int

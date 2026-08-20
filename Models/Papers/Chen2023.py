@@ -22,7 +22,7 @@ class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2023ApJ...953..188C
     info = {
         }
 
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 class HaloProfiles(BaseProfile, Study):  # https://arxiv.org/pdf/2201.12591
     models = {}
     params = {

@@ -55,7 +55,7 @@ class Study(BaseStudy):  # The universal galaxy cluster pressure profile from a 
     }
     
     
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 class HaloProfiles(BaseProfile, Study):  # Pressure Profile fit to REXCESS cluseters with XMM-Newton data
     models = {'model': ['norm', 'ST', 'coolcore', 'disturbed'],}  # different best-fit parameter sets
     params = {  # Eq 12

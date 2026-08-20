@@ -129,6 +129,8 @@ class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2021PhRvD.103f3513S
     info['MsMax'] = cycle(info['MsMax'], lambda M: M *u.Msun)
     info['MhMax'] = cycle(info['MhMax'], lambda M: M *u.Msun)
     
+    
+from Models import HaloModels
 class Measurements(Study):  # ACT DR5 maps stacked on SDSS BOSS DR10 (Schaan+ 2021, arxiv.org/abs/2009.05557)
     path = f"{DATA_PATH}/Schaan2021"  # path to data, shared by author
     subs = {
@@ -147,27 +149,31 @@ class Measurements(Study):  # ACT DR5 maps stacked on SDSS BOSS DR10 (Schaan+ 20
         measpath = f"{self.path}/{self.sample}_data_sharing_schaan21/f{self.freq}"  # each meas in different folder
         if self.sample=='cmass':
             self.R = np.genfromtxt(f"{measpath}/diskring_tsz_varweight_measured.txt").T[0] *u.arcmin
-            self.kSZ_data, self.kSZ_err = (np.genfromtxt(f"{measpath}/diskring_ksz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
-            self.tSZ_data, self.tSZ_err = (np.genfromtxt(f"{measpath}/diskring_tsz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
-            self.kSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_ksz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
-            self.tSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_tsz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.TkSZ_data, self.kSZ_err = (np.genfromtxt(f"{measpath}/diskring_ksz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.TtSZ_data, self.tSZ_err = (np.genfromtxt(f"{measpath}/diskring_tsz_varweight_measured.txt").T[1:] *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.TkSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_ksz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.TtSZ_cov = (np.genfromtxt(f"{measpath}/cov_diskring_tsz_varweight_bootstrap.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
 
         elif self.sample=='lowz':
             freqstr = str(int(self.freq))
             self.R = np.genfromtxt(f"{measpath}/ksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T[0] *u.arcmin
-            self.kSZ_data = (np.genfromtxt(f"{measpath}/ksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
-            self.tSZ_data = (np.genfromtxt(f"{measpath}/tsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
-            self.kSZ_cov = (np.genfromtxt(f"{measpath}/covksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
-            self.tSZ_cov = (np.genfromtxt(f"{measpath}/covtsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.TkSZ_data = (np.genfromtxt(f"{measpath}/ksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.TtSZ_data = (np.genfromtxt(f"{measpath}/tsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt") *u.uK*u.sr).to(u.uK*u.arcmin**2)
+            self.TkSZ_cov = (np.genfromtxt(f"{measpath}/covksz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
+            self.TtSZ_cov = (np.genfromtxt(f"{measpath}/covtsz_lowz_kendrick_pactf{freqstr}daynight20200228maskgal60r2.txt").T *(u.uK*u.sr)**2).to((u.uK*u.arcmin**2)**2)
 
-        for val in ['kSZ', 'tSZ']:  # get errors from covariance matrices
+        for val in ['TkSZ', 'TtSZ']:  # get errors from covariance matrices
             setattr(self, f'{val}_err', np.diag(getattr(self, f'{val}_cov'))**0.5) 
 
         # Convert to y units
+        
+        x = (c.h * np.float32(self.freq)*u.GHz / (c.k_B * self.T_CMB)).decompose().value
+        fnu = x / np.tanh(x / 2.0) - 4.0
+        convfac = 1/(self.T_CMB.to(u.uK*fnu))
 
-        # convfac = 1/HaloModels.y_to_uK(np.float32(self.freq)*u.GHz, self.T_CMB)
-        # self.y_data = self.TtSZ_data*convfac
-        # self.y_cov = self.TtSZ_cov*convfac**2
+        self.y_data = self.TtSZ_data*convfac
+        self.y_err = -self.TtSZ_err*convfac
+        self.y_cov = self.TtSZ_cov*convfac**2
         
         
 from Models.TargetData import BaseTargetData
@@ -185,11 +191,11 @@ class TargetData(BaseTargetData, Study):  # ACT DR5 maps stacked on SDSS BOSS DR
         self.catdist('z', self.bigdata_cmass[:, 2], qMin=zMin, qMax=zMax, dq=dz, qNum=zNum, densspace=self.area)
         
     def make_Msdist(self, halomodel, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None):
-        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.dfdata.z.max())-halomodel.Vcom(self.dfdata.z.min()))/(1+self.dfdata.z.mean())**3
+        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.bigdata_cmass.z.max())-halomodel.Vcom(self.bigdata_cmass.z.min()))/(1+self.bigdata_cmass.z.mean())**3
 
-        self.catdist('logMs', self.bigdata[:, 18], qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
+        self.catdist('logMs', self.bigdata_cmass[:, 18], qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
         
     def make_Mhdist(self, halomodel, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None):        
-        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.dfdata.z.max())-halomodel.Vcom(self.dfdata.z.min()))/(1+self.dfdata.z.mean())**3
+        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.bigdata_cmass.z.max())-halomodel.Vcom(self.bigdata_cmass.z.min()))/(1+self.bigdata_cmass.z.mean())**3
 
-        self.catdist('logMh', self.bigdata[:, 20], qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=vol)
+        self.catdist('logMh', self.bigdata_cmass[:, 20], qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=vol)

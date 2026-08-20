@@ -1,19 +1,20 @@
 """
 Generates the .sh script that runchains.py needs (Slurm sbatch script for
-rusty/nersc, or a tmux launcher for local), then submits it, mirroring
+rusty/nersc, or a tmux launcher for local), stages a frozen copy of the
+chosen yaml into the run directory, then submits it -- mirroring
 runchains_rusty.sh / runchains_NERSC.sh / runchains_local.sh by hand.
 
 Usage:
-    python submit_chain.py                                  # uses JOB_NAME/CLUSTER/etc. below
-    python submit_chain.py --job-name my_run
-    python submit_chain.py --job-name my_run --cluster nersc --time 04:00:00 --cpus-per-task 8
-    python submit_chain.py --job-name my_run --cluster local
-    python submit_chain.py --job-name my_run --dry-run      # write the .sh but don't submit
+    python submit_chain.py                                  # uses JOB_NAME/CLUSTER/YAML_NAME below
+    python submit_chain.py --job-name my_run --yaml RG25
+    python submit_chain.py --job-name my_run --yaml RG25 --cluster nersc --time 04:00:00 --cpus-per-task 8
+    python submit_chain.py --job-name my_run --yaml RG25 --cluster local
+    python submit_chain.py --job-name my_run --yaml RG25 --dry-run      # write the .sh but don't submit
 """
 
 import argparse
+import shutil
 import subprocess
-from pathlib import Path
 
 from config import *
 
@@ -21,15 +22,18 @@ from config import *
 # Everything a run needs, in one place. Edit these directly to change what a
 # plain `python submit_chain.py` submits; each one also has a matching --flag
 # (see parse_args) for a one-off override without touching this file.
+# Which cluster to use is picked here too (CLUSTER), by name into LAUNCHERS
+# at the bottom of this file.
 # ---------------------------------------------------------------------------
 JOB_NAME = "CobayaRunRusty_LiuJoint_1"  # also SLURM_JOB_NAME / run_dir name / tmux session name
+YAML_NAME = "runchainsRiedGuachalla_2"  # yamls/<name>.yaml -- staged into run_dir before submission
 CLUSTER = "rusty"  # "rusty", "nersc", or "local"
 
 NODES = 1
-# 4 MPI chains, for the Gelman-Rubin R-1 convergence check cobaya's mcmc sampler uses across independent chains. Only the rusty branch currently loads openmpi/installs mpi4py (see env_setup in build_script), so this default only actually parallelizes there; nersc still launches a single plain process (launch_cmd below), so pass --ntasks 1 there to avoid reserving 4 Slurm tasks for 1 process.
+# 4 MPI chains, for the Gelman-Rubin R-1 convergence check cobaya's mcmc sampler uses across independent chains. Only rusty currently loads openmpi/installs mpi4py (see RustyLauncher.env_setup), so this default only actually parallelizes there; nersc still launches a single plain process (NERSCLauncher.launch_cmd), so pass --ntasks 1 there to avoid reserving 4 Slurm tasks for 1 process.
 NTASKS = 4
 CPUS_PER_TASK = 4
-TIME = "1-00:00:00"
+TIME = "0-03:00:00"
 
 RUSTY_PARTITION = "gen"
 RUSTY_VENV = "/mnt/home/cpopik/soliket_cappibaras_venv"
@@ -38,20 +42,82 @@ NERSC_ACCOUNT = "mp107a"
 NERSC_QOS = "regular"
 NERSC_CONDA_ENV = "soliket-test2"
 
-# Shared by rusty and nersc, which differ in their Slurm resource directives
-# (plain partition vs constraint/account/qos), env setup (venv + openmpi vs
-# conda), and launch command (srun, for rusty's MPI chains, vs plain python).
-# `{resource_directives}`, `{env_setup}`, and `{launch_cmd}` are filled in
-# per-cluster in build_script(); every other placeholder comes from the
-# `common` dict there.
-# Any literal `{`/`}` that must survive into the bash output (the `${...}`
-# variable expansions and the `{ ... }` grouping block) is doubled to `{{`/`}}`
-# so str.format() doesn't try to interpret it as a field.
-SLURM_TEMPLATE = """#!/bin/bash
+class ClusterLauncher:
+    """
+    Base class for one cluster's script-generation + submission. Subclasses
+    fill in build_script() (render a template into a full .sh) and submit()
+    (hand that .sh to sbatch, or run it directly).
+
+    name: registry key -- must match a --cluster choice and a LAUNCHERS entry.
+    """
+    name = None
+
+    def __init__(self, job_name, yaml_name, nodes, ntasks, cpus_per_task, time):
+        self.job_name = job_name
+        self.yaml_name = yaml_name
+        self.nodes = nodes
+        self.ntasks = ntasks
+        self.cpus_per_task = cpus_per_task
+        self.time = time
+
+    @property
+    def run_dir(self):
+        # Where runchains.py's output/logs/queue-timing/staged yaml all land:
+        # OUTPUT_PATH/<job_name>, matching how runchains.py itself lays out
+        # its output directory.
+        return OUTPUT_PATH / self.job_name
+
+    def stage_yaml(self):
+        # Freeze yamls/<yaml_name>.yaml into run_dir/<job_name>.yaml *before*
+        # the job is submitted, so a queued/running job always uses the yaml
+        # as it looked at submission time -- editing yamls/<yaml_name>.yaml
+        # afterwards (to prep the next run) can't change a job already in
+        # flight. runchains.py looks for this file first and only falls back
+        # to reading yamls/<yaml_name>.yaml live if it isn't there.
+        src = CAPPIBARAS_PATH / "yamls" / f"{self.yaml_name}.yaml"
+        dst = self.run_dir / f"{self.job_name}.yaml"
+        shutil.copy2(src, dst)
+
+    def build_script(self):
+        raise NotImplementedError
+
+    def submit(self, sh_path):
+        raise NotImplementedError
+
+    def write_and_submit(self, dry_run):
+        # run_dir must exist before Slurm's --output/--error can be used, and
+        # before the yaml can be staged into it -- both must happen ahead of
+        # sbatch/tmux, not inside the job like runchains.py's own fallback
+        # mkdir does for a bare `python runchains.py`.
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        self.stage_yaml()
+
+        script_text = self.build_script()
+        sh_path = self.run_dir / f"{self.job_name}_{self.name}.sh"
+        sh_path.write_text(script_text)
+        sh_path.chmod(0o755)  # executable, so it can also be run/inspected by hand later
+        print(f"Wrote {sh_path}")
+
+        if dry_run:
+            print("--dry-run set, not submitting.")
+            return
+        self.submit(sh_path)
+
+
+class SlurmLauncher(ClusterLauncher):
+    """Shared by rusty/nersc: both render template and submit via sbatch."""
+
+    # `{resource_directives}`, `{env_setup}`, `{launch_cmd}`, `{out_path}`,
+    # and `{err_path}` are filled in per-cluster by subclasses; every other
+    # placeholder comes from build_script() below. Any literal `{`/`}` that
+    # must survive into the bash output (the `${...}` variable expansions and
+    # the `{ ... }` grouping block) is doubled to `{{`/`}}` so str.format()
+    # doesn't try to interpret it as a field.
+    template = """#!/bin/bash
 #SBATCH --job-name={job_name}
 
-#SBATCH --output={run_dir}/%x_%j.out
-#SBATCH --error={run_dir}/%x_%j.err
+#SBATCH --output={out_path}
+#SBATCH --error={err_path}
 
 #SBATCH --nodes={nodes}
 #SBATCH --ntasks={ntasks}
@@ -68,8 +134,9 @@ export COBAYA_USE_FILE_LOCKING=False
 cd {cappibaras_path}
 
 # run_dir is resolved from config.py's OUTPUT_PATH once, in Python, at script-
-# generation time (see build_script), so the #SBATCH --output/--error paths
-# above and this run_dir are guaranteed to agree without any manual syncing.
+# generation time (see ClusterLauncher.write_and_submit), so the #SBATCH
+# --output/--error paths above and this run_dir are guaranteed to agree
+# without any manual syncing.
 run_dir="{run_dir}"
 
 # Record time spent waiting in the SLURM queue (Submit -> Start).
@@ -90,12 +157,111 @@ queue_seconds=$(( $(date -d "$start_time" +%s) - $(date -d "$submit_time" +%s) )
 {launch_cmd}
 """
 
-# No Slurm involved: launches runchains.py in a detached tmux session instead,
-# so a run keeps going after the SSH/VSCode connection that started it drops.
-# The inner heredoc (delimited by LAUNCHEOF) is written out to its own file
-# and handed to tmux, rather than passed as an inline command string, because
-# nested quoting through tmux's own command parsing is fragile.
-LOCAL_TEMPLATE = """#!/bin/bash
+    def resource_directives(self):
+        raise NotImplementedError
+
+    def env_setup(self):
+        raise NotImplementedError
+
+    def launch_cmd(self):
+        raise NotImplementedError
+
+    def out_path(self):
+        # Fixed names rather than the usual %x_%j (job name + job id), so
+        # each run_dir always has one obvious output.out/error.err instead of
+        # a new pair per job id -- resubmitting under the same job name
+        # overwrites the previous run's logs rather than accumulating them.
+        # RustyLauncher overrides this to the literal %x-rooted directory
+        # form instead (matching runchains_rusty.sh), which is equivalent in
+        # practice -- %x expands to this same job_name -- but keeps the
+        # directive human-readable/copy-pasteable without a job name baked in.
+        return f"{self.run_dir}/output.out"
+
+    def err_path(self):
+        return f"{self.run_dir}/error.err"
+
+    def build_script(self):
+        return self.template.format(
+            job_name=self.job_name,
+            run_dir=self.run_dir,
+            cappibaras_path=CAPPIBARAS_PATH,
+            nodes=self.nodes,
+            ntasks=self.ntasks,
+            cpus_per_task=self.cpus_per_task,
+            time=self.time,
+            resource_directives=self.resource_directives(),
+            env_setup=self.env_setup(),
+            launch_cmd=self.launch_cmd(),
+            out_path=self.out_path(),
+            err_path=self.err_path(),
+        )
+
+    def submit(self, sh_path):
+        subprocess.run(["sbatch", str(sh_path)], check=True)
+
+
+class RustyLauncher(SlurmLauncher):
+    # Rusty: just a partition, no account. openmpi is loaded so mpi4py
+    # (installed into the venv) is available, letting cobaya's mcmc sampler
+    # run one chain per srun task and check convergence across them via
+    # Gelman-Rubin R-1 instead of a single-chain fallback.
+    name = "rusty"
+
+    def __init__(self, *, partition, venv, **kwargs):
+        super().__init__(**kwargs)
+        self.partition = partition
+        self.venv = venv
+
+    def resource_directives(self):
+        return f"#SBATCH --partition={self.partition}"
+
+    def env_setup(self):
+        return f"module load openmpi/4.1.8\nmodule load python/3.11.11\n\nsource {self.venv}/bin/activate"
+
+    def launch_cmd(self):
+        return "srun python runchains.py"
+
+    def out_path(self):
+        return f"{OUTPUT_PATH}/%x/output.out"
+
+    def err_path(self):
+        return f"{OUTPUT_PATH}/%x/error.err"
+
+
+class NERSCLauncher(SlurmLauncher):
+    # NERSC (Perlmutter): CPU constraint + QOS instead of a partition, conda
+    # instead of venv. mpi4py isn't set up in the conda env, so this still
+    # launches a single plain process; pass --ntasks 1 here or the job
+    # reserves 4 Slurm tasks for 1 process actually doing anything.
+    name = "nersc"
+
+    def __init__(self, *, account, qos, conda_env, **kwargs):
+        super().__init__(**kwargs)
+        self.account = account
+        self.qos = qos
+        self.conda_env = conda_env
+
+    def resource_directives(self):
+        return f"#SBATCH --constraint=cpu\n#SBATCH --account={self.account}\n#SBATCH -q {self.qos}"
+
+    def env_setup(self):
+        return f"module load python\n\nconda activate {self.conda_env}"
+
+    def launch_cmd(self):
+        return "python runchains.py"
+
+
+class LocalLauncher(ClusterLauncher):
+    # No Slurm involved: launches runchains.py in a detached tmux session
+    # instead, so a run keeps going after the SSH/VSCode connection that
+    # started it drops.
+    name = "local"
+
+    # The inner heredoc (delimited by LAUNCHEOF) is written out to its own
+    # file and handed to tmux, rather than passed as an inline command
+    # string, because nested quoting through tmux's own command parsing is
+    # fragile.
+    template = """#!/bin/bash
 # Run runchains.py in a detached tmux session so it keeps going if the
 # SSH/VSCode connection drops.
 #
@@ -113,8 +279,8 @@ if tmux has-session -t "$job_name" 2>/dev/null; then
 fi
 
 # Same run_dir (under config.py's OUTPUT_PATH) as the Slurm templates use.
-# submit_chain.py's main() already created it before writing/launching this
-# script, so nothing here needs to mkdir it.
+# ClusterLauncher.write_and_submit already created it before writing/launching
+# this script, so nothing here needs to mkdir it.
 run_dir="{run_dir}"
 # There's no Slurm job ID to key log filenames on locally, so use a timestamp
 # instead (mirrors the %j in the Slurm templates' --output/--error paths).
@@ -145,46 +311,51 @@ echo "Logs:    $out_file"
 echo "         $err_file"
 """
 
+    def __init__(self, *, venv, **kwargs):
+        super().__init__(**kwargs)
+        self.venv = venv
 
-def build_script(args):
-    """Render the .sh contents for args.cluster from the parsed CLI args."""
-    # Fields every template needs, regardless of cluster. run_dir is where
-    # runchains.py's output/logs/queue-timing all land: OUTPUT_PATH/<job_name>,
-    # matching how runchains.py itself lays out its output directory.
+    def build_script(self):
+        return self.template.format(
+            job_name=self.job_name,
+            run_dir=self.run_dir,
+            venv=self.venv,
+            cappibaras_path=CAPPIBARAS_PATH,
+            cpus_per_task=self.cpus_per_task,
+        )
+
+    def submit(self, sh_path):
+        # local has no scheduler to hand off to, so just run the launcher
+        # script directly; it backgrounds itself via tmux.
+        subprocess.run(["bash", str(sh_path)], check=True)
+
+
+LAUNCHERS = {"rusty": RustyLauncher, "nersc": NERSCLauncher, "local": LocalLauncher}
+
+
+def make_launcher(args):
+    """Build the ClusterLauncher for args.cluster from the parsed CLI args."""
     common = dict(
         job_name=args.job_name,
-        cappibaras_path=CAPPIBARAS_PATH,
-        run_dir=OUTPUT_PATH / args.job_name,
+        yaml_name=args.yaml,
         nodes=args.nodes,
         ntasks=args.ntasks,
         cpus_per_task=args.cpus_per_task,
         time=args.time,
     )
     if args.cluster == "rusty":
-        # Rusty: just a partition, no account. openmpi is loaded so mpi4py
-        # (installed into the venv) is available, letting cobaya's mcmc
-        # sampler run one chain per srun task and check convergence across
-        # them via Gelman-Rubin R-1 instead of a single-chain fallback.
-        resource_directives = f"#SBATCH --partition={args.partition}"
-        env_setup = f"module load openmpi/4.1.8\nmodule load python/3.11.11\n\nsource {args.venv}/bin/activate"
-        return SLURM_TEMPLATE.format(**common, resource_directives=resource_directives, env_setup=env_setup, launch_cmd="srun python runchains.py")
+        return RustyLauncher(partition=args.partition, venv=args.venv, **common)
     if args.cluster == "nersc":
-        # NERSC (Perlmutter): CPU constraint + QOS instead of a partition, conda instead of venv.
-        # mpi4py isn't set up in NERSC_CONDA_ENV, so this still launches a single
-        # plain process; pass --ntasks 1 here or the job reserves 4 Slurm tasks
-        # for 1 process actually doing anything.
-        resource_directives = f"#SBATCH --constraint=cpu\n#SBATCH --account={args.account}\n#SBATCH -q {args.qos}"
-        env_setup = f"module load python\n\nconda activate {args.conda_env}"
-        return SLURM_TEMPLATE.format(**common, resource_directives=resource_directives, env_setup=env_setup, launch_cmd="python runchains.py")
-    # local: no Slurm fields needed beyond what's already in `common`.
-    return LOCAL_TEMPLATE.format(**common, venv=args.venv)
+        return NERSCLauncher(account=args.account, qos=args.qos, conda_env=args.conda_env, **common)
+    return LocalLauncher(venv=args.venv, **common)
 
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     # Names the job, the run's output directory, and (for local) the tmux session.
-    # Defaults to JOB_NAME/CLUSTER above, so this is only needed for a one-off override.
+    # Defaults to JOB_NAME/CLUSTER/YAML_NAME above, so these are only needed for a one-off override.
     p.add_argument("--job-name", default=JOB_NAME, help="Job name (also SLURM_JOB_NAME / run directory / tmux session name)")
+    p.add_argument("--yaml", default=YAML_NAME, help="yamls/<name>.yaml to stage into the run directory and use for this run")
     p.add_argument("--cluster", choices=["rusty", "nersc", "local"], default=CLUSTER)
     # Slurm resource knobs, shared across rusty/nersc; meaningless for local since
     # there's no scheduler there (cpus_per_task still sets OMP/MKL threads locally).
@@ -212,34 +383,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    script_text = build_script(args)
-
-    # Write the generated script into the same run_dir (OUTPUT_PATH/<job_name>)
-    # that the script's own --output/--error/queue_time.txt use, so everything
-    # for a given run lives in one place under OUTPUT_PATH instead of scattering
-    # a second copy of the folder structure back into the CAPPIBARAS checkout.
-    # This also satisfies Slurm's requirement that --output/--error's directory
-    # already exist at submission time (it can't create missing parent dirs).
-    # None of the generated .sh templates mkdir it themselves. runchains.py
-    # has its own fallback mkdir too, but only for a bare `python runchains.py`
-    # run that bypasses this script entirely.
-    run_dir = OUTPUT_PATH / args.job_name
-    run_dir.mkdir(parents=True, exist_ok=True)
-    sh_path = run_dir / f"{args.job_name}_{args.cluster}.sh"
-    sh_path.write_text(script_text)
-    sh_path.chmod(0o755)  # executable, so it can also be run/inspected by hand later
-    print(f"Wrote {sh_path}")
-
-    if args.dry_run:
-        print("--dry-run set, not submitting.")
-        return
-
-    # local has no scheduler to hand off to, so just run the launcher script
-    # directly; it backgrounds itself via tmux. rusty/nersc go through sbatch.
-    if args.cluster == "local":
-        subprocess.run(["bash", str(sh_path)], check=True)
-    else:
-        subprocess.run(["sbatch", str(sh_path)], check=True)
+    launcher = make_launcher(args)
+    launcher.write_and_submit(dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,127 @@
+likelihood:
+    # kSZ_RG25_all:
+    #     class: SOLikelihoods.SOLikelihood
+
+    #     Measurement: {name: 'RiedGuachalla2025','bin':'all'}
+    #     TargetData: {name: 'RiedGuachalla2025', 'bin':'all'}
+    #     MapData: {name: 'Coulton2024'}
+
+    #     HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'all'}
+
+    # kSZ_RG25_z1:
+    #     class: SOLikelihoods.SOLikelihood
+
+    #     Measurement: {name: 'RiedGuachalla2025','bin':'z_1'}
+    #     TargetData: {name: 'RiedGuachalla2025', 'bin':'z_1'}
+    #     MapData: {name: 'Coulton2024'}
+
+    #     HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'z1'}
+
+    # kSZ_RG25_z2:
+    #     class: SOLikelihoods.SOLikelihood
+
+    #     Measurement: {name: 'RiedGuachalla2025','bin':'z_2'}
+    #     TargetData: {name: 'RiedGuachalla2025', 'bin':'z_2'}
+    #     MapData: {name: 'Coulton2024'}
+
+    #     HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'z2'}
+
+    # kSZ_RG25_z3:
+    #     class: SOLikelihoods.SOLikelihood
+
+    #     Measurement: {name: 'RiedGuachalla2025','bin':'z_3'}
+    #     TargetData: {name: 'RiedGuachalla2025', 'bin':'z_3'}
+    #     MapData: {name: 'Coulton2024'}
+
+    #     HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'z3'}
+
+    # kSZ_RG25_z4:
+    #     class: SOLikelihoods.SOLikelihood
+
+    #     Measurement: {name: 'RiedGuachalla2025','bin':'z_4'}
+    #     TargetData: {name: 'RiedGuachalla2025', 'bin':'z_4'}
+    #     MapData: {name: 'Coulton2024'}
+
+    #     HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'z4'}
+
+    kSZ_RG25_m1:
+        class: SOLikelihoods.SOLikelihood
+
+        Measurement: {name: 'RiedGuachalla2025','bin':'mass_1'}
+        TargetData: {name: 'RiedGuachalla2025', 'bin':'mass_1'}
+        MapData: {name: 'Coulton2024'}
+
+        HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'all'}
+
+    kSZ_RG25_m2:
+        class: SOLikelihoods.SOLikelihood
+
+        Measurement: {name: 'RiedGuachalla2025','bin':'mass_2'}
+        TargetData: {name: 'RiedGuachalla2025', 'bin':'mass_2'}
+        MapData: {name: 'Coulton2024'}
+
+        HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'all'}
+
+    kSZ_RG25_m3:
+        class: SOLikelihoods.SOLikelihood
+
+        Measurement: {name: 'RiedGuachalla2025','bin':'mass_3'}
+        TargetData: {name: 'RiedGuachalla2025', 'bin':'mass_3'}
+        MapData: {name: 'Coulton2024'}
+
+        HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'all'}
+
+    kSZ_RG25_m4:
+        class: SOLikelihoods.SOLikelihood
+
+        Measurement: {name: 'RiedGuachalla2025','bin':'mass_4'}
+        TargetData: {name: 'RiedGuachalla2025', 'bin':'mass_4'}
+        MapData: {name: 'Coulton2024'}
+
+        HOD: {name: 'Hadzhiyska2025B', 'Sample': 'MainLRGs', 'Bin':'all'}
+
+
+shared:  # Aspects that are shared between all likelihoods
+    Cosmology: {name: 'pyccl', 'h': 0.6736, 'Omega_m': 0.3137, 'Omega_b': 0.0493, 'sigma8':0.811355, 'n_s': 0.9649, 'T_CMB': 2.725, 'XH': 0.76}
+    HaloModel: {name: 'pyccl', 'MassDef':'200c', 'MassFunc':'Tinker08', 'HaloBias': 'Tinker10', 'Concentration':'Diemer15'}
+    'SHMR': {'name': 'Gao2023', 'model':'Psat', 'Concentration': 'Duffy08'}
+
+    Projection: {name: 'Popik2026'}
+    BeamConvolution: {name: 'Popik2026'}
+    CAP: {name: 'Popik2026'}
+
+    Spectra: {name: 'Popik2026'}
+
+    Density: {name: 'Popik2026'}  # Profile model
+
+
+params:
+    rho0: {latex: '\rho_0', # GNFW Amplitude
+        prior: {min: 0.1, max: 20},
+        ref: {dist: norm, loc: 3, scale: 2},
+    }
+    xc_rho: {latex: 'x_{c, \rho}', # Core Radius
+        # prior: {min: 0.1, max: 5},
+        # ref: {dist: norm, loc: 0.5, scale: 0.2},
+        value: 0.5,
+    }
+    gamma_rho: {latex: '\gamma_\rho', # Inner Slope
+        # prior: {min: -2, max: -0.01},
+        # ref: {dist: norm, loc: -0.2, scale: 0.1},
+        value: -0.2,
+    }
+    alpha_rho: {latex: '\alpha_\rho', # Intermediate slope
+        # prior: {min: 0.1, max: 5},
+        # ref: {dist: norm, loc: 0.8, scale: 0.3},
+        value: 0.8,
+    }
+    beta_rho: {latex: '\beta_\rho', # Outer slope
+        prior: {min: 1, max: 10},
+        ref: {dist: norm, loc: 2, scale: 1},
+        # value: 2
+    }
+
+    A_2h_rho: {latex: 'A_{2h, \rho}', # two-halo amplitude
+        prior: {min: 0.5, max: 20},
+        ref: {dist: norm, loc: 3, scale: 2},
+    }

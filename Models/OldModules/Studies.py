@@ -46,7 +46,8 @@ class BaseStudy:
                 setattr(self, infokey, spefval)  # try to use it to narrow it down
 
             if isinstance(getattr(self, infokey), dict) or getattr(self, infokey) is None:
-                setattr(self, infokey, None) # set to none if it's still a dict
+                continue # ignore it if it's a dict
+                # setattr(self, infokey, None) # set to none if it's still a dict
             elif isinstance(getattr(self, infokey), str):
                 continue
             else:

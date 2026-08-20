@@ -133,22 +133,18 @@ class Fig20(BasePlots2):
 
 """Old implementation being phased out"""
 
-from Models.Studies import BaseStudy, cycle
-class Study(BaseStudy):  # ui.adsabs.harvard.edu/abs/2025PhRvD.112j3512R
-    subs = {}  # subset of galaxy selection
-    info = {
-        }
     
     
-class Measurements(Study):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs (arxiv.org/abs/2503.19870)
+class Measurement():  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs (arxiv.org/abs/2503.19870)
     path = f"{DATA_PATH}/RiedGuachalla2025"  # Path to data downloaded from zenodo.org/records/15081008
     subs = {
         'bin': ['all', 'z_1', 'z_2', 'z_3', 'z_4', 'mass_1', 'mass_2', 'mass_3', 'mass_4'],  # redshift/mass bin
     }
+    
+    observable = "TkSZ"
 
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
-        self.require(['bin'])
+    def __init__(self, bin, inputsdict={}, **inputvars):
+        self.bin = bin
 
         self.get_meas()  # get the measurements
 
@@ -173,78 +169,191 @@ class Measurements(Study):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRG
         
         
         
-from Models.TargetData import BaseTargetData
-from Models.Papers import Gao2023
-class TargetData(BaseTargetData, Study):  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs
+class TargetData():  # Stacked kSZ measurement of ACT DR6 and DESI Y1 LRGs
     path = f"{DATA_PATH}/RiedGuachalla2025"  # Path to data downloaded from zenodo.org/records/15081008
-    subs = {
-        'bin': ['all', 'z_1', 'z_2', 'z_3', 'z_4', 'mass_1', 'mass_2', 'mass_3', 'mass_4'],  # redshift/mass subsample
-    }
     
-    info = {
-        'area': 4300 *u.deg**2,  # overlapping region of ACT and DESI [deg^2], F1 and III.B.p4
-        'logMhMean': 13.4 *u.dimensionless_unscaled,  # Msun/littleh, estimated mean halo mass of LRG [Msun/h], III.B.p5
-        'zMin': {# spectroscopic redshift bins, III.B.p6
-            'all':0.4, 'z_1':0.4, 'z_2':0.6, 'z_3':0.8, 'z_4':0.95},
-        'zMax': {# spectroscopic redshift bins, III.B.p6
-            'all':1.1, 'z_1':0.6, 'z_2':0.8, 'z_3':0.95, 'z_4':1.1},
-        'logMsMin': {# stellar mass bins [Msun], III.B.p7
-            'all':10.5, 'mass_1':10.5, 'mass_2':11.2, 'mass_3':11.4, 'mass_4':11.6},
-        'logMsMax': {# stellar mass bins [Msun], III.B.p7
-            'all':12.40, 'mass_1':11.2, 'mass_2':11.4, 'mass_3':11.6, 'mass_4':12.5},
-        'zMean': {# mean redshift, T2
-            'all':0.74, 'z_1':0.51, 'z_2':0.71, 'z_3':0.87, 'z_4':1.01, 'mass_1':0.76, 'mass_2':0.75, 'mass_3':0.71, 'mass_4':0.69},
-        'zMed': {# median redshift, T2
-            'all':0.75, 'z_1':0.51, 'z_2':0.71, 'z_3':0.87, 'z_4':1.01, 'mass_1':0.79, 'mass_2':0.76, 'mass_3':0.70, 'mass_4':0.67},
-        'MsMean': {'units': 1e11*u.Msun, # mean stellar mass , T2
-            'all':2.2, 'z_1':2.4, 'z_2':2.3, 'z_3':2.0, 'z_4':2.1, 'mass_1':1.2, 'mass_2':2.0, 'mass_3':3.0, 'mass_4':5.1},
-        'NGal': {# number of galaxies, T2
-            'all':825283, 'z_1':195877, 'z_2':235620, 'z_3':235620, 'z_4':96346, 'mass_1':244932, 'mass_2':320914, 'mass_3':194037, 'mass_4':53997},
-    }
-    
-    # Assume z/m bins have same m/z limits as all
-    for b in [1, 2, 3, 4]:
-        info['zMin'][f'mass_{b}'] = info['zMin']['all']
-        info['zMax'][f'mass_{b}'] = info['zMax']['all']
-        info['logMsMin'][f'z_{b}'] = info['logMsMin']['all']
-        info['logMsMax'][f'z_{b}'] = info['logMsMax']['all']
-    
-    def __init__(self, inputsdict={}, **inputvars):
-        self.setup(inputsdict | inputvars)
+    area = 4300 *u.deg**2  # overlapping region of ACT and DESI [deg^2], F1 and III.B.p4
+    logMhMean = 13.4 *u.dimensionless_unscaled  # Msun/littleh, estimated mean halo mass of LRG [Msun/h], III.B.p5
+    v_rms = 233*u.km/u.s  # rms line-of-sight velocity of LRGs, estimated from the halo model and the linear matter power spectrum, III.B.p5
+
+    def __init__(self, bin, 
+                 inputsdict={}, **inputvars):
+        self.bin = bin
+
+        # Table II keys its rows as 'Full sample'/'z1'.../'mass1'... rather than our 'all'/'z_1'.../'mass_1'...
+        csvbin = 'Full sample' if bin == 'all' else bin.replace('_', '')
+        p = Table2().getparams(Bin=csvbin)
+        # z bins don't quote stellar-mass limits, and mass/all bins don't quote redshift limits;
+        # fall back to the full sample's limits (which catdist further falls back from if still missing)
+        pall = Table2().getparams(Bin='Full sample') if bin != 'all' else p
+
+        self.zMean, self.zMed, self.NGal = p['zmean'], p['zmed'], int(p['N'])
+        self.MsMean = p['Mstar/1e11Msun'] * 1e11*u.Msun
+
+        # only set these when the paper actually quotes a value for this bin; leave the attribute
+        # undefined otherwise so downstream getattr(self, ..., <fallback>) calls fall back cleanly
+        for attr, val in [
+            ('zMin', p['zspecMin'] if not pd.isna(p['zspecMin']) else pall['zspecMin']),
+            ('zMax', p['zspecMax'] if not pd.isna(p['zspecMax']) else pall['zspecMax']),
+            ('logMsMin', p['logMstarMin'] if not pd.isna(p['logMstarMin']) else pall['logMstarMin']),
+            ('logMsMax', p['logMstarMax'] if not pd.isna(p['logMstarMax']) else pall['logMstarMax']),
+        ]:
+            if pd.notna(val): setattr(self, attr, val)
+
+        self.load_z_catalog()  # load redshifts of all galaxies in catalog
+        self.load_Ms_catalog()
         
-    def make_zdist(self, zMin=None, zMax=None, dz=None, zNum=None, **kwargs):
-        self.require(['bin'])  # require bin for file specification
+    def load_z_catalog(self):
         self.allcat_zs = dict(np.load(f"{self.path}/fig2_hist_z.npz"))  # load redshifts of all galaxies in catalog
         if self.bin[0]=='z': self.cat_zs = self.allcat_zs[f'{self.bin}']  # if zbin is specified, select for that subsample
         else: self.cat_zs = np.concatenate([self.allcat_zs[f'z_{i}'] for i in range(1, 5)])  # otherwise, get all of them
-
-        self.catdist('z', self.cat_zs, qMin=zMin, qMax=zMax, dq=dz, qNum=zNum, densspace=self.area)
         
-    def make_Msdist(self, halomodel, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None, **kwargs):
-        self.require(['bin'])  # require bin for file specification
+    def load_Ms_catalog(self):
         self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
         if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
         else: self.cat_Ms = np.concatenate([self.allcat_Ms[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
         self.cat_logMs = np.log10(self.cat_Ms)  # convert to log values
         
-        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.zMax)-halomodel.Vcom(self.zMin))/(1+self.zMean)**3
+    def make_zbins(self, zMin=None, zMax=None, zNum=None, dz=None, **kwargs):
+        zMin = zMin if zMin is not None else getattr(self, 'zMin', self.cat_zs.min())
+        zMax = zMax if zMax is not None else getattr(self, 'zMax', self.cat_zs.max())
+        zNum = zNum if zNum is not None else np.int32((zMax-zMin)/dz)
         
-        self.catdist('logMs', self.cat_logMs, qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
+        zbins = np.linspace(zMin, zMax, zNum)
+        z = (zbins[1:]+zbins[:-1])/2
+        dz = z[1]-z[0]
+        return zbins, z, dz
         
-    def make_Mhdist(self, halomodel, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None, **kwargs):
-        self.require(['bin'])  # require bin for file specification
-        self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
-        if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
-        else: self.cat_Ms = np.concatenate([self.allcat_Ms[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
-        self.cat_logMs = np.log10(self.cat_Ms)  # convert to log values
+    def N_z(self, zMin=None, zMax=None, zNum=None, dz=None, **kwargs):
+        zbins, z, dz = self.make_zbins(zMin=zMin, zMax=zMax, zNum=zNum, dz=dz)
+        return z, np.histogram(self.cat_zs, bins=zbins)[0]
+    
+    def dNdz(self, zMin=None, zMax=None, zNum=None, dz=None, **kwargs):
+        zbins, z, dz = self.make_zbins(zMin=zMin, zMax=zMax, zNum=zNum, dz=dz)
+        return z, np.histogram(self.cat_zs, bins=zbins)[0]/dz
+    
+    def n_z(self, zMin=None, zMax=None, zNum=None, dz=None, **kwargs):
+        zbins, z, dz = self.make_zbins(zMin=zMin, zMax=zMax, zNum=zNum, dz=dz)
+        return z, np.histogram(self.cat_zs, bins=zbins)[0]/self.area
+    
+    def dndz(self, zMin=None, zMax=None, zNum=None, dz=None, **kwargs):
+        zbins, z, dz = self.make_zbins(zMin=zMin, zMax=zMax, zNum=zNum, dz=dz)
+        return z, np.histogram(self.cat_zs, bins=zbins)[0]/dz/self.area
         
-        # Get function to convert stellar masses to halo masses
-        self.cat_logMh = Gao2023.SHMR({'model':'Psat'}).HSMR(self.cat_logMs)()  # Use SHMR of Gao 2023
-        # TODO: 1. is the Psat model the best to use?, 2. think this converts to virial mass
-        
-        vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(halomodel.Vcom(self.zMax)-halomodel.Vcom(self.zMin))/(1+self.zMean)**3
+    def vol(self, cosmology):
+        return (self.area/(4*np.pi*u.sr).to(u.deg**2))*(cosmology.Vcom(self.zMax)-cosmology.Vcom(self.zMin))/(1+self.zMean)**3
 
-        self.catdist('logMh', self.cat_logMh, qMin=logMhMin, qMax=logMhMax, dq=dlogMh, qNum=logMhNum, densspace=vol)
+    def make_logMsbins(self, logMsMin=None, logMsMax=None, logMsNum=None, dlogMs=None, **kwargs):
+        logMsMin = logMsMin if logMsMin is not None else getattr(self, 'logMsMin', self.cat_logMs.min())
+        logMsMax = logMsMax if logMsMax is not None else getattr(self, 'logMsMax', self.cat_logMs.max())
+        logMsNum = logMsNum if logMsNum is not None else np.int32((logMsMax-logMsMin)/dlogMs)
+
+        logMsbins = np.linspace(logMsMin, logMsMax, logMsNum)
+        logMs = (logMsbins[1:]+logMsbins[:-1])/2
+        dlogMs = logMs[1]-logMs[0]
+        return logMsbins, logMs, dlogMs
+
+    def N_logMs(self, logMsMin=None, logMsMax=None, logMsNum=None, dlogMs=None, **kwargs):
+        logMsbins, logMs, dlogMs = self.make_logMsbins(logMsMin=logMsMin, logMsMax=logMsMax, logMsNum=logMsNum, dlogMs=dlogMs)
+        return logMs, np.histogram(self.cat_logMs, bins=logMsbins)[0]
+
+    def dNdlogMs(self, logMsMin=None, logMsMax=None, logMsNum=None, dlogMs=None, **kwargs):
+        logMsbins, logMs, dlogMs = self.make_logMsbins(logMsMin=logMsMin, logMsMax=logMsMax, logMsNum=logMsNum, dlogMs=dlogMs)
+        return logMs, np.histogram(self.cat_logMs, bins=logMsbins)[0]/dlogMs
+
+    def n_logMs(self, cosmology, logMsMin=None, logMsMax=None, logMsNum=None, dlogMs=None, **kwargs):
+        logMsbins, logMs, dlogMs = self.make_logMsbins(logMsMin=logMsMin, logMsMax=logMsMax, logMsNum=logMsNum, dlogMs=dlogMs)
+        return logMs, np.histogram(self.cat_logMs, bins=logMsbins)[0]/self.vol(cosmology)
+
+    def dndlogMs(self, cosmology, logMsMin=None, logMsMax=None, logMsNum=None, dlogMs=None, **kwargs):
+        logMsbins, logMs, dlogMs = self.make_logMsbins(logMsMin=logMsMin, logMsMax=logMsMax, logMsNum=logMsNum, dlogMs=dlogMs)
+        return logMs, np.histogram(self.cat_logMs, bins=logMsbins)[0]/dlogMs/self.vol(cosmology)
+
+    def add_Mh_catalog(self, conversion):
+        if hasattr(self, 'logMsMin'):
+            self.logMhMin = conversion(self.logMsMin)[0]
+        if hasattr(self, 'logMsMax'):
+            self.logMhMax = conversion(self.logMsMax)[0]
+        if hasattr(self, 'logMsMean'):
+            self.logMhMean = conversion(self.logMsMean)[0]
+        self.cat_logMh = conversion(self.cat_logMs)
+
+    def make_logMhbins(self, logMhMin=None, logMhMax=None, logMhNum=None, dlogMh=None, **kwargs):
+        logMhMin = logMhMin if logMhMin is not None else getattr(self, 'logMhMin', self.cat_logMh.min())
+        logMhMax = logMhMax if logMhMax is not None else getattr(self, 'logMhMax', self.cat_logMh.max())
+        logMhNum = logMhNum if logMhNum is not None else np.int32((logMhMax-logMhMin)/dlogMh)
+
+        logMhbins = np.linspace(logMhMin, logMhMax, logMhNum)
+        logMh = (logMhbins[1:]+logMhbins[:-1])/2
+        dlogMh = logMh[1]-logMh[0]
+        return logMhbins, logMh, dlogMh
+
+    def N_logMh(self, logMhMin=None, logMhMax=None, logMhNum=None, dlogMh=None, **kwargs):
+        logMhbins, logMh, dlogMh = self.make_logMhbins(logMhMin=logMhMin, logMhMax=logMhMax, logMhNum=logMhNum, dlogMh=dlogMh)
+        return logMh, np.histogram(self.cat_logMh, bins=logMhbins)[0]
+
+    def dNdlogMh(self, logMhMin=None, logMhMax=None, logMhNum=None, dlogMh=None, **kwargs):
+        logMhbins, logMh, dlogMh = self.make_logMhbins(logMhMin=logMhMin, logMhMax=logMhMax, logMhNum=logMhNum, dlogMh=dlogMh)
+        return logMh, np.histogram(self.cat_logMh, bins=logMhbins)[0]/dlogMh
+
+    def n_logMh(self, cosmology, logMhMin=None, logMhMax=None, logMhNum=None, dlogMh=None, **kwargs):
+        logMhbins, logMh, dlogMh = self.make_logMhbins(logMhMin=logMhMin, logMhMax=logMhMax, logMhNum=logMhNum, dlogMh=dlogMh)
+        return logMh, np.histogram(self.cat_logMh, bins=logMhbins)[0]/self.vol(cosmology)
+
+    def dndlogMh(self, cosmology, logMhMin=None, logMhMax=None, logMhNum=None, dlogMh=None, **kwargs):
+        logMhbins, logMh, dlogMh = self.make_logMhbins(logMhMin=logMhMin, logMhMax=logMhMax, logMhNum=logMhNum, dlogMh=dlogMh)
+        return logMh, np.histogram(self.cat_logMh, bins=logMhbins)[0]/dlogMh/self.vol(cosmology)
 
 
-    # TODO: add 2D z/M distribution?
+    # def make_Msdist(self, cosmology, logMsMin=None, logMsMax=None, dlogMs=None, logMsNum=None, **kwargs):
+    #     self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
+    #     if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
+    #     else: self.cat_Ms = np.concatenate([self.allcat_Ms[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
+    #     self.cat_logMs = np.log10(self.cat_Ms)  # convert to log values
+        
+    #     vol = (self.area/(4*np.pi*u.sr).to(u.deg**2))*(cosmology.Vcom(self.zMax)-cosmology.Vcom(self.zMin))/(1+self.zMean)**3
+        
+    #     self.catdist('logMs', self.cat_logMs, qMin=logMsMin, qMax=logMsMax, dq=dlogMs, qNum=logMsNum, densspace=vol)
+        
+    # def make_Mhdist(self, cosmology=None, halomodel=None, MassDef=None, logMhMin=None, logMhMax=None, dlogMh=None, logMhNum=None, **kwargs):
+    #     self.allcat_Ms = dict(np.load(f"{self.path}/fig3_mass_dist.npz"))  # load stellar masses of all galaxies from file
+    #     if self.bin[0]=='m': self.cat_Ms = self.allcat_Ms[f'{self.bin}']  # if mbin is specified, select for that subsample
+    #     else: self.cat_Ms = np.concatenate([self.allcat_Ms[f'mass_{i}'] for i in range(1, 5)])  # otherwise, get all of them
+    #     self.cat_logMs = np.log10(self.cat_Ms)  # convert to log values
+
+
+    
+    
+    
+    #     def catdist(self, qName, qs, qMin=None, qMax=None, dq=None, qNum=None, densspace=None):
+    #     # Try to set range with input values first, then with info dict values, then just from data
+    #     qMin = qMin if qMin is not None else ((getattr(self, f'{qName}Min', None)*u.dimensionless_unscaled).value if getattr(self, f'{qName}Min', None) is not None else qs.min())
+    #     qMax = qMax if qMax is not None else ((getattr(self, f'{qName}Max', None)*u.dimensionless_unscaled).value if getattr(self, f'{qName}Max', None) is not None else qs.max())
+    #     # Pretty ranges, may use later
+    #     # if qmin is None: qmin = np.floor(qs.min()/dq)*dq  # default min
+    #     # if qmax is None: qmax = np.ceil(qs.max()/dq)*dq  # default max
+    #     # Try to get array size from input size of spacing
+    #     try: qNum = qNum if qNum is not None else np.int32((qMax-qMin)/dq)
+    #     except: raise ValueError("Must specify array spacing or length")
+
+    #     setattr(self, f'{qName}Bins', np.linspace(qMin, qMax, qNum))  # make linearly spaced bins
+    #     setattr(self, qName, (getattr(self, f'{qName}Bins')[1:]+getattr(self, f'{qName}Bins')[:-1])/2)  # center of bins
+    #     setattr(self, f'd{qName}', getattr(self, qName)[1]-getattr(self, qName)[0])  # width of the bins
+    #     setattr(self, f'N_{qName}', np.histogram(qs, bins=getattr(self, f'{qName}Bins'))[0])  # number distribution
+    #     setattr(self, f'dNd{qName}', getattr(self, f'N_{qName}')/getattr(self, f'd{qName}'))  # differential number distribution
+    #     if densspace is not None:  # if given area/volume, use that for the density
+    #         setattr(self, f'n_{qName}', getattr(self, f'N_{qName}')/densspace)  # number density distribution
+    #         setattr(self, f'dnd{qName}', getattr(self, f'dNd{qName}')/densspace)  # differential number density distribution
+
+
+    # # TODO: make 2D dist from samples with two values
+    # # def make_N_q1_q2(self, q1s, dq1, q2s, dq2, q1min=None, q1max=None, q2min=None, q2max=None):  # make 2D dist from samples with two values
+    # #     N_q1, q1cents, q1bins = self.make_N_q(q1s, dq1, q1min, q1max)  # make 1D dist of value 1
+    # #     N_q2, q2cents, q2bins = self.make_N_q(q2s, dq2, q2min, q2max)  # make 1D dist of value 1
+    # #     N_q1_q2, _, _ = np.histogram2d(q1s, q2s, bins=[q1bins, q2bins])  # make 2D number dist from hist
+    # #     # dNdq1dq2 = N /dq1/u.dex /dq2/u.dex  # apply units [dex^-2]
+    # #     return N_q1_q2, N_q1, N_q2, q1cents, q2cents
+
+    # def distave(self, q, qdist, qint=None):
+    #     qint = qint if qint is not None else q
+    #     return np.trapezoid(q*qdist, qint)/np.trapezoid(qdist, qint)

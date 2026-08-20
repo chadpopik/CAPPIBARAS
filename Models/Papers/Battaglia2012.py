@@ -150,7 +150,7 @@ class Study(BaseStudy):  # On the Cluster Physics of Sunyaev-Zel'dovich and X-Ra
         'mdef':'200c',  # Mass definition, S2p3/Eq11
     }
     
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 class HaloProfiles(BaseProfile, Study):  # Pressure Profile from GADGET-2 made hydro sims
     models = {}
     params = {        

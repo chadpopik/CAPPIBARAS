@@ -1,13 +1,12 @@
 """
-Rewrite of HaloModels.astropy_model with the inputs flipped: z is fixed at construction
-(as self.z) instead of being passed into every function call.
+Rewrite of HaloModels.astropy_model. Unlike the pyccl and colossus rewrites, z is passed
+into every function call rather than being fixed at construction.
 
-All unit handling (stripping astropy units) happens once in __init__, so the functions
-themselves just use self.z directly with no further unit handling.
+All unit handling (stripping astropy units) happens inside each function, so the caller
+can pass z as a bare number/array or as an astropy Quantity.
 
-z is reshaped in __init__ the same way z is reshaped in the pyccl and colossus rewrites,
-so results from all three line up. z may be left as None; __init__ never fails because
-it's missing, only whichever function actually needs it does.
+z is reshaped the same way z is reshaped in the pyccl and colossus rewrites, so results
+from all three line up.
 
 The original class in Models/HaloModels.py is untouched; this is a standalone rewrite.
 """
@@ -23,32 +22,50 @@ def unitinput(val, unit=u.dimensionless_unscaled):
     return (val if isinstance(val, u.Quantity) else val*unit).to(unit).value
 
 
-class astropy_model:  # https://docs.astropy.org/en/stable/cosmology/index.html
-    def __init__(self, z=None, Cosmology='Planck18', **cosmo_params):
-        cosmo = getattr(astropy.cosmology, Cosmology.capitalize())
-        self.cosmology = cosmo.clone(**(cosmo.parameters | cosmo_params))
+class Cosmology:  # https://docs.astropy.org/en/stable/cosmology/index.html
+    # Available preset cosmologies in astropy
+    available_cosmologies = list(astropy.cosmology.available)
+    # Available cosmo parameters to set in astropy cosmology 
+    cosmo_input_params = list(astropy.cosmology.Planck18.parameters.keys())
+    
+    def __init__(self, cosmo_name, **cosmo_params):
+        # Check if cosmo_name is in the list of available cosmologies
+        if cosmo_name not in self.available_cosmologies:
+            raise ValueError(f"Choose cosmology in {self.available_cosmologies}")
+        
+        # Get default cosmology and then update based on input cosmological parameters
+        cosmo_default = getattr(astropy.cosmology, cosmo_name)
+        self.cosmology = cosmo_default.clone(**(cosmo_default.parameters | cosmo_params))
+        
+        
         self.params = {(k[1:] if k.startswith('_') else k): v for k, v in self.cosmology.__dict__.items()}
 
-        z = None if z is None else unitinput(z)
-        self.z = None if z is None else np.array(z, ndmin=1)  # z axis
+    def _reshape_z(self, z):  # z axis
+        return None if z is None else np.array(unitinput(z), ndmin=1)
 
-    def H(self):  # Hubble function [km/s/Mpc], from self.z
-        return self.cosmology.H(self.z)
+    def H(self, z):  # Hubble function [km/s/Mpc]
+        z = self._reshape_z(z)
+        return self.cosmology.H(z)
 
-    def chi(self):  # comoving distance [Mpc], from self.z
-        return self.cosmology.comoving_distance(self.z)
+    def chi(self, z):  # comoving distance [Mpc]
+        z = self._reshape_z(z)
+        return self.cosmology.comoving_distance(z)
 
-    def dA(self):  # angular diameter distance [Mpc], from self.z
-        return self.cosmology.angular_diameter_distance(self.z)
+    def dA(self, z):  # angular diameter distance [Mpc]
+        z = self._reshape_z(z)
+        return self.cosmology.angular_diameter_distance(z)
 
-    def dL(self):  # luminosity distance [Mpc], from self.z
-        return self.cosmology.luminosity_distance(self.z)
+    def dL(self, z):  # luminosity distance [Mpc]
+        z = self._reshape_z(z)
+        return self.cosmology.luminosity_distance(z)
 
-    def rhoc(self):  # critical density [Msun/Mpc^3], from self.z
-        return self.cosmology.critical_density(self.z).to(u.Msun/u.Mpc**3)
+    def rhoc(self, z):  # critical density [Msun/Mpc^3]
+        z = self._reshape_z(z)
+        return self.cosmology.critical_density(z).to(u.Msun/u.Mpc**3)
 
-    def rhom(self):  # mean matter density [Msun/Mpc^3], from self.z
-        return self.rhoc() * self.params['Om0']
+    def rhom(self, z):  # mean matter density [Msun/Mpc^3]
+        return self.rhoc(z) * self.params['Om0']
 
-    def Vcom(self):  # comoving volume [Mpc^3], from self.z
-        return self.cosmology.comoving_volume(self.z)
+    def Vcom(self, z):  # comoving volume [Mpc^3]
+        z = self._reshape_z(z)
+        return self.cosmology.comoving_volume(z)

@@ -12,7 +12,7 @@ from config import *
 from Models.Papers.Figures.PlotsTables import BasePlots2, splittable, ParamTable, read_wide_table
 thispath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Figures", "Vikram2017")
 import Models.HaloModels as HaloModels
-from Models.Codes.colossus import colossus_model
+from Models.Codes import colossus
 from Models.Papers.Figures.PlotsTables import BasePlots2
 
 
@@ -29,7 +29,7 @@ class Cosmology():
         for key, value in (inputdict | inputvars).items(): setattr(self, key, value)
 
         if not hasattr(self, 'hmod'):
-            self.hmod = colossus_model(z=self.z, H0=self.h*100, Om0=self.Om0, Ob0=self.Ob0, sigma8=self.sigma8, ns=self.ns, flat=True)
+            self.hmod = colossus.HaloModel(z=self.z, H0=self.h*100, Om0=self.Om0, Ob0=self.Ob0, sigma8=self.sigma8, ns=self.ns, flat=True)
 
         for key in ['H', 'rho_c']:
             if not hasattr(self, key):
@@ -177,7 +177,7 @@ class Study(BaseStudy):  # A Measurement of the Galaxy Group-Thermal Sunyaev-Zel
     }
     
     
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 class Profiles(BaseProfile, Study):  # TODO in progress
     models = {}  # only one model
     params = { 
@@ -196,7 +196,6 @@ class Profiles(BaseProfile, Study):  # TODO in progress
         
         fft = HaloModels.mcfit_package(rs=rs)  # setup FFT
         ks, FFT3D, IFFT3D = fft.ks, fft.FFT3D, fft.IFFT3D  # Define ks and FFT functions
-        ks, zs, logMs = np.array(ks, ndmin=1)[:, None, None], np.array(zs, ndmin=1)[:, None], np.array(logMs, ndmin=1)  # Assign proper dimensions [nr, nz, nm]
 
         prefac = self.bh(zs, logMs)*self.Plin(ks, zs)  # collect factors outside int
         intfac = self.dndlogm(zs, logMs_2h)*self.bh(zs, logMs_2h)  # collect factors inside int: uses M200h instead of other

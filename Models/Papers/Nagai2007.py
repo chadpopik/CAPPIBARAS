@@ -125,7 +125,7 @@ class Study(BaseStudy):  # Effects of Galaxy Formation on Thermodynamics of the 
         'mu':0.59, 'mu_e':'1.14'
     }
     
-from Models.Profiles import BaseProfile
+from CAPPIBARAS.Models.OldModules.Profiles import BaseProfile
 class HaloProfile(BaseProfile, Study):  # Pressure Profile from GADGET-2 made hydro sims
     models = {
         'Run': ['Obs', 'CSF', 'NR'],  # Observed/cooling+SF sims/Non-rad sims

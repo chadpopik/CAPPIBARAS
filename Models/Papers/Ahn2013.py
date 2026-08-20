@@ -24,16 +24,6 @@ class Data():
 """Everything below this line is old"""
 
 
-
-from Models.Studies import BaseStudy, cycle
-class Study(BaseStudy):  # The Tenth Data Release of the Sloan Digital Sky Survey: First Spectroscopic Data from the SDSS-III Apache Point Observatory Galactic Evolution Experiment, ui.adsabs.harvard.edu/abs/2014ApJS..211...17A
-    subs = {'DR': ['DR10', 'DR12']
-    }
-    info = {
-        'area': {'DR12': 9376, 'DR10': 6373.2},
-        }
-
-    info['area'] = cycle(info['area'], lambda a: a *u.deg**2)
     
     
 # class SDSSBOSS(BaseTargetData, Studies.Ahn2013Alam2015):  # (Ahn+ 2013, arxiv.org/abs/1307.7735, Alam+ 2015, https://arxiv.org/abs/1501.00963)

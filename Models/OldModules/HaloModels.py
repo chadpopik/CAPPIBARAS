@@ -19,6 +19,7 @@ def unitinput(val, unit=u.dimensionless_unscaled):
     return (val if isinstance(val, u.Quantity) else val*unit).to(unit).value
 
 
+
 class BaseModel(Studies.BaseStudy):
     def setup(self, inputs):
         self.check_inputs(inputs, self.options)  # check inputs

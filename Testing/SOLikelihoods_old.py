@@ -3,10 +3,15 @@ Likelihood for SZ model
 
 """
 
+from CAPPIBARAS.Models.OldModules import FFTs, Profiles
 from config import *
 
 from typing import Optional, Sequence, Dict, Any
+
+from Models import TargetData, MapData, HaloModels, Projections, SHMRs, HODs, Dust, Measurements, Spectra2
+
 from cobaya.yaml import yaml_load_file
+
 sys.path.append(str(SOLIKET_PATH))
 from soliket.gaussian import GaussianData, GaussianLikelihood
 
@@ -23,23 +28,10 @@ class SZLikelihood(GaussianLikelihood):
     MapData: Optional[Dict[str, Any]] = None  # Map data (beams, responses, etc.)
     HOD: Optional[Dict[str, Any]] = None  # Halo Occupancy Distribution
     HaloModel: Optional[Dict[str, Any]] = None  # Halo Model
-    Spectra: Optional[Dict[str, Any]] = None  # Spectra/Averaging Calculation
 
     # Anything that should be used for multiple likelihoods should be defined in the initalize
     # Anything that is fixed should also be used here
-    def import_modules(self):
-        
-    
     def initialize(self):
-        for submodel in ['Measurement', 'Profile', 'Projection', 'TargetData', 'MapData', 'HOD', 'HaloModel']:
-            if VERBOSE: print("Importing and Initializing", submodel)
-            # Import the file of the submodel
-            module = importlib.import_module(f"Models.Papers.{getattr(self, submodel)['model']}")
-            # Get the specific class
-            cl = getattr(module, submodel)
-            # Initialize that class and set it as an attribute
-            setattr(submodel.lower(), cl(getattr(self, submodel)['spefs']))
-        
         if VERBOSE: print("Loading in Fixed Parameters and Data/Model Dictionaries from yaml file")
         # Load the yaml file
         yaml_info = yaml_load_file(YAML_FILE)
@@ -48,8 +40,17 @@ class SZLikelihood(GaussianLikelihood):
         # Get all fixed parameters in the params block that have a set value
         self.cosmopars = {k: v["value"] for k, v in yaml_info['params'].items() if isinstance(v, dict) and "value" in v}
 
+        if VERBOSE: print("Loading and Initializing Halo Model:", self.HaloModel['name'], self.HaloModel['spefs'])
+        self.halomodel = getattr(HaloModels, self.HaloModel['name'])(self.HaloModel['spefs'] | self.cosmopars)
 
+        if VERBOSE: print("Loading in Measurement Data:", self.Measurement['name'], self.Measurement['spefs'])
+        self.meas = getattr(Measurements, self.Measurement['name'])(self.Measurement['spefs'])
 
+        if VERBOSE: print("Loading in Map Data:", self.MapData['name'], self.MapData['spefs'])
+        self.mapdata = getattr(MapData, self.MapData['name'])(self.MapData['spefs'])
+
+        if VERBOSE: print("Loading in Target Data:", self.TargetData['name'], self.TargetData['spefs'])
+        self.targetdata = getattr(TargetData, self.TargetData['name'])(self.TargetData['spefs'])
         if VERBOSE: print("Making Redshift and Halo Mass Distributions:")
         # Construct redshift distribution
         self.targetdata.make_zdist(**self.TargetData)
@@ -57,7 +58,7 @@ class SZLikelihood(GaussianLikelihood):
         self.targetdata.make_Mhdist(halomodel=self.halomodel, **self.TargetData)
         if PaperCheck: self.print_datainfo()
 
-
+        if VERBOSE: print("Setting up Projection, Beam Convolution, Aperture methods:", self.Projection['name'], self.Projection['spefs'])
         zmean = self.targetdata.zMean if hasattr(self.targetdata, 'zMean') else self.targetdata.distave(self.targetdata.z, self.targetdata.dndz)
         self.proj = getattr(Projections, self.Projection['name'])(Rs=self.meas.R, AngDist=self.halomodel.dA(zmean), **self.Projection['spefs'])
         self.r = np.geomspace(self.proj.r3D.min(), self.proj.r3D.max(), self.Profile['nr'])  # r values for profile evaluation
